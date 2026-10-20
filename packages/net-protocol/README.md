@@ -36,6 +36,9 @@ const r = decodeServerMessage(event.data);
 if (r.ok && r.msg.t === 'snap') for (const a of r.msg.p) unpackSnapshotPlayer(a); // { id, x, ..., protected }
 ```
 
+Weapon durability: `inv.dur` (uses left per slot, `null` = never breaks), `dur` on ground items (`item+`, `welcome.items`)
+and the `broke` message (`{ t: 'broke', slot, weapon }`). The `dur` fields are optional, so older messages stay valid.
+
 Also exported: `CLIENT_MESSAGES` / `SERVER_MESSAGES` (each type with a description and `[spec, description]` per field),
 `serverMessage` / `clientMessage` (checked objects instead of strings), `makeFlags` / `readFlags`, `isValid(spec, value)`,
 `setEncodeChecks(false)` (skip encode checks if they ever cost too much), and the limits `MAX_NUMBER`, `MAX_STRING`, `MAX_ARRAY`,

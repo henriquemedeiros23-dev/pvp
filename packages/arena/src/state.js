@@ -1,6 +1,6 @@
 // The arena's inner state and the small helpers every part uses.
 
-import { RULES as defaultRules } from '@pvp/game-rules';
+import { RULES as defaultRules, weaponDurability, weaponWear } from '@pvp/game-rules';
 import { ARENA_DEFAULTS } from './tuning.js';
 
 // Accept a @pvp/seeded-random generator (or anything with next(), or a plain function).
@@ -35,7 +35,7 @@ export function createState({ island, rules = defaultRules, random, now = 0, tun
     chests: island.chests.map(c => ({ id: c.id, x: c.x, z: c.z, openUntil: 0 })),
     golden: null,           // { x, z } while a golden chest is waiting
     nextGolden: now + tune.firstGoldenMs,
-    items: new Map(),       // id -> { id, kind, weapon, x, y, z, expires }
+    items: new Map(),       // id -> { id, kind, weapon, x, y, z, expires, dur? (weapons: uses left or null) }
     projectiles: new Map(),
     mines: new Map(),
     out: [],
@@ -68,4 +68,8 @@ export const randInt = (r, min, max) => min + Math.floor(r.next() * (max - min +
 export const randPick = (r, list) => list[Math.floor(r.next() * list.length)];
 
 export const weaponDef = (A, id) => (Object.hasOwn(A.rules.WEAPONS, id) ? A.rules.WEAPONS[id] : undefined);
+/** Full durability of a weapon (uses before it breaks), or null = never breaks. */
+export const maxDurability = (A, id) => weaponDurability(id, A.rules.WEAPONS);
+/** Durability one use of the weapon costs (wearPerUse, default 1). */
+export const wearOf = (A, id) => weaponWear(id, A.rules.WEAPONS);
 export const heightOf = (A, p) => ((p.flags & 1) ? A.rules.CROUCH_HEIGHT : A.rules.PLAYER_HEIGHT);

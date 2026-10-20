@@ -19,11 +19,19 @@ weaponPrice('sniper');          // 200 (undefined for the basic weapon or an unk
 skinPrice('hat', 'crown');      // 300 (slot: 'color' | 'hat' | 'face' | 'back' | 'shirt')
 isBuyable('weapon', 'rocket');  // true ('weapon' or a skin slot)
 weaponsByRarity('legendary');   // ['sniper', 'rocket', 'mine']
+weaponDurability('sniper');     // 12 uses before it breaks (null = never breaks, e.g. the basic weapon)
+weaponWear('sniper');           // 1 = durability one use costs (the weapon's wearPerUse, default 1)
 
 validateRules(RULES);           // [] — empty means valid
 validateRules({ ...RULES, BASIC_WEAPON: 'sword' });
 // ['BASIC_WEAPON "sword" is not the basic weapon']
 ```
+
+**Durability:** every weapon has `durability` = how many uses (swing, shot, throw, rocket, mine) it lasts
+before it breaks and disappears, or `null` = never breaks. An optional `wearPerUse` (whole number, default 1)
+says how much one use costs. "Never breaks" is a setting on the weapon, not a special case for the basic weapon.
+Today: melee 40-60, pistol 60, shotgun 25, rifle 150, sniper 12, grenades 5, rocket launcher 6, mines 5,
+wooden sword `null`. `validateRules` reports a missing or bad `durability` / `wearPerUse`.
 
 Files: `src/player.js` (limits, timers, movement), `src/weapons.js` (weapons, heals, loot), `src/skins.js` (colors, outfits, default skin), `src/validate.js`, all re-exported from `src/index.js`.
 

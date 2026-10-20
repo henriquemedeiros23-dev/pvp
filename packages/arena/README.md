@@ -50,6 +50,16 @@ setInterval(() => {
 - Weapons behave only by their `type` (`melee`, `gun`, `throw`, `rocket`, `mine`) and numbers in the rules
   (`dmg`, `range`, `rate`, `spread`, `pellets`, `knock`, `speed`, `radius`, `fuse`, `maxActive`), never by id:
   a new weapon only needs a new entry in `@pvp/game-rules`.
+- **Durability** (from the rules' `durability` / `wearPerUse`, see `@pvp/game-rules`): each player weapon has
+  uses left (`getPlayer(id).dur`, parallel to `weapons`; `null` = never breaks). Every fire that passes the rate
+  check (swing, shot, throw, rocket, mine) costs `wearPerUse` and queues an `inv` (with `dur`) for that player.
+  At 0 the weapon is removed, the player gets `{ t: 'broke', slot, weapon }` then an `inv`, and the hand stays
+  on the same slot number (or the last slot if that one is gone). Its last use still fires.
+  Loadout weapons and chest loot start full. Ground items carry `dur`: a weapon dropped on knockout keeps
+  what it had left, and whoever picks it up gets exactly that.
+- **Decision (the boss can change it):** `leave(id, { alive: true })` returns plain weapon ids, so weapons put
+  back in the backpack are **full again** next time. Broken weapons are gone for good (they were taken out of
+  the backpack at `join` and are not returned).
 - Coins come only from chests. The arena keeps a player's coins (from `join`) for the 'coins' and 'inv' messages.
 
 Files: `src/state.js`, `src/players.js`, `src/chests.js`, `src/loot.js`, `src/combat.js`, `src/projectiles.js`,

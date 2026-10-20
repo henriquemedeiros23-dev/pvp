@@ -8,6 +8,7 @@ const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
 
 const isObject = v => v !== null && typeof v === 'object';
 const isPrice = v => typeof v === 'number' && Number.isFinite(v) && v >= 0;
+const isPosInt = v => Number.isInteger(v) && v > 0;
 
 /**
  * Validate a rules object shaped like this package's exports
@@ -32,6 +33,9 @@ export function validateRules(rules) {
       if (w.type !== undefined && !WEAPON_TYPES.includes(w.type)) problems.push(`weapon ${id}: unknown type "${w.type}"`);
       if (w.rarity !== undefined && !RARITIES.includes(w.rarity)) problems.push(`weapon ${id}: unknown rarity "${w.rarity}"`);
       if (w.price !== undefined && !isPrice(w.price)) problems.push(`weapon ${id}: price must be a number >= 0`);
+      if (w.durability === undefined) problems.push(`weapon ${id}: missing durability (null = never breaks)`);
+      else if (w.durability !== null && !isPosInt(w.durability)) problems.push(`weapon ${id}: durability must be null or a whole number > 0`);
+      if (w.wearPerUse !== undefined && !isPosInt(w.wearPerUse)) problems.push(`weapon ${id}: wearPerUse must be a whole number > 0`);
       if (w.type === 'gun') {
         for (const f of GUN_FIELDS) if (w[f] === undefined) problems.push(`weapon ${id}: gun missing ${f}`);
       }

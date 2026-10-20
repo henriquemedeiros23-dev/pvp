@@ -27,14 +27,15 @@ The exact rules live in `src/messages.js`.
 | `full` | – | Arena is full. |
 | `left` | – | You left (answer to `leave`). |
 | `snap` | `p` [snapshot player], `n` uint | 20 times a second: players near you, and how many are in the arena. |
-| `inv` | `weapons` [weapon id], `slot`, `bandages`, `medkits`, `coins`, `hp`, `picked?` string | Your inventory and health (`picked` = name of what you just picked up). |
+| `inv` | `weapons` [weapon id], `dur?` [uint or null], `slot`, `bandages`, `medkits`, `coins`, `hp`, `picked?` string | Your inventory and health (`picked` = name of what you just picked up). `dur` = uses left per slot, same order as `weapons`; `null` = never breaks. The max is the weapon's `durability` in `@pvp/game-rules`. |
+| `broke` | `slot` uint, `weapon` id | Your weapon in `slot` broke (durability 0) and is gone, e.g. show "Your Pistol broke!". An updated `inv` follows. |
 | `pjoin` | `id`, `name`, `skin` {color, hat, face, back, shirt} | A player joined. |
 | `pleave` | `id` | A player left. |
 | `pos` | `x, y, z` | Server put you back here (you moved too far too fast). |
 | `coins` | `amount`, `total` | You got coins. |
 | `chest` | `id`, `open` bool | A chest opened (true) or came back full (false). |
 | `golden` | `golden` {x, z} or null, `by?` string | Golden chest appeared, or `by` opened it. |
-| `item+` | `id`, `kind` weapon/bandage/medkit, `weapon` id or null, `x, y, z` | Item dropped on the ground. |
+| `item+` | `id`, `kind` weapon/bandage/medkit, `weapon` id or null, `x, y, z`, `dur?` uint or null | Item dropped on the ground. `dur` (weapons only) = uses left, it keeps them when picked up. Items in `welcome` have the same `dur?`. |
 | `item-` | `id`, `by?` player id | Item gone (`by` picked it up; missing = it expired). |
 | `shot` | `id` shooter, `w` weapon id, `from` vec3, `to` [vec3] | Gun fired; one `to` per bullet. |
 | `swing` | `id` | Melee swing. |

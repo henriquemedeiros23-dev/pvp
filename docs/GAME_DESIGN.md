@@ -17,6 +17,9 @@ Decided by the boss through 22 questions.
 - **Guns:** pistol, shotgun, rifle, sniper.
 - **Explosives:** grenades, rocket launcher, mines.
 - **Weapons:** you start with a basic wooden sword, find better weapons on the island, or buy them in the shop.
+- **Durability:** every weapon wears out a little each time you use it (each swing, shot, throw, rocket or mine).
+  When it reaches 0 it **breaks and disappears** from your inventory. There is no repair.
+  Some weapons can be set to never break (for now the basic weapon never breaks).
 - **Health:** heal only with bandages and medkits from chests or the ground.
 
 ## When you get knocked out

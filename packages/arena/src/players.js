@@ -1,7 +1,7 @@
 // Players: join, leave, movement updates (with anti-teleport), slot switch, healing.
 
 import { findSpawn } from '@pvp/world-gen';
-import { at, send, weaponDef } from './state.js';
+import { at, send, weaponDef, maxDurability } from './state.js';
 import { welcomeFor } from './snapshot.js';
 
 /** Heal kind -> the player field that counts it, and the rule with its limit. */
@@ -11,7 +11,7 @@ export const HEAL_SLOTS = Object.freeze({
 });
 
 export function inventoryMsg(p, picked) {
-  const msg = { t: 'inv', weapons: [...p.weapons], slot: p.slot, bandages: p.bandages, medkits: p.medkits, coins: p.coins, hp: p.hp };
+  const msg = { t: 'inv', weapons: [...p.weapons], dur: [...p.dur], slot: p.slot, bandages: p.bandages, medkits: p.medkits, coins: p.coins, hp: p.hp };
   if (picked !== undefined) msg.picked = picked;
   return msg;
 }
@@ -41,7 +41,8 @@ export function join(A, key, { name, skin, loadout = [], coins = 0 } = {}, now) 
     id: A.newId(), key, name: String(name ?? key), skin: { ...(skin ?? R.DEFAULT_SKIN ?? {}) },
     coins: Number.isInteger(coins) && coins >= 0 ? coins : 0,
     x: spot.x, y: 0, z: spot.z, ry: 0, pitch: 0, flags: 0,
-    hp: R.MAX_HP, weapons, slot: 0, bandages: 1, medkits: 0, lastFire: -Infinity, lastHeal: -Infinity,
+    // dur: uses left per slot (parallel to weapons), null = never breaks. Loadout weapons start full.
+    hp: R.MAX_HP, weapons, dur: weapons.map(w => maxDurability(A, w)), slot: 0, bandages: 1, medkits: 0, lastFire: -Infinity, lastHeal: -Infinity,
     protectUntil: now + R.SPAWN_PROTECT_MS, lastState: now,
   };
   A.players.set(p.id, p);
@@ -59,7 +60,11 @@ export function removePlayer(A, p) {
   if (A.byKey.get(p.key) === p.id) A.byKey.delete(p.key);
 }
 
-/** Leaves the arena. Alive: returns the non-basic weapons to put back in the backpack. */
+/**
+ * Leaves the arena. Alive: returns the non-basic weapons to put back in the backpack.
+ * Broken weapons are already gone; worn ones go back as plain ids (the backpack keeps no durability,
+ * so they are full again next time).
+ */
 export function leave(A, id, { alive = true } = {}) {
   const p = A.players.get(id);
   if (!p) return [];
