@@ -1,0 +1,13 @@
+{
+  "name": "@pvp/collision",
+  "version": "1.0.0",
+  "description": "Deterministic collision and movement math: box grid, circle vs box, player movement, rays vs boxes and cylinders.",
+  "type": "module",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "scripts": {
+    "test": "node --test"
+  }
+}
