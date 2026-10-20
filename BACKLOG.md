@@ -49,6 +49,7 @@ The live list is on GitHub Issues: https://github.com/henriquemedeiros23-dev/pvp
 | 17 | 🔲 | **Black triangle on the horizon, ruins too dark** | No black shapes in the sky; ruins look like light stone. |
 | 18 | 🔲 | **Joining/leaving: no timeout, backpack text late** | Join gives up with a message after a few seconds; backpack text is right after leaving. |
 | 19 | 🔲 | **Tests use a separate data file** | Tests never create accounts in the real data file. |
+| 20 | 🔲 | **Chest lid turned the wrong way** | The lid sits along the chest, opens like a real lid, and the lock is on the front. |
 
 ## Later ideas
 - Sounds and music
