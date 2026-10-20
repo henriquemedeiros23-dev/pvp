@@ -1,0 +1,13 @@
+{
+  "name": "@pvp/seeded-random",
+  "version": "1.0.0",
+  "description": "Deterministic seeded random numbers (mulberry32) for Node and the browser.",
+  "type": "module",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "scripts": {
+    "test": "node --test"
+  }
+}
