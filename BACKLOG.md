@@ -41,6 +41,15 @@ The live list is on GitHub Issues: https://github.com/henriquemedeiros23-dev/pvp
 | 15 | ✅ | **Server crashes on a bad web address** | A request like `/%E0` makes the server crash. It must answer 400 instead, with a test. |
 | 14 | 🔲 | **Package catalog** | `CATALOG.md` lists every package: what it does, how to use it, how deterministic it is. |
 
+## Phase 5: Polish (found while testing)
+
+| # | Status | Issue | What "done" means |
+|---|---|---|---|
+| 16 | 🔲 | **Menu: stickman preview hidden behind buttons** | You can see your skin next to the menu buttons, also on a phone. |
+| 17 | 🔲 | **Black triangle on the horizon, ruins too dark** | No black shapes in the sky; ruins look like light stone. |
+| 18 | 🔲 | **Joining/leaving: no timeout, backpack text late** | Join gives up with a message after a few seconds; backpack text is right after leaving. |
+| 19 | 🔲 | **Tests use a separate data file** | Tests never create accounts in the real data file. |
+
 ## Later ideas
 - Sounds and music
 - Ranking of top players
