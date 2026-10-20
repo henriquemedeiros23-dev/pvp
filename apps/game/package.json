@@ -1,0 +1,15 @@
+{
+  "name": "@pvp/game",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "three": "0.170.0",
+    "ws": "^8.22.0"
+  }
+}

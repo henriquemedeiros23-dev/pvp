@@ -7,6 +7,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
+import { createRequire } from 'node:module';
 import { WebSocketServer } from 'ws';
 import * as C from './shared/config.js';
 import { generateWorld, rayWorld, rayPlayer, findSpawn, nearbyBoxes, circleHitsBox } from './shared/world.js';
@@ -14,6 +15,9 @@ import { generateWorld, rayWorld, rayPlayer, findSpawn, nearbyBoxes, circleHitsB
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT) || 3000;
 const DATA_FILE = path.join(ROOT, 'data', 'accounts.json');
+// three.js may be installed here or hoisted to the workspace root.
+// Its "exports" hides package.json, so resolve the main file (build/three.cjs) and go up.
+const THREE_DIR = path.resolve(path.dirname(createRequire(import.meta.url).resolve('three')), '..');
 
 // ---------------------------------------------------------------- accounts
 let accounts = {};
@@ -101,9 +105,9 @@ function serveStatic(req, res) {
   let file;
   if (p === '/') p = '/index.html';
   if (p.startsWith('/shared/')) file = path.join(ROOT, p);
-  else if (p.startsWith('/three/')) file = path.join(ROOT, 'node_modules', 'three', p.slice(7));
+  else if (p.startsWith('/three/')) file = path.join(THREE_DIR, p.slice(7));
   else file = path.join(ROOT, 'public', p);
-  const allowed = [path.join(ROOT, 'public'), path.join(ROOT, 'shared'), path.join(ROOT, 'node_modules', 'three')];
+  const allowed = [path.join(ROOT, 'public'), path.join(ROOT, 'shared'), THREE_DIR];
   if (!allowed.some(dir => path.resolve(file).startsWith(dir + path.sep))) { res.writeHead(403); return res.end(); }
   fs.readFile(file, (err, data) => {
     if (err) { res.writeHead(404); return res.end('Not found'); }

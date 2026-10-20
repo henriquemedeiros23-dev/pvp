@@ -16,5 +16,11 @@ npm start
 ```
 
 Then open the address it prints. Phones on the same Wi-Fi can join too.
+Set `PORT` to use another port (default 3000). Run every test with `npm test`.
+
+## Layout
+
+- `apps/game/`: the game (server, phone/browser code, shared code). Accounts are saved in `apps/game/data/accounts.json`.
+- `packages/`: reusable packages, see [packages/README.md](packages/README.md).
 
 > Work in progress: the game is being split into reusable packages (see the backlog).

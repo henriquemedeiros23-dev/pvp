@@ -9,7 +9,7 @@ When the GitHub repo is ready, these move to GitHub Issues.
 
 | # | Status | Issue | What "done" means |
 |---|---|---|---|
-| 1 | 🔲 | **Set up the monorepo** | npm workspaces with a `packages/` folder, `apps/` folder, `npm test` runs every package's tests (node:test). The current code moves to `apps/game/` and still starts with `npm start`. |
+| 1 | ✅ | **Set up the monorepo** | npm workspaces with a `packages/` folder, `apps/` folder, `npm test` runs every package's tests (node:test). The current code moves to `apps/game/` and still starts with `npm start`. |
 | 2 | 🔲 | **Package `@pvp/seeded-random`** | Random numbers from a seed (same seed = same numbers). Helpers: range, pick, shuffle, chance. Tests prove it repeats exactly. |
 | 3 | 🔲 | **Package `@pvp/game-rules`** | Weapons, heals, skins, outfits, prices and limits as plain data, with a check that the data is valid. Taken from `shared/config.js`. |
 

@@ -1,17 +1,14 @@
 {
-  "name": "pvp-game",
+  "name": "pvp",
   "version": "1.0.0",
-  "description": "",
-  "main": "server.js",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
   "scripts": {
-    "start": "node server.js"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "dependencies": {
-    "three": "^0.170.0",
-    "ws": "^8.22.0"
-  },
-  "type": "module"
+    "start": "npm start --workspace=@pvp/game",
+    "test": "npm test --workspaces --if-present"
+  }
 }
