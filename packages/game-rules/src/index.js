@@ -8,7 +8,7 @@ import { deepFreeze } from './freeze.js';
 export * from './player.js';
 export {
   BASIC_WEAPON, WEAPON_TYPES, RARITIES, WEAPONS, HEALS, LOOT_TABLE,
-  weaponsByRarity, weaponPrice,
+  weaponsByRarity, weaponPrice, weaponDurability, weaponWear,
 } from './weapons.js';
 export { COLORS, OUTFITS, SKIN_SLOTS, DEFAULT_SKIN, skinPrice } from './skins.js';
 export { validateRules } from './validate.js';

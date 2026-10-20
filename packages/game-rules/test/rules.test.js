@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import * as rules from '../src/index.js';
 import {
   RULES, WEAPONS, COLORS, OUTFITS, DEFAULT_SKIN, LOOT_TABLE, HEALS, BASIC_WEAPON,
-  validateRules, weaponPrice, skinPrice, isBuyable, itemPrice, weaponsByRarity,
+  validateRules, weaponPrice, weaponDurability, weaponWear, skinPrice, isBuyable, itemPrice, weaponsByRarity,
 } from '../src/index.js';
 import { readFileSync } from 'node:fs';
 // Frozen copy of the old apps/game/shared/config.js (removed in #12), so the rules don't drift by accident.
@@ -15,11 +15,49 @@ test('real rules validate with zero problems', () => {
   assert.deepEqual(validateRules(RULES), []);
 });
 
+// The old file has no durability (issue #21 is packages only), so those fields are left out here.
+const withoutDurability = weapons => Object.fromEntries(Object.entries(weapons)
+  .map(([id, { durability, wearPerUse, ...w }]) => [id, w]));
+
 test('same named exports and values as the old apps/game/shared/config.js', () => {
   for (const [name, value] of Object.entries(oldConfig)) {
     assert.ok(name in rules, `missing export ${name}`);
-    assert.deepEqual(rules[name], value, `export ${name} differs`);
+    const ours = name === 'WEAPONS' ? withoutDurability(rules[name]) : rules[name];
+    const theirs = name === 'WEAPONS' ? withoutDurability(value) : value;
+    assert.deepEqual(ours, theirs, `export ${name} differs`);
   }
+});
+
+test('every weapon has a durability; the basic weapon never breaks', () => {
+  for (const [id, w] of Object.entries(WEAPONS)) {
+    assert.ok(w.durability === null || (Number.isInteger(w.durability) && w.durability > 0), id);
+  }
+  assert.equal(WEAPONS[BASIC_WEAPON].durability, null);
+  assert.equal(weaponDurability(BASIC_WEAPON), null);
+  assert.equal(weaponDurability('sniper'), 12);
+  assert.equal(weaponDurability('rifle'), 150);
+  assert.equal(weaponDurability('laser'), null);
+  assert.equal(weaponDurability('toString'), null);
+  assert.equal(weaponWear('pistol'), 1);
+  assert.equal(weaponWear('x', { x: { wearPerUse: 3 } }), 3);
+  assert.equal(weaponDurability('x', { x: { durability: 7 } }), 7);
+});
+
+test('bad durability and wearPerUse are reported', () => {
+  const r = copy();
+  delete r.WEAPONS.pistol.durability;
+  r.WEAPONS.sword.durability = 0;
+  r.WEAPONS.bat.durability = 2.5;
+  r.WEAPONS.axe.durability = '10';
+  r.WEAPONS.rifle.wearPerUse = 0;
+  r.WEAPONS.sniper.wearPerUse = 2; // fine
+  assert.deepEqual(validateRules(r), [
+    'weapon sword: durability must be null or a whole number > 0',
+    'weapon bat: durability must be null or a whole number > 0',
+    'weapon axe: durability must be null or a whole number > 0',
+    'weapon pistol: missing durability (null = never breaks)',
+    'weapon rifle: wearPerUse must be a whole number > 0',
+  ]);
 });
 
 test('gun without range is reported', () => {

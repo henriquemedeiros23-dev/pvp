@@ -26,3 +26,4 @@ Rules:
 - No dependency on the game app (`apps/`). Packages may depend on other `@pvp/*` packages.
 - Keep outside dependencies to a minimum.
 - `npm test` at the repo root runs every package's tests.
+- **Every new package must be added to [CATALOG.md](../CATALOG.md)** (the table and its own section). `npm run catalog:check` (part of `npm test`) fails if it is missing or does not follow this template.
