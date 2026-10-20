@@ -5,19 +5,27 @@ import { circleHitsBox } from '@pvp/collision';
 import {
   generateIsland, findSpawn, validateIsland, DEFAULT_SEED, ISLAND_RADIUS, PLAY_RADIUS, CHEST_RADIUS,
 } from '../src/index.js';
-import { generateWorld } from '../../../apps/game/shared/world.js';
+import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+
+// Frozen facts about the map the game used before (the old apps/game/shared/world.js, removed in #12).
+const OLD_MAP = JSON.parse(readFileSync(new URL('./fixtures/old-map.json', import.meta.url), 'utf8'));
 
 const plain = island => ({ boxes: island.boxes, chests: island.chests, goldenSpots: island.goldenSpots });
 
 test('default seed reproduces the old map from apps/game exactly', () => {
-  const old = generateWorld();
   const island = generateIsland();
   assert.equal(island.seed, DEFAULT_SEED);
   assert.equal(island.islandRadius, ISLAND_RADIUS);
   assert.equal(island.playRadius, PLAY_RADIUS);
-  assert.deepEqual(island.boxes, old.boxes);
-  assert.deepEqual(island.chests, old.chests);
-  assert.deepEqual(island.goldenSpots, old.goldenSpots);
+  assert.equal(island.boxes.length, OLD_MAP.boxes);
+  assert.equal(island.chests.length, OLD_MAP.chests);
+  assert.equal(island.goldenSpots.length, OLD_MAP.goldenSpots);
+  assert.deepEqual(island.boxes[0], OLD_MAP.firstBox);
+  assert.deepEqual(island.boxes.at(-1), OLD_MAP.lastBox);
+  assert.deepEqual(island.chests[0], OLD_MAP.firstChest);
+  const json = JSON.stringify({ boxes: island.boxes, chests: island.chests, goldenSpots: island.goldenSpots });
+  assert.equal(createHash('sha256').update(json).digest('hex'), OLD_MAP.sha256);
   assert.ok(island.boxes.length > 300, 'the map is not empty');
 });
 

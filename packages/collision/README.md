@@ -54,4 +54,4 @@ Notes:
 Fully deterministic. No randomness, no time, no globals: same inputs give the
 same outputs. `near()` returns boxes in the order they were given, so movement
 resolves walls in a fixed order. With the same numbers, `movePlayer` behaves
-exactly like the old code in `apps/game/shared/world.js`.
+exactly like the old game code (`apps/game/shared/world.js`, now removed).

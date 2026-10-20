@@ -5,8 +5,9 @@ import {
   RULES, WEAPONS, COLORS, OUTFITS, DEFAULT_SKIN, LOOT_TABLE, HEALS, BASIC_WEAPON,
   validateRules, weaponPrice, skinPrice, isBuyable, itemPrice, weaponsByRarity,
 } from '../src/index.js';
-// Old source of truth. Remove this drift check when issue #12 deletes the file.
-import * as oldConfig from '../../../apps/game/shared/config.js';
+import { readFileSync } from 'node:fs';
+// Frozen copy of the old apps/game/shared/config.js (removed in #12), so the rules don't drift by accident.
+const oldConfig = JSON.parse(readFileSync(new URL('./fixtures/old-config.json', import.meta.url), 'utf8'));
 
 const copy = () => structuredClone(RULES);
 
@@ -14,7 +15,7 @@ test('real rules validate with zero problems', () => {
   assert.deepEqual(validateRules(RULES), []);
 });
 
-test('same named exports and values as apps/game/shared/config.js', () => {
+test('same named exports and values as the old apps/game/shared/config.js', () => {
   for (const [name, value] of Object.entries(oldConfig)) {
     assert.ok(name in rules, `missing export ${name}`);
     assert.deepEqual(rules[name], value, `export ${name} differs`);

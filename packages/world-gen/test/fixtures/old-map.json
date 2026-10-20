@@ -1,0 +1,32 @@
+{
+  "note": "Frozen copy of the map the game used before issue #12 (old apps/game/shared/world.js, seed 20261020).",
+  "sha256": "07f384d8a3920618a70b7e8fa7cf23b59a5025854597cfbb66cdd1d0b9573718",
+  "boxes": 524,
+  "chests": 72,
+  "goldenSpots": 7,
+  "firstBox": {
+    "x": 12,
+    "z": 0,
+    "w": 1.3,
+    "d": 1.3,
+    "h": 1.2385878304485232,
+    "y": 0,
+    "kind": "pillar",
+    "id": 0
+  },
+  "lastBox": {
+    "x": 27.159473408573664,
+    "z": 20.200898748512834,
+    "w": 1.28519802140072,
+    "d": 1.55924601694569,
+    "h": 0.761227774224244,
+    "y": 0,
+    "kind": "rubble",
+    "id": 523
+  },
+  "firstChest": {
+    "x": 35.28957724846784,
+    "z": 158.3516012841726,
+    "id": 0
+  }
+}

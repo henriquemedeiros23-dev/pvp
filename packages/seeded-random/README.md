@@ -30,7 +30,7 @@ const again = createRandom.fromState(saved);  // continues the same sequence
 
 Fully deterministic. No `Math.random`, no time, no globals: the output depends
 only on the seed and the calls made. A numeric seed gives exactly the same
-sequence as the `rng` in `apps/game/shared/world.js`, so the island map does
+sequence as the `rng` in the old `apps/game/shared/world.js`, so the island map does
 not change. String seeds are hashed with FNV-1a (32-bit).
 
 `fork(label)` derives a new generator from the current state and the label

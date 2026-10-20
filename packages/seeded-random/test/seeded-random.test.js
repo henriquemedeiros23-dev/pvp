@@ -13,7 +13,7 @@ test('different seeds give different sequences', () => {
 });
 
 test('matches the game world rng for seed 20261020', () => {
-  // Values produced by rng(20261020) in apps/game/shared/world.js.
+  // Values produced by rng(20261020) in the old apps/game/shared/world.js (the island map seed).
   assert.deepEqual(take(createRandom(20261020), 5), [
     0.264247833751142,
     0.23858783044852316,
