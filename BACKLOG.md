@@ -20,7 +20,7 @@ The live list is on GitHub Issues: https://github.com/henriquemedeiros23-dev/pvp
 |---|---|---|---|
 | 4 | ✅ | **Package `@pvp/collision`** | Spatial grid, circle-vs-box, player movement (walls, step up, jump, landing), ray vs boxes, ray vs player. Pure functions, no randomness. Taken from `shared/world.js`. |
 | 5 | 🔲 | **Package `@pvp/world-gen`** | Builds the island of ruins (houses, towers, pillars, walls, rocks, chests, golden spots) from a seed. Test: same seed gives the same map every time. |
-| 6 | 🔲 | **Package `@pvp/net-protocol`** | Every message between phone and server written down in one place, with helpers to build and check messages. Bad messages get rejected. |
+| 6 | ✅ | **Package `@pvp/net-protocol`** | Every message between phone and server written down in one place, with helpers to build and check messages. Bad messages get rejected. |
 | 7 | ✅ | **Package `@pvp/accounts-shop`** | Sign up, log in, coins, buy and equip skins, buy weapons into the backpack. Storage is pluggable (JSON file by default). |
 | 8 | 🔲 | **Package `@pvp/arena`** | The fight itself: players join and leave, chests (same spots, back after 15 s), golden chest every 3 min, loot, damage, knockouts, dropping weapons. Runs by ticks with a clock and random numbers passed in, so tests can replay a fight exactly. |
 
