@@ -29,7 +29,7 @@ The live list is on GitHub Issues: https://github.com/henriquemedeiros23-dev/pvp
 | # | Status | Issue | What "done" means |
 |---|---|---|---|
 | 9 | 🔲 | **Package `@pvp/stickman-3d`** | Builds a three.js stickman with color, pattern, hat, mask, back item, clothes and a weapon in hand, plus walk / crouch / slide / jump / aim / swing animation. |
-| 10 | 🔲 | **Package `@pvp/touch-controls`** | Joystick on the left, buttons on the right, drag to aim, plus keyboard and mouse for computers. |
+| 10 | ✅ | **Package `@pvp/touch-controls`** | Joystick on the left, buttons on the right, drag to aim, plus keyboard and mouse for computers. |
 
 ## Phase 4: Make the game work
 
