@@ -1,0 +1,17 @@
+{
+  "name": "@pvp/accounts-shop",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Player accounts, coins, the shop and the weapon backpack, with pluggable storage (Node only).",
+  "type": "module",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "scripts": {
+    "test": "node --test"
+  },
+  "dependencies": {
+    "@pvp/game-rules": "1.0.0"
+  }
+}
