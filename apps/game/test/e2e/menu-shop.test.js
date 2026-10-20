@@ -130,16 +130,26 @@ test('sign up, shop, join the arena, leave: no errors', { skip: !RUN && 'set E2E
   assert.equal(await isVisible('#loading'), false);
   await shot('in-game.png');
 
-  // walk forward for a second with the keyboard: the stickman must move
+  // walk forward with the keyboard: the stickman must move more than 1 m.
+  // Software WebGL (swiftshader) can draw only a few frames a second, and the game caps one
+  // frame's step at 0.05 s, so we hold W until 1 m is reached (at most 5 s) instead of a fixed second.
   await page.waitForFunction(() => window.pvpDebug?.().me != null);
   const start = (await page.evaluate(() => window.pvpDebug())).me;
+  await page.evaluate(() => { window.__frames = 0; const tick = () => { window.__frames++; requestAnimationFrame(tick); }; requestAnimationFrame(tick); });
+  const t0 = Date.now();
   await page.keyboard.down('w');
-  await page.waitForTimeout(1000);
+  let moved = 0;
+  while (Date.now() - t0 < 5000) {
+    await page.waitForTimeout(100);
+    const me = (await page.evaluate(() => window.pvpDebug())).me;
+    moved = Math.hypot(me.x - start.x, me.z - start.z);
+    if (moved > 1) break;
+  }
   await page.keyboard.up('w');
-  await page.waitForTimeout(200);
-  const end = (await page.evaluate(() => window.pvpDebug())).me;
-  const moved = Math.hypot(end.x - start.x, end.z - start.z);
-  assert.ok(moved > 1, `player should move forward, moved ${moved.toFixed(2)} m`);
+  const secs = (Date.now() - t0) / 1000;
+  const fps = (await page.evaluate(() => window.__frames)) / secs;
+  console.log(`walk: moved ${moved.toFixed(2)} m in ${secs.toFixed(1)} s at ${fps.toFixed(1)} fps (software WebGL)`);
+  assert.ok(moved > 1, `player should move forward, moved ${moved.toFixed(2)} m in ${secs.toFixed(1)} s at ${fps.toFixed(1)} fps`);
   assert.equal((await page.evaluate(() => window.pvpDebug())).mode, 'play');
 
   // leave
