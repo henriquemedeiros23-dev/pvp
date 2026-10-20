@@ -8,9 +8,16 @@
   <meta name="theme-color" content="#16131f">
   <title>Stickman Ruins</title>
   <link rel="manifest" href="/manifest.json">
+  <link rel="icon" href="/icon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/style.css">
   <script type="importmap">
-    { "imports": { "three": "/three/build/three.module.js", "three/addons/": "/three/examples/jsm/" } }
+    { "imports": {
+      "three": "/three/build/three.module.js",
+      "three/addons/": "/three/examples/jsm/",
+      "@pvp/game-rules": "/packages/game-rules/src/index.js",
+      "@pvp/api-client": "/packages/api-client/src/index.js",
+      "@pvp/shop-catalog": "/packages/shop-catalog/src/index.js"
+    } }
   </script>
 </head>
 <body>

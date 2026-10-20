@@ -16,7 +16,7 @@ npm start
 ```
 
 Then open the address it prints. Phones on the same Wi-Fi can join too.
-Set `PORT` to use another port (default 3000). Run every test with `npm test`.
+Set `PORT` to use another port (default 3000). Run every test with `npm test`. Run the browser check of the menu and shop with `npm run test:e2e` (needs Chromium for Playwright; add `SCREENSHOTS=1` to update `docs/screenshots/`).
 
 ## Layout
 

@@ -1,0 +1,17 @@
+{
+  "name": "@pvp/shop-catalog",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Pure functions that turn the game rules and an account into what the shop screen shows.",
+  "type": "module",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "scripts": {
+    "test": "node --test"
+  },
+  "dependencies": {
+    "@pvp/game-rules": "1.0.0"
+  }
+}

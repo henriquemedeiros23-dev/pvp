@@ -45,6 +45,22 @@ test('serves shared code', async () => {
   assert.equal(await get('/shared/config.js'), 200);
 });
 
+test('serves package source files for the browser', async () => {
+  assert.equal(await get('/packages/game-rules/src/index.js'), 200);
+  assert.equal(await get('/packages/api-client/src/index.js'), 200);
+  assert.equal(await get('/packages/shop-catalog/src/index.js'), 200);
+  assert.equal(await get('/packages/game-rules/src/nope.js'), 404);
+});
+
+test('only package src folders are served', async () => {
+  assert.equal(await get('/packages/game-rules/package.json'), 403);
+  assert.equal(await get('/packages/game-rules/test/rules.test.js'), 403);
+  assert.equal(await get('/packages/game-rules/src/../package.json'), 403);
+  assert.equal(await get('/packages/game-rules/src/../../api-client/src/index.js'), 403);
+  assert.equal(await get('/packages/game-rules/src/%2e%2e/package.json'), 403);
+  assert.equal(await get('/packages/README.md'), 403);
+});
+
 test('blocks path traversal', async () => {
   assert.equal(await get('/shared/../server.js'), 403);
   assert.equal(await get('/three/../../package.json'), 403);
