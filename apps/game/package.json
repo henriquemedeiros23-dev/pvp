@@ -14,6 +14,7 @@
     "@pvp/arena": "*",
     "@pvp/collision": "*",
     "@pvp/game-rules": "*",
+    "@pvp/island-scene": "*",
     "@pvp/net-protocol": "*",
     "@pvp/seeded-random": "*",
     "@pvp/shop-catalog": "*",

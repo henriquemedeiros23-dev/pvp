@@ -25,6 +25,9 @@ graph LR
   shop["@pvp/shop-catalog"] --> rules
   stickman["@pvp/stickman-3d"] --> rules
   stickman --> three(["three (outside)"])
+  scene["@pvp/island-scene"] --> random
+  scene --> three
+  scene -.-> worldgen
   api["@pvp/api-client"]
   controls["@pvp/touch-controls"]
 ```
@@ -46,6 +49,7 @@ graph LR
 | `@pvp/shop-catalog` | Turns the rules and an account into the cards the shop screen shows. | both | fully: pure functions of their inputs | 9 |
 | `@pvp/api-client` | Talks to the server's account and shop API and keeps the login token. | both | fully: fetch and storage are passed in | 10 |
 | `@pvp/stickman-3d` | A three.js stickman with skins, outfits, weapons and animation. | browser (pose math also in Node) | partly: pose math is pure, how it looks depends on the renderer | 16 |
+| `@pvp/island-scene` | The 3D island: sky, sun, ground, water, palms, ruins and chests. | browser (also builds in Node) | partly: all placement and colors from a seed, how it looks depends on the renderer | 8 |
 | `@pvp/touch-controls` | Joystick, aim by dragging, buttons, keyboard and mouse. | browser (core also in Node) | partly: the core is pure, the DOM part depends on real fingers and mice | 18 |
 
 "Both" means Node and the browser (in the browser, `@pvp/*` imports need an import map or a bundler).
@@ -210,6 +214,22 @@ graph LR
 
 **Depends on:** `@pvp/game-rules`, and `three` (peer dependency).
 **Determinism:** partly. `computePose`, `rainbowHue` and `weaponModelKind` are pure and take time as input; what shows on screen depends on the renderer.
+
+## `@pvp/island-scene`
+
+**Purpose:** the three.js scenery of an island from `@pvp/world-gen`: sky dome and sun, lights and shadows, ground, beach, water, grass, palms, ruins of light sandy stone, chests with a lid that opens backwards, and the golden chest.
+
+| Export | Example |
+|---|---|
+| `createIslandScene(opts)` | `const isl = createIslandScene({ island: generateIsland(), mobile, random: 'island-scene' }).addTo(scene);` |
+| `isl.update(dt, time, focus)` | `isl.update(dt, time, { x: me.x, z: me.z }); // sky, water and sun follow the focus` |
+| `isl.chests` | `isl.chests.setOpen(3, true); isl.chests.isOpen(3); isl.chests.closeAll();` |
+| `isl.golden` | `isl.golden.show(x, z); isl.golden.hide();` |
+| `buildChest({ golden })` | `scene.add(buildChest()); // one chest model, lid in userData.lid` |
+| `noiseTexture(random, opts)` | `noiseTexture(createRandom(1), { blocks: true, cracks: 6 });` |
+
+**Depends on:** `@pvp/seeded-random`, and `three` (peer dependency). Tests also use `@pvp/world-gen`.
+**Determinism:** partly. Every random placement, shade and texture comes from a seeded random (one fork per part), so the same seed gives the same scenery; time is passed in to `update()`. How it looks on screen depends on the renderer.
 
 ## `@pvp/touch-controls`
 
