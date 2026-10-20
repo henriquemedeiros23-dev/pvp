@@ -17,6 +17,8 @@ const PORT = Number(process.env.PORT) || 3000;
 const DATA_FILE = path.join(ROOT, 'data', 'accounts.json');
 // three.js may be installed here or hoisted to the workspace root.
 // Its "exports" hides package.json, so resolve the main file (build/three.cjs) and go up.
+// The monorepo's packages/ folder (read-only: the browser loads package src files from here).
+const PACKAGES_DIR = path.resolve(ROOT, '..', '..', 'packages');
 const THREE_DIR = path.resolve(path.dirname(createRequire(import.meta.url).resolve('three')), '..');
 
 // ---------------------------------------------------------------- accounts
@@ -105,10 +107,17 @@ function serveStatic(req, res) {
   try { p = decodeURIComponent(req.url.split('?')[0]); } catch { res.writeHead(400); return res.end('Bad Request'); }
   let file;
   if (p === '/') p = '/index.html';
+  let allowed = [path.join(ROOT, 'public'), path.join(ROOT, 'shared'), THREE_DIR];
   if (p.startsWith('/shared/')) file = path.join(ROOT, p);
   else if (p.startsWith('/three/')) file = path.join(THREE_DIR, p.slice(7));
+  else if (p.startsWith('/packages/')) {
+    // Browser code of the @pvp packages: only /packages/<name>/src/... may be read.
+    const m = /^\/packages\/([a-z0-9-]+)\/src\//.exec(p);
+    if (!m) { res.writeHead(403); return res.end(); }
+    file = path.join(PACKAGES_DIR, p.slice('/packages/'.length));
+    allowed = [path.join(PACKAGES_DIR, m[1], 'src')];
+  }
   else file = path.join(ROOT, 'public', p);
-  const allowed = [path.join(ROOT, 'public'), path.join(ROOT, 'shared'), THREE_DIR];
   if (!allowed.some(dir => path.resolve(file).startsWith(dir + path.sep))) { res.writeHead(403); return res.end(); }
   fs.readFile(file, (err, data) => {
     if (err) { res.writeHead(404); return res.end('Not found'); }
