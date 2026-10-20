@@ -49,7 +49,7 @@ The live list is on GitHub Issues: https://github.com/henriquemedeiros23-dev/pvp
 | 17 | 🔲 | **Black triangle on the horizon, ruins too dark** | No black shapes in the sky; ruins look like light stone. |
 | 18 | 🔲 | **Joining/leaving: no timeout, backpack text late** | Join gives up with a message after a few seconds; backpack text is right after leaving. |
 | 19 | 🔨 | **Tests use a separate data file** | Tests never create accounts in the real data file. |
-| 21 | 🔨 | **Weapon durability** | Weapons wear out with use; at 0 they break and disappear. |
+| 21 | ✅ | **Weapon durability** | Weapons wear out with use; at 0 they break and disappear. |
 | 22 | 🔲 | **Arena HUD: 5 slots with durability bars** | 5 slots always shown, health bar above, durability bar per weapon. |
 | 20 | 🔲 | **Chest lid turned the wrong way** | The lid sits along the chest, opens like a real lid, and the lock is on the front. |
 
