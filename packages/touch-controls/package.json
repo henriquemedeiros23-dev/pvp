@@ -1,0 +1,13 @@
+{
+  "name": "@pvp/touch-controls",
+  "version": "1.0.0",
+  "description": "Phone and computer game controls: joystick, drag-to-aim, buttons, keyboard and mouse, with a pure deterministic core.",
+  "type": "module",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "scripts": {
+    "test": "node --test"
+  }
+}
