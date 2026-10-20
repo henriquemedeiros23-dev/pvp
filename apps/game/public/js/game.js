@@ -1,11 +1,11 @@
 // The 3D game: draws the island, runs your stickman, talks to the server.
 // Glue only: the rules, island, movement, stickman, controls and messages all come from packages.
 import * as THREE from 'three';
-import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import * as C from '@pvp/game-rules';
 import { generateIsland } from '@pvp/world-gen';
 import { movePlayer, rayBoxes, rayCylinder } from '@pvp/collision';
 import { Stickman, buildWeapon } from '@pvp/stickman-3d';
+import { createIslandScene } from '@pvp/island-scene';
 import { createInputState, attachTouchControls, attachDesktopControls, isTouchDevice } from '@pvp/touch-controls';
 import { decodeServerMessage, encodeClient, unpackSnapshotPlayer, makeFlags, readFlags } from '@pvp/net-protocol';
 
@@ -26,41 +26,6 @@ function rayWorld(world, ox, oy, oz, dx, dy, dz, maxDist) {
 // Distance along a unit ray to a standing player, or Infinity.
 function rayPlayer(ox, oy, oz, dx, dy, dz, px, py, pz, height) {
   return rayCylinder(v3(ox, oy, oz), v3(dx, dy, dz), { x: px, y: py, z: pz, height, radius: HIT_RADIUS });
-}
-
-function noiseTexture(size, base, spread, cracks = false) {
-  const c = document.createElement('canvas');
-  c.width = c.height = size;
-  const g = c.getContext('2d');
-  const img = g.createImageData(size, size);
-  for (let i = 0; i < size * size; i++) {
-    const v = base + (Math.random() - 0.5) * spread;
-    img.data[i * 4] = img.data[i * 4 + 1] = img.data[i * 4 + 2] = v;
-    img.data[i * 4 + 3] = 255;
-  }
-  g.putImageData(img, 0, 0);
-  if (cracks) {
-    // stone blocks
-    g.strokeStyle = 'rgba(0,0,0,0.35)'; g.lineWidth = 2;
-    const rows = 4;
-    for (let r = 0; r < rows; r++) {
-      const y = (r / rows) * size;
-      g.beginPath(); g.moveTo(0, y); g.lineTo(size, y); g.stroke();
-      const off = r % 2 ? size / 4 : 0;
-      for (let x = off; x < size + 1; x += size / 2) { g.beginPath(); g.moveTo(x, y); g.lineTo(x, y + size / rows); g.stroke(); }
-    }
-    g.strokeStyle = 'rgba(0,0,0,0.25)'; g.lineWidth = 1;
-    for (let k = 0; k < 6; k++) {
-      g.beginPath(); let x = Math.random() * size, y = Math.random() * size; g.moveTo(x, y);
-      for (let s = 0; s < 5; s++) { x += (Math.random() - 0.5) * 30; y += Math.random() * 20; g.lineTo(x, y); }
-      g.stroke();
-    }
-  }
-  const t = new THREE.CanvasTexture(c);
-  t.wrapS = t.wrapT = THREE.RepeatWrapping;
-  t.colorSpace = THREE.SRGBColorSpace;
-  t.anisotropy = 4;
-  return t;
 }
 
 function nameTag(name) {
@@ -111,9 +76,10 @@ export class Game {
 
     this.scene = new THREE.Scene();
     this.camera = new THREE.PerspectiveCamera(70, 1, 0.1, 900);
-    this.buildEnvironment();
-    this.buildRuins();
-    this.buildChests();
+    // the scenery: sky, sun, ground, water, palms, ruins, chests (@pvp/island-scene)
+    this.island = createIslandScene({ island: this.world, mobile: this.mobile }).addTo(this.scene);
+    this.chests = this.island.chests;
+    this.golden = null;
 
     this.remotes = new Map();   // id -> remote player
     this.infos = new Map();     // id -> { name, skin }
@@ -165,184 +131,6 @@ export class Game {
     this.camera.aspect = w / h;
     this.camera.fov = w < h ? 85 : 70;
     this.camera.updateProjectionMatrix();
-  }
-
-  // ------------------------------------------------------------ scenery
-  buildEnvironment() {
-    const s = this.scene;
-    const horizon = new THREE.Color('#f3c9a0'), top = new THREE.Color('#4a78c9');
-    s.fog = new THREE.Fog(horizon, 90, 420);
-    // sky dome
-    const skyGeo = new THREE.SphereGeometry(800, 32, 16);
-    const cols = [];
-    const pos = skyGeo.attributes.position;
-    for (let i = 0; i < pos.count; i++) {
-      const t = Math.max(0, pos.getY(i) / 800);
-      const col = horizon.clone().lerp(top, Math.pow(t, 0.6));
-      cols.push(col.r, col.g, col.b);
-    }
-    skyGeo.setAttribute('color', new THREE.Float32BufferAttribute(cols, 3));
-    s.add(new THREE.Mesh(skyGeo, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.BackSide, fog: false, depthWrite: false })));
-    const sun = new THREE.Mesh(new THREE.SphereGeometry(22, 16, 16), new THREE.MeshBasicMaterial({ color: '#fff4d6', fog: false }));
-    sun.position.set(-400, 260, -500);
-    s.add(sun);
-
-    s.add(new THREE.HemisphereLight('#bfd8ff', '#8a6a4a', 1.1));
-    const dir = this.sun = new THREE.DirectionalLight('#fff1dc', 2.4);
-    dir.position.set(-40, 70, -50);
-    dir.castShadow = true;
-    const sz = this.mobile ? 1024 : 2048;
-    dir.shadow.mapSize.set(sz, sz);
-    const sc = dir.shadow.camera;
-    sc.left = -45; sc.right = 45; sc.top = 45; sc.bottom = -45; sc.near = 1; sc.far = 200;
-    dir.shadow.bias = -0.0005;
-    dir.shadow.normalBias = 0.03;
-    s.add(dir, dir.target);
-
-    // island
-    const ISLAND_RADIUS = this.world.islandRadius;
-    const ground = new THREE.CircleGeometry(ISLAND_RADIUS + 12, 96, 0, Math.PI * 2);
-    ground.rotateX(-Math.PI / 2);
-    const gp = ground.attributes.position, gc = [];
-    const grass = new THREE.Color('#87a85e'), dry = new THREE.Color('#b3a36d'), sand = new THREE.Color('#e6cf98');
-    for (let i = 0; i < gp.count; i++) {
-      const d = Math.hypot(gp.getX(i), gp.getZ(i));
-      const c = d > ISLAND_RADIUS - 8 ? sand : grass.clone().lerp(dry, Math.min(1, d / ISLAND_RADIUS) * 0.8);
-      gc.push(c.r, c.g, c.b);
-    }
-    ground.setAttribute('color', new THREE.Float32BufferAttribute(gc, 3));
-    const gtex = noiseTexture(128, 200, 70);
-    gtex.repeat.set(80, 80);
-    const groundMesh = new THREE.Mesh(ground, new THREE.MeshStandardMaterial({ vertexColors: true, map: gtex, roughness: 0.95 }));
-    groundMesh.receiveShadow = true;
-    s.add(groundMesh);
-    // beach ring that slopes into the water
-    const beach = new THREE.Mesh(new THREE.RingGeometry(ISLAND_RADIUS + 11, ISLAND_RADIUS + 40, 96, 1), new THREE.MeshStandardMaterial({ color: '#d9bd84', roughness: 1 }));
-    beach.rotation.x = -Math.PI / 2; beach.position.y = -0.8;
-    s.add(beach);
-    this.water = new THREE.Mesh(new THREE.CircleGeometry(900, 64), new THREE.MeshStandardMaterial({ color: '#2a8fb8', roughness: 0.15, metalness: 0.1, transparent: true, opacity: 0.92 }));
-    this.water.rotation.x = -Math.PI / 2; this.water.position.y = -0.35;
-    s.add(this.water);
-
-    // grass tufts and beach palms (decoration only)
-    const tuftGeo = new THREE.ConeGeometry(0.12, 0.5, 4);
-    tuftGeo.translate(0, 0.25, 0);
-    const tufts = new THREE.InstancedMesh(tuftGeo, new THREE.MeshStandardMaterial({ color: '#5f8a3a', roughness: 1 }), this.mobile ? 1500 : 4000);
-    const m = new THREE.Matrix4(), q = new THREE.Quaternion(), v = new THREE.Vector3(), sc3 = new THREE.Vector3();
-    for (let i = 0; i < tufts.count; i++) {
-      const a = Math.random() * Math.PI * 2, d = Math.sqrt(Math.random()) * (ISLAND_RADIUS - 12);
-      v.set(Math.cos(a) * d, 0, Math.sin(a) * d);
-      q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.random() * 3);
-      const k = 0.6 + Math.random() * 0.9; sc3.set(k, k, k);
-      tufts.setMatrixAt(i, m.compose(v, q, sc3));
-    }
-    s.add(tufts);
-    const trunkMat = new THREE.MeshStandardMaterial({ color: '#8a6440', roughness: 1 });
-    const leafMat = new THREE.MeshStandardMaterial({ color: '#3f8f3a', roughness: 0.8, side: THREE.DoubleSide });
-    for (let i = 0; i < 40; i++) {
-      const a = (i / 40) * Math.PI * 2 + Math.random() * 0.1, d = ISLAND_RADIUS + 2 + Math.random() * 7;
-      const palm = new THREE.Group();
-      const h = 6 + Math.random() * 4;
-      const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.3, h, 7), trunkMat);
-      trunk.position.y = h / 2; trunk.castShadow = true;
-      palm.add(trunk);
-      for (let k = 0; k < 6; k++) {
-        const leaf = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 3.4), leafMat);
-        leaf.geometry.translate(0, 1.7, 0);
-        leaf.position.y = h;
-        leaf.rotation.set(1.1, (k / 6) * Math.PI * 2, 0, 'YXZ');
-        palm.add(leaf);
-      }
-      palm.position.set(Math.cos(a) * d, 0, Math.sin(a) * d);
-      palm.rotation.z = (Math.random() - 0.5) * 0.3;
-      s.add(palm);
-    }
-  }
-
-  buildRuins() {
-    const tex = noiseTexture(128, 175, 50, true);
-    const tint = { wall: '#c9b9a0', tower: '#b8a68c', pillar: '#ddd2bd', rubble: '#a59a8a', stone: '#c0b4a0' };
-    const geos = [];
-    for (const b of this.world.boxes) {
-      const g = new THREE.BoxGeometry(b.w, b.h, b.d);
-      const uv = g.attributes.uv;
-      const dims = [[b.d, b.h], [b.d, b.h], [b.w, b.d], [b.w, b.d], [b.w, b.h], [b.w, b.h]];
-      for (let f = 0; f < 6; f++) for (let k = 0; k < 4; k++) {
-        const i = f * 4 + k;
-        uv.setXY(i, uv.getX(i) * dims[f][0] / 2.5, uv.getY(i) * dims[f][1] / 2.5);
-      }
-      g.translate(b.x, b.y + b.h / 2, b.z);
-      const c = new THREE.Color(tint[b.kind] || tint.stone).offsetHSL(0, 0, (Math.random() - 0.5) * 0.08);
-      const cols = new Float32Array(g.attributes.position.count * 3);
-      for (let i = 0; i < cols.length; i += 3) { cols[i] = c.r; cols[i + 1] = c.g; cols[i + 2] = c.b; }
-      g.setAttribute('color', new THREE.BufferAttribute(cols, 3));
-      geos.push(g);
-    }
-    const mesh = new THREE.Mesh(mergeGeometries(geos), new THREE.MeshStandardMaterial({ map: tex, vertexColors: true, roughness: 0.9 }));
-    mesh.castShadow = mesh.receiveShadow = true;
-    this.scene.add(mesh);
-    // moss on the tops of tall walls
-    const mossGeos = [];
-    for (const b of this.world.boxes) {
-      if (b.h < 2.5 || Math.random() < 0.5) continue;
-      const g = new THREE.BoxGeometry(b.w + 0.06, 0.12, b.d + 0.06);
-      g.translate(b.x, b.y + b.h + 0.02, b.z);
-      mossGeos.push(g);
-    }
-    if (mossGeos.length) this.scene.add(new THREE.Mesh(mergeGeometries(mossGeos), new THREE.MeshStandardMaterial({ color: '#5e8c3c', roughness: 1 })));
-  }
-
-  makeChestMesh(golden) {
-    const g = new THREE.Group();
-    const wood = new THREE.MeshStandardMaterial(golden ? { color: '#ffc531', metalness: 0.9, roughness: 0.25, emissive: '#5a3c00' } : { color: '#9b6331', roughness: 0.8 });
-    const band = new THREE.MeshStandardMaterial(golden ? { color: '#fff1a8', metalness: 1, roughness: 0.2 } : { color: '#3a3a42', metalness: 0.6, roughness: 0.4 });
-    const base = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.55, 0.75), wood);
-    base.position.y = 0.275; base.castShadow = true;
-    g.add(base);
-    for (const x of [-0.4, 0.4]) {
-      const b = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.57, 0.77), band);
-      b.position.set(x, 0.275, 0); g.add(b);
-    }
-    const lidPivot = new THREE.Group();
-    lidPivot.position.set(0, 0.55, -0.375);
-    const lid = new THREE.Mesh(new THREE.CylinderGeometry(0.375, 0.375, 1.1, 14, 1, false, 0, Math.PI), wood);
-    lid.rotation.z = Math.PI / 2; lid.rotation.y = Math.PI / 2;
-    lid.position.z = 0.375; lid.castShadow = true;
-    lidPivot.add(lid);
-    const lock = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.18, 0.06), band);
-    lock.position.set(0, 0, 0.76);
-    lidPivot.add(lock);
-    g.add(lidPivot);
-    g.userData.lid = lidPivot;
-    return g;
-  }
-
-  buildChests() {
-    this.chestMeshes = this.world.chests.map(c => {
-      const m = this.makeChestMesh(false);
-      m.position.set(c.x, 0, c.z);
-      m.rotation.y = Math.atan2(-c.x, -c.z); // face the island center
-      m.userData.open = false;
-      this.scene.add(m);
-      return m;
-    });
-    this.goldenMesh = this.makeChestMesh(true);
-    this.goldenMesh.scale.setScalar(1.35);
-    const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.6, 140, 12, 1, true),
-      new THREE.MeshBasicMaterial({ color: '#ffd24a', transparent: true, opacity: 0.35, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false }));
-    beam.position.y = 70;
-    this.goldenMesh.add(beam);
-    this.goldenLight = new THREE.PointLight('#ffcc44', 25, 14);
-    this.goldenLight.position.y = 1.5;
-    this.goldenMesh.add(this.goldenLight);
-    this.goldenMesh.visible = false;
-    this.scene.add(this.goldenMesh);
-    this.golden = null;
-  }
-
-  setChestOpen(id, open) {
-    const m = this.chestMeshes[id];
-    if (m) m.userData.open = open;
   }
 
   // ------------------------------------------------------------ menu preview
@@ -401,7 +189,7 @@ export class Game {
       case 'pleave': this.removeRemote(m.id); this.infos.delete(m.id); return;
       case 'pos': if (this.me) { this.me.x = m.x; this.me.y = m.y; this.me.z = m.z; } return;
       case 'coins': this.coins = m.total; $('hudCoins').textContent = m.total; this.toast(`+${m.amount} coins`); return;
-      case 'chest': return this.setChestOpen(m.id, m.open);
+      case 'chest': return this.chests.setOpen(m.id, m.open);
       case 'golden': return this.onGolden(m);
       case 'item+': return this.addItem(m);
       case 'item-': return this.removeItem(m.id);
@@ -434,8 +222,8 @@ export class Game {
     this.scene.add(sm.root);
     this.me = { x: m.x, y: 0, z: m.z, vy: 0, onGround: true, crouch: false, slide: 0, slideDir: [0, 0], kx: 0, kz: 0, sm, speed: 0, hp: C.MAX_HP };
     this.yaw = Math.atan2(-m.x, -m.z); this.pitch = -0.1;
-    this.chestMeshes.forEach(c => (c.userData.open = false));
-    for (const id of m.chests) this.setChestOpen(id, true);
+    this.chests.closeAll();
+    for (const id of m.chests) this.chests.setOpen(id, true);
     this.onGolden({ golden: m.golden, quiet: true });
     for (const it of m.items) this.addItem(it);
     for (const mi of m.mines) this.addMine(mi);
@@ -466,7 +254,7 @@ export class Game {
     for (const p of this.projectiles.values()) this.scene.remove(p.mesh);
     for (const x of this.mines.values()) this.scene.remove(x);
     this.items.clear(); this.projectiles.clear(); this.mines.clear();
-    this.goldenMesh.visible = false; this.golden = null;
+    this.island.golden.hide(); this.golden = null;
     $('compass').classList.add('hidden');
   }
 
@@ -555,12 +343,12 @@ export class Game {
 
   onGolden(m) {
     this.golden = m.golden;
-    this.goldenMesh.visible = !!m.golden;
     if (m.golden) {
-      this.goldenMesh.position.set(m.golden.x, 0, m.golden.z);
+      this.island.golden.show(m.golden.x, m.golden.z);
       if (!m.quiet) this.banner('★ A GOLDEN CHEST appeared! Follow the light! ★');
-    } else if (m.by) {
-      this.banner(`${m.by} opened the golden chest!`);
+    } else {
+      this.island.golden.hide();
+      if (m.by) this.banner(`${m.by} opened the golden chest!`);
     }
     $('compass').classList.toggle('hidden', !m.golden);
   }
@@ -725,8 +513,7 @@ export class Game {
       this.preview.root.rotation.y = t + Math.PI * 0.15;
       this.preview.animate(dt, {}, this.time);
     }
-    this.sun.target.position.copy(c);
-    this.sun.position.set(c.x - 40, 70, c.z - 50);
+    this.focus = c;
   }
 
   updatePlay(dt) {
@@ -827,7 +614,7 @@ export class Game {
     let near = null, best = 2.8;
     if (this.golden && Math.hypot(this.golden.x - me.x, this.golden.z - me.z) < 3) near = 'golden';
     else this.world.chests.forEach((c, i) => {
-      if (this.chestMeshes[i].userData.open) return;
+      if (this.chests.isOpen(i)) return;
       const d = Math.hypot(c.x - me.x, c.z - me.z);
       if (d < best) { best = d; near = i; }
     });
@@ -853,8 +640,7 @@ export class Game {
       this.send('state', { x: +me.x.toFixed(2), y: +me.y.toFixed(2), z: +me.z.toFixed(2), ry: +me.sm.root.rotation.y.toFixed(3), pitch: +this.pitch.toFixed(2), f });
     }
 
-    this.sun.target.position.set(me.x, 0, me.z);
-    this.sun.position.set(me.x - 40, 70, me.z - 50);
+    this.focus = me;
   }
 
   updateWorld(dt) {
@@ -873,15 +659,8 @@ export class Game {
       const fl = readFlags(r.flags);
       r.sm.animate(dt, { speed: r.speed, crouch: fl.crouch && !fl.slide, slide: fl.slide, air: fl.air, pitch: r.pitch }, t);
     }
-    // chest lids
-    for (const m of this.chestMeshes) {
-      const target = m.userData.open ? -1.9 : 0;
-      m.userData.lid.rotation.x += (target - m.userData.lid.rotation.x) * Math.min(1, dt * 8);
-    }
-    if (this.goldenMesh.visible) {
-      this.goldenMesh.rotation.y = t * 0.6;
-      this.goldenLight.intensity = 20 + Math.sin(t * 4) * 8;
-    }
+    // scenery: sky, water and sun follow the player (or the menu spot); chest lids; golden chest
+    this.island.update(dt, t, this.focus || this.previewSpot);
     // items bob and spin
     for (const it of this.items.values()) {
       it.spin.rotation.y = t * 1.8;
@@ -913,7 +692,6 @@ export class Game {
         this.effects.splice(i, 1);
       }
     }
-    this.water.position.y = -0.35 + Math.sin(t * 0.8) * 0.05;
   }
 }
 

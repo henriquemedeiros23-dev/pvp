@@ -1,0 +1,24 @@
+{
+  "name": "@pvp/island-scene",
+  "version": "1.0.0",
+  "private": true,
+  "description": "The three.js scenery of the island: sky, sun, ground, beach, water, palms, ruins and chests.",
+  "type": "module",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "scripts": {
+    "test": "node --test"
+  },
+  "dependencies": {
+    "@pvp/seeded-random": "*"
+  },
+  "peerDependencies": {
+    "three": ">=0.160.0"
+  },
+  "devDependencies": {
+    "@pvp/world-gen": "*",
+    "three": "0.170.0"
+  }
+}
