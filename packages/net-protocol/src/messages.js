@@ -38,7 +38,11 @@ const SKIN = { obj: {
   color: 'string?', hat: 'string?', face: 'string?', back: 'string?', shirt: 'string?',
 } };
 const PLAYER_INFO = { obj: { id: 'uint', name: 'string', skin: SKIN } };
-const ITEM = { obj: { id: 'uint', kind: { enum: ITEM_KINDS }, weapon: { nullable: 'string' }, x: 'number', y: 'number', z: 'number' } };
+const DUR = { nullable: 'uint' };                                 // uses left, null = never breaks
+const ITEM = { obj: {
+  id: 'uint', kind: { enum: ITEM_KINDS }, weapon: { nullable: 'string' }, x: 'number', y: 'number', z: 'number',
+  dur: { optional: DUR },
+} };
 const MINE = { obj: { id: 'uint', x: 'number', z: 'number', owner: 'uint' } };
 const SNAP_PLAYER = { tuple: [
   'uint',          // ID
@@ -101,6 +105,7 @@ export const SERVER_MESSAGES = deepFreeze({
   }),
   inv: m('Your inventory and health.', {
     weapons: [{ list: 'string', max: 32 }, 'Weapon ids, one per slot'],
+    dur: [{ optional: { list: DUR, max: 32 } }, 'Uses left per slot, same order as weapons (null = never breaks); max is the weapon\'s durability in the rules'],
     slot: ['uint', 'Slot in hand'],
     bandages: ['uint', 'Bandages carried'],
     medkits: ['uint', 'Medkits carried'],
@@ -125,6 +130,10 @@ export const SERVER_MESSAGES = deepFreeze({
     id: ['uint', 'Item id'], kind: [{ enum: ITEM_KINDS }, '"weapon", "bandage" or "medkit"'],
     weapon: [{ nullable: 'string' }, 'Weapon id when kind is "weapon", else null'],
     x: ['number', 'X'], y: ['number', 'Height'], z: ['number', 'Z'],
+    dur: [{ optional: DUR }, 'Weapon only: uses left (null = never breaks)'],
+  }),
+  broke: m('Your weapon broke (durability 0) and is gone. An "inv" follows.', {
+    slot: ['uint', 'Slot it was in'], weapon: ['string', 'Weapon id'],
   }),
   'item-': m('An item is gone (picked up or expired).', {
     id: ['uint', 'Item id'], by: ['uint?', 'Player who picked it up, missing if it expired'],

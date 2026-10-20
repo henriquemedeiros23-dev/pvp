@@ -2,8 +2,8 @@
 // weapon's `type` (melee | gun | throw | rocket | mine) and its numbers in the rules.
 
 import { rayBoxes, rayCylinder } from '@pvp/collision';
-import { at, send, tellServer, weaponDef, heightOf } from './state.js';
-import { removePlayer } from './players.js';
+import { at, send, tellServer, weaponDef, heightOf, wearOf } from './state.js';
+import { removePlayer, inventoryMsg } from './players.js';
 import { dropItem } from './loot.js';
 import { launchProjectile } from './projectiles.js';
 import { placeMine } from './mines.js';
@@ -24,8 +24,12 @@ export function damage(A, victim, amount, attacker, weapon, kx = 0, kz = 0) {
 /** Knocked out: drop everything except the basic weapon, leave the arena. */
 function knockOut(A, victim, attacker, weapon) {
   const R = A.rules, spread = A.tune.koDropSpread;
-  const lost = victim.weapons.filter(w => w !== R.BASIC_WEAPON);
-  for (const w of lost) dropItem(A, 'weapon', w, victim.x, victim.z, spread);
+  const lost = [];
+  victim.weapons.forEach((w, i) => {
+    if (w === R.BASIC_WEAPON) return;
+    lost.push(w);
+    dropItem(A, 'weapon', w, victim.x, victim.z, spread, victim.dur[i]); // keeps its wear
+  });
   if (victim.medkits) dropItem(A, 'medkit', null, victim.x, victim.z, spread);
   if (victim.bandages) dropItem(A, 'bandage', null, victim.x, victim.z, spread);
   removePlayer(A, victim);
@@ -105,12 +109,29 @@ export function fire(A, id, dir, now) {
   const d = { x: dx / len, y: dy / len, z: dz / len };
   const o = { x: p.x, y: p.y + heightOf(A, p) - A.tune.muzzleDrop, z: p.z };
 
+  const slot = p.slot;
   switch (def.type) {
-    case 'melee': melee(A, p, w, def); return true;
-    case 'gun': gun(A, p, w, def, o, d); return true;
+    case 'melee': melee(A, p, w, def); break;
+    case 'gun': gun(A, p, w, def, o, d); break;
     case 'throw':
-    case 'rocket': launchProjectile(A, p, w, def, o, d, now); return true;
-    case 'mine': placeMine(A, p, w, def, now); return true;
+    case 'rocket': launchProjectile(A, p, w, def, o, d, now); break;
+    case 'mine': placeMine(A, p, w, def, now); break;
     default: return false;
   }
+  wear(A, p, slot);
+  return true;
+}
+
+/** One use of the weapon in `slot`: lose wearPerUse durability; at 0 it breaks and is gone. */
+function wear(A, p, slot) {
+  const left = p.dur[slot];
+  if (left === null || left === undefined) return; // never breaks
+  p.dur[slot] = Math.max(0, left - wearOf(A, p.weapons[slot]));
+  if (p.dur[slot] === 0) {
+    const [weapon] = p.weapons.splice(slot, 1);
+    p.dur.splice(slot, 1);
+    p.slot = Math.max(0, Math.min(p.slot, p.weapons.length - 1)); // same slot number, or the last one
+    send(A, p.id, { t: 'broke', slot, weapon });
+  }
+  send(A, p.id, inventoryMsg(p)); // so the durability bar is always right
 }

@@ -33,14 +33,15 @@ const SERVER_EXAMPLES = {
   full: {},
   left: {},
   snap: { p: [[3, 1.5, 0, -2.25, 0.5, -0.1, 5, 'pistol', 100, 1]], n: 4 },
-  inv: { weapons: ['fists', 'pistol'], slot: 0, bandages: 1, medkits: 0, coins: 120, hp: 100 },
+  inv: { weapons: ['fists', 'pistol'], dur: [null, 42], slot: 0, bandages: 1, medkits: 0, coins: 120, hp: 100 },
+  broke: { slot: 1, weapon: 'pistol' },
   pjoin: { id: 3, name: 'Bob', skin: SKIN },
   pleave: { id: 3 },
   pos: { x: 1, y: 0, z: 2 },
   coins: { amount: 10, total: 130 },
   chest: { id: 4, open: true },
   golden: { golden: { x: 50, z: -30 } },
-  'item+': { id: 9, kind: 'weapon', weapon: 'shotgun', x: 1, y: 0, z: 2 },
+  'item+': { id: 9, kind: 'weapon', weapon: 'shotgun', x: 1, y: 0, z: 2, dur: 17 },
   'item-': { id: 9, by: 3 },
   shot: { id: 3, w: 'shotgun', from: [1, 1.4, 2], to: [[5, 1, 9], [6, 1, 9]] },
   swing: { id: 3 },
@@ -240,6 +241,20 @@ test('flags helpers', () => {
   assert.equal(makeFlags(), 0);
   assert.deepEqual(readFlags(6), { crouch: false, slide: true, moving: true, air: false });
   for (let f = 0; f < 16; f++) assert.equal(makeFlags(readFlags(f)), f);
+});
+
+test('durability fields: optional (old messages still work), null = never breaks, bad values rejected', () => {
+  const { dur, ...oldInv } = SERVER_EXAMPLES.inv;
+  assert.deepEqual(decodeServerMessage(encode('inv', oldInv)).msg, { t: 'inv', ...oldInv });
+  assert.ok(decodeServerMessage(encode('item+', { id: 1, kind: 'weapon', weapon: 'woodsword', x: 0, y: 0, z: 0, dur: null })).ok);
+  assert.ok(decodeServerMessage(encode('item+', { id: 1, kind: 'bandage', weapon: null, x: 0, y: 0, z: 0 })).ok);
+  const welcome = { ...SERVER_EXAMPLES.welcome, items: [{ id: 9, kind: 'weapon', weapon: 'pistol', x: 1, y: 0, z: 2, dur: 3 }] };
+  assert.deepEqual(decodeServerMessage(encode('welcome', welcome)).msg.items[0].dur, 3);
+  for (const bad of [[-1], [1.5], ['5']]) {
+    assert.equal(decodeServerMessage(J({ t: 'inv', ...oldInv, dur: bad })).ok, false, J(bad));
+  }
+  assert.equal(decodeServerMessage(J({ t: 'broke', slot: 1 })).ok, false);
+  assert.deepEqual(decodeServerMessage(encode('broke', { slot: 2, weapon: 'sniper' })).msg, { t: 'broke', slot: 2, weapon: 'sniper' });
 });
 
 test('isValid helper', () => {

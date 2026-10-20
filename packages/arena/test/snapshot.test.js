@@ -61,6 +61,7 @@ test('replay: same seed and inputs give an identical outbox', () => {
   assert.ok(one.length > 1000);
   assert.ok(msgs(one, 'boom').length > 0, 'explosions happened');
   assert.ok(msgs(one, 'chest').length > 0, 'chests opened');
+  assert.ok(msgs(one, 'broke').length > 0, 'weapons broke');
   assert.deepEqual(two, one);
   assert.notDeepEqual(replay(8), one, 'another seed gives another fight');
 });

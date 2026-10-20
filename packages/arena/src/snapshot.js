@@ -27,7 +27,7 @@ export function snapshotFor(A, id) {
   const near = [];
   for (const o of A.players.values()) {
     if (o !== p && Math.hypot(o.x - p.x, o.z - p.z) > A.tune.snapshotRadius) continue;
-    near.push([o.id, round2(o.x), round2(o.y), round2(o.z), round2(o.ry), round2(o.pitch), o.flags, o.weapons[o.slot], o.hp, A.now < o.protectUntil ? 1 : 0]);
+    near.push([o.id, round2(o.x), round2(o.y), round2(o.z), round2(o.ry), round2(o.pitch), o.flags, o.weapons[o.slot] ?? '', o.hp, A.now < o.protectUntil ? 1 : 0]);
   }
   return { t: 'snap', p: near, n: A.players.size };
 }
