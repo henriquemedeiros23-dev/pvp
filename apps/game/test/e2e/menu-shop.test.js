@@ -91,7 +91,7 @@ const shot = async name => {
 const isVisible = sel => page.locator(sel).isVisible();
 
 test('sign up, shop, join the arena, leave: no errors', { skip: !RUN && 'set E2E=1 to run (npm run test:e2e)', timeout: 120000 }, async () => {
-  await page.goto(`http://127.0.0.1:${port}/`);
+  await page.goto(`http://127.0.0.1:${port}/?debug=1`); // ?debug: window.pvpDebug() shows the game state
   await page.locator('#login').waitFor({ state: 'visible' });
 
   // sign up
@@ -130,10 +130,23 @@ test('sign up, shop, join the arena, leave: no errors', { skip: !RUN && 'set E2E
   assert.equal(await isVisible('#loading'), false);
   await shot('in-game.png');
 
+  // walk forward for a second with the keyboard: the stickman must move
+  await page.waitForFunction(() => window.pvpDebug?.().me != null);
+  const start = (await page.evaluate(() => window.pvpDebug())).me;
+  await page.keyboard.down('w');
+  await page.waitForTimeout(1000);
+  await page.keyboard.up('w');
+  await page.waitForTimeout(200);
+  const end = (await page.evaluate(() => window.pvpDebug())).me;
+  const moved = Math.hypot(end.x - start.x, end.z - start.z);
+  assert.ok(moved > 1, `player should move forward, moved ${moved.toFixed(2)} m`);
+  assert.equal((await page.evaluate(() => window.pvpDebug())).mode, 'play');
+
   // leave
   await page.click('#btnLeave');
   await page.locator('#menu').waitFor({ state: 'visible' });
   assert.equal(await isVisible('#hud'), false);
+  assert.equal((await page.evaluate(() => window.pvpDebug())).mode, 'menu');
 
   // log out and back in with the saved account
   await page.click('#btnLogout');

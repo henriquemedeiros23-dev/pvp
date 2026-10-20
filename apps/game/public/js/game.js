@@ -414,6 +414,7 @@ export class Game {
       case 'mine-': { const x = this.mines.get(m.id); if (x) { this.scene.remove(x); this.mines.delete(m.id); } return; }
       case 'hitmark': return this.hitmark(m.dead);
       case 'hurt': return this.onHurt(m);
+      case 'broke': return this.toast(`Your ${C.WEAPONS[m.weapon]?.name || 'weapon'} broke!`); // an 'inv' follows
       case 'ko': return this.onKO(m);
       case 'dead': this.endPlay(); return this.ui.onDead(m.by, m.weapon);
       case 'left':
@@ -508,7 +509,7 @@ export class Game {
   }
 
   onInventory(m) {
-    this.inv = m;
+    this.inv = m; // weapons, dur (uses left per slot, null = never breaks), slot, bandages, medkits, coins, hp
     this.coins = m.coins;
     $('hudCoins').textContent = m.coins;
     $('bandageCount').textContent = m.bandages;

@@ -21,7 +21,7 @@ Set `PORT` to use another port (default 3000). Run every test with `npm test`. R
 
 ## Layout
 
-- `apps/game/`: the game (server, phone/browser code, shared code). Accounts are saved in `apps/game/data/accounts.json`.
+- `apps/game/`: the game: thin glue that connects the packages (server and phone/browser code). Accounts are saved in `apps/game/data/accounts.json` (or the file in the `DATA_FILE` environment variable; tests always use a temp file).
 - `packages/`: reusable packages, see [CATALOG.md](CATALOG.md) for the list and [packages/README.md](packages/README.md) for the template.
 
 > Work in progress: the game is being split into reusable packages (see the backlog).
