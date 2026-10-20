@@ -7,6 +7,7 @@ shop, and be the last stickman standing.
 - Game design: [docs/GAME_DESIGN.md](docs/GAME_DESIGN.md)
 - How we work: [docs/HOW_WE_WORK.md](docs/HOW_WE_WORK.md)
 - Jobs to do: [BACKLOG.md](BACKLOG.md)
+- Package catalog (every reusable package, for this game and others): [CATALOG.md](CATALOG.md)
 
 ## Run it
 
@@ -21,6 +22,6 @@ Set `PORT` to use another port (default 3000). Run every test with `npm test`. R
 ## Layout
 
 - `apps/game/`: the game (server, phone/browser code, shared code). Accounts are saved in `apps/game/data/accounts.json`.
-- `packages/`: reusable packages, see [packages/README.md](packages/README.md).
+- `packages/`: reusable packages, see [CATALOG.md](CATALOG.md) for the list and [packages/README.md](packages/README.md) for the template.
 
 > Work in progress: the game is being split into reusable packages (see the backlog).
