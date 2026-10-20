@@ -101,7 +101,8 @@ function handleApi(req, res, body) {
 // ---------------------------------------------------------------- static files
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.png': 'image/png', '.svg': 'image/svg+xml' };
 function serveStatic(req, res) {
-  let p = decodeURIComponent(req.url.split('?')[0]);
+  let p;
+  try { p = decodeURIComponent(req.url.split('?')[0]); } catch { res.writeHead(400); return res.end('Bad Request'); }
   let file;
   if (p === '/') p = '/index.html';
   if (p.startsWith('/shared/')) file = path.join(ROOT, p);
@@ -119,11 +120,16 @@ function serveStatic(req, res) {
 const server = http.createServer((req, res) => {
   if (req.url.startsWith('/api/') && req.method === 'POST') {
     let raw = '';
+    req.on('error', () => {}); // aborted or too big: just drop it
     req.on('data', c => { raw += c; if (raw.length > 1e4) req.destroy(); });
     req.on('end', () => {
       let body = {};
       try { body = JSON.parse(raw || '{}'); } catch {}
-      handleApi(req, res, body);
+      try { handleApi(req, res, body); } catch (e) {
+        console.error('API error:', e);
+        if (!res.headersSent) res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Server error' }));
+      }
     });
     return;
   }
