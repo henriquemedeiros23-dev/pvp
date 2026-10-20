@@ -1,0 +1,17 @@
+{
+  "name": "@pvp/world-gen",
+  "version": "1.0.0",
+  "description": "Deterministic island-of-ruins generator: boxes, chests, golden spots, spawn points and map checks from a seed.",
+  "type": "module",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "scripts": {
+    "test": "node --test"
+  },
+  "dependencies": {
+    "@pvp/collision": "*",
+    "@pvp/seeded-random": "*"
+  }
+}
