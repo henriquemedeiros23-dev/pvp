@@ -1,0 +1,62 @@
+# @pvp/arena
+
+## What it does
+
+The fight itself as a simulation with no sockets, no clock and no `Math.random`: players join and leave,
+move (with an anti-teleport check), fire weapons (melee, guns, thrown grenades, rockets, mines), open chests
+and the golden chest, pick up and drop loot, get hurt and knocked out. The server calls the methods and
+`tick(now)`, then sends whatever `drain()` returns. Depends on `@pvp/game-rules`, `@pvp/collision` and `@pvp/world-gen`.
+
+## How to use
+
+```js
+import { createArena, ARENA_DEFAULTS } from '@pvp/arena';
+import { generateIsland } from '@pvp/world-gen';
+import { createRandom } from '@pvp/seeded-random';
+import { RULES } from '@pvp/game-rules';
+
+const arena = createArena({ island: generateIsland(), rules: RULES, random: createRandom(1234), now: Date.now() });
+// optional: tuning: { snapshotRadius: 200, ... } (see src/tuning.js), snapshots: false
+
+const r = arena.join('alice', { name: 'Alice', skin, loadout: ['rocket', 'pistol'], coins: 120 }, Date.now());
+// { ok: true, id, weapons: ['rocket', 'pistol'] (taken from the loadout: remove them from the backpack),
+//   replaced: null | { id, weapons } (same key was already in: that player left alive) }
+// or { ok: false, reason: 'full' } (send 'full' yourself)
+
+arena.setState(id, { x, y, z, ry, pitch, f }, now); // false + a 'pos' correction if it moved too far
+arena.fire(id, [dx, dy, dz], now);                  // or { x, y, z }
+arena.selectSlot(id, i);
+arena.openChest(id, 3, now);                        // chest index, or 'golden'
+arena.heal(id, 'bandage', now);
+const back = arena.leave(id, { alive: true });      // weapons to put back in the backpack ([] if not alive)
+
+setInterval(() => {
+  arena.tick(Date.now());                           // chests, golden chest, items, projectiles, mines, snaps
+  for (const ev of arena.drain()) {
+    if (ev.to === 'server') handle(ev);             // { kind: 'coins', playerId, playerKey, amount, total }
+                                                    // { kind: 'knockedOut', playerId, playerKey, weapons, by, byId }
+    else if (ev.to === 'all') for (const id of arena.playerIds()) { if (id !== ev.except) sendTo(id, ev.msg); }
+    else sendTo(ev.to, ev.msg);                     // also deliver to a player id that just got knocked out ('dead')
+  }
+}, 50);
+```
+
+- Every `msg` is a server message of `@pvp/net-protocol` (`{ t, ...fields }`), checked in the tests with `serverMessage`.
+- `now` is optional on every method; it defaults to the latest time seen. The clock never goes backwards.
+- `'all'` means everyone in the arena when you drain, so drain after every call (or at least every tick).
+- Also: `snapshotFor(id)`, `welcomeFor(id)` (join already queues 'welcome' + 'inv' + 'pjoin'), `playerCount()`,
+  `playerIds()`, `hasPlayer(id)`, `idOf(key)`, `teleport(id, { x, y, z, ry })` (no checks), and read-only copies:
+  `getPlayer(id)`, `chests()`, `golden()`, `nextGoldenAt()`, `items()`, `projectiles()`, `mines()`, `now()`.
+- Weapons behave only by their `type` (`melee`, `gun`, `throw`, `rocket`, `mine`) and numbers in the rules
+  (`dmg`, `range`, `rate`, `spread`, `pellets`, `knock`, `speed`, `radius`, `fuse`, `maxActive`), never by id:
+  a new weapon only needs a new entry in `@pvp/game-rules`.
+- Coins come only from chests. The arena keeps a player's coins (from `join`) for the 'coins' and 'inv' messages.
+
+Files: `src/state.js`, `src/players.js`, `src/chests.js`, `src/loot.js`, `src/combat.js`, `src/projectiles.js`,
+`src/mines.js`, `src/snapshot.js`, `src/tuning.js`, all wired in `src/index.js`.
+
+## Determinism
+
+Fully deterministic. Time is passed in, and all randomness comes from the seeded `random` you give it
+(split with `fork` into its own streams for spawns, loot, the golden chest and gun spread). No `Math.random`,
+no `Date.now`, no timers. The same seed and the same calls give exactly the same outbox (there is a replay test).

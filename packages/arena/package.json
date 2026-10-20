@@ -1,0 +1,23 @@
+{
+  "name": "@pvp/arena",
+  "version": "1.0.0",
+  "private": true,
+  "description": "The fight itself as a deterministic, transport-free simulation: players, chests, loot, weapons, projectiles, mines and snapshots.",
+  "type": "module",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "scripts": {
+    "test": "node --test"
+  },
+  "dependencies": {
+    "@pvp/collision": "*",
+    "@pvp/game-rules": "*",
+    "@pvp/world-gen": "*"
+  },
+  "devDependencies": {
+    "@pvp/net-protocol": "*",
+    "@pvp/seeded-random": "*"
+  }
+}
