@@ -1,0 +1,23 @@
+{
+  "name": "@pvp/stickman-3d",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A three.js stickman character with skins, outfits, weapon models and a pure, testable animation pose.",
+  "type": "module",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "scripts": {
+    "test": "node --test"
+  },
+  "dependencies": {
+    "@pvp/game-rules": "*"
+  },
+  "peerDependencies": {
+    "three": ">=0.160.0"
+  },
+  "devDependencies": {
+    "three": "0.170.0"
+  }
+}
