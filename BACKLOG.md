@@ -39,7 +39,7 @@ The live list is on GitHub Issues: https://github.com/henriquemedeiros23-dev/pvp
 | 12 | 🔨 | **Connect the game to the packages** | Server and phone code use the packages instead of their own copies. The game runs from start to finish. |
 | 13 | 🔲 | **Automatic play test** | A browser test signs up, joins the arena, moves, opens a chest and leaves, with no errors. |
 | 15 | ✅ | **Server crashes on a bad web address** | A request like `/%E0` makes the server crash. It must answer 400 instead, with a test. |
-| 14 | 🔨 | **Package catalog** | `CATALOG.md` lists every package: what it does, how to use it, how deterministic it is. |
+| 14 | ✅ | **Package catalog** | `CATALOG.md` lists every package: what it does, how to use it, how deterministic it is. |
 
 ## Phase 5: Polish (found while testing)
 
