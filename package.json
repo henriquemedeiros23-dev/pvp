@@ -1,0 +1,17 @@
+{
+  "name": "pvp-game",
+  "version": "1.0.0",
+  "description": "",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "three": "^0.170.0",
+    "ws": "^8.22.0"
+  },
+  "type": "module"
+}
