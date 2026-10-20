@@ -41,6 +41,8 @@ try {
 } catch (e) {
   console.warn('3D view could not start:', e);
 }
+// Open the game with ?debug to look inside from the browser console (the browser test uses it).
+if (game && new URLSearchParams(location.search).has('debug')) window.pvpDebug = () => game.debugState();
 
 function preview() {
   if (game && account) game.showPreview(account.skin);

@@ -2,11 +2,17 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
+import fs from 'node:fs';
 import http from 'node:http';
 import net from 'node:net';
+import os from 'node:os';
+import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const SERVER = fileURLToPath(new URL('../server.js', import.meta.url));
+// Never touch the real accounts file (issue #19): every run gets its own temp file.
+const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pvp-test-'));
+const dataFile = path.join(dataDir, 'accounts.json');
 let child, port;
 
 // ask the OS for a free port
@@ -22,7 +28,7 @@ const get = path => new Promise((resolve, reject) => {
 
 before(async () => {
   port = await freePort();
-  child = spawn(process.execPath, [SERVER], { env: { ...process.env, PORT: String(port) }, stdio: ['ignore', 'pipe', 'inherit'] });
+  child = spawn(process.execPath, [SERVER], { env: { ...process.env, PORT: String(port), DATA_FILE: dataFile }, stdio: ['ignore', 'pipe', 'inherit'] });
   // wait until the server says it is listening
   await new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error('server did not start')), 10000);
@@ -31,7 +37,17 @@ before(async () => {
   });
 });
 
-after(() => { child?.kill(); });
+// stop the server (it saves accounts on SIGTERM), then remove the temp data
+const stopServer = async () => {
+  if (child && child.exitCode === null && child.signalCode === null) {
+    const exited = new Promise(resolve => child.once('exit', resolve));
+    child.kill();
+    await exited;
+  }
+  fs.rmSync(dataDir, { recursive: true, force: true });
+};
+
+after(stopServer);
 
 test('serves the page', async () => {
   assert.equal(await get('/'), 200);
@@ -41,14 +57,13 @@ test('serves three.js', async () => {
   assert.equal(await get('/three/build/three.module.js'), 200);
 });
 
-test('serves shared code', async () => {
-  assert.equal(await get('/shared/config.js'), 200);
-});
-
 test('serves package source files for the browser', async () => {
   assert.equal(await get('/packages/game-rules/src/index.js'), 200);
   assert.equal(await get('/packages/api-client/src/index.js'), 200);
   assert.equal(await get('/packages/shop-catalog/src/index.js'), 200);
+  for (const name of ['net-protocol', 'world-gen', 'seeded-random', 'collision', 'stickman-3d', 'touch-controls']) {
+    assert.equal(await get(`/packages/${name}/src/index.js`), 200, name);
+  }
   assert.equal(await get('/packages/game-rules/src/nope.js'), 404);
 });
 
@@ -62,6 +77,7 @@ test('only package src folders are served', async () => {
 });
 
 test('blocks path traversal', async () => {
-  assert.equal(await get('/shared/../server.js'), 403);
+  assert.equal(await get('/../server.js'), 403);
+  assert.equal(await get('/js/../../server.js'), 403);
   assert.equal(await get('/three/../../package.json'), 403);
 });

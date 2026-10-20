@@ -9,6 +9,17 @@
     "test": "node --test"
   },
   "dependencies": {
+    "@pvp/accounts-shop": "*",
+    "@pvp/api-client": "*",
+    "@pvp/arena": "*",
+    "@pvp/collision": "*",
+    "@pvp/game-rules": "*",
+    "@pvp/net-protocol": "*",
+    "@pvp/seeded-random": "*",
+    "@pvp/shop-catalog": "*",
+    "@pvp/stickman-3d": "*",
+    "@pvp/touch-controls": "*",
+    "@pvp/world-gen": "*",
     "three": "0.170.0",
     "ws": "^8.22.0"
   }

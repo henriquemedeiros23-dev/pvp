@@ -1,16 +1,32 @@
 // The 3D game: draws the island, runs your stickman, talks to the server.
+// Glue only: the rules, island, movement, stickman, controls and messages all come from packages.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import * as C from '/shared/config.js';
-import { generateWorld, movePlayer, rayWorld, rayPlayer, ISLAND_RADIUS } from '/shared/world.js';
-import { Stickman, buildWeapon } from './stickman.js';
-import { Controls } from './controls.js';
+import * as C from '@pvp/game-rules';
+import { generateIsland } from '@pvp/world-gen';
+import { movePlayer, rayBoxes, rayCylinder } from '@pvp/collision';
+import { Stickman, buildWeapon } from '@pvp/stickman-3d';
+import { createInputState, attachTouchControls, attachDesktopControls, isTouchDevice } from '@pvp/touch-controls';
+import { decodeServerMessage, encodeClient, unpackSnapshotPlayer, makeFlags, readFlags } from '@pvp/net-protocol';
 
 const $ = id => document.getElementById(id);
 export const WEAPON_ICONS = {
   woodsword: '🗡️', sword: '⚔️', bat: '🏏', spear: '🔱', axe: '🪓', pistol: '🔫', shotgun: '💥',
   rifle: '🎯', sniper: '🔭', grenade: '💣', rocket: '🚀', mine: '🧨',
 };
+
+const HIT_RADIUS = C.PLAYER_RADIUS + 0.1; // a bit wider than the body, like the server
+const v3 = (x, y, z) => ({ x, y, z });
+
+// Distance along a unit ray to the first wall or the ground, at most maxDist.
+function rayWorld(world, ox, oy, oz, dx, dy, dz, maxDist) {
+  return Math.min(maxDist, rayBoxes(world.grid, v3(ox, oy, oz), v3(dx, dy, dz), maxDist)); // rayBoxes gives Infinity on a miss
+}
+
+// Distance along a unit ray to a standing player, or Infinity.
+function rayPlayer(ox, oy, oz, dx, dy, dz, px, py, pz, height) {
+  return rayCylinder(v3(ox, oy, oz), v3(dx, dy, dz), { x: px, y: py, z: pz, height, radius: HIT_RADIUS });
+}
 
 function noiseTexture(size, base, spread, cracks = false) {
   const c = document.createElement('canvas');
@@ -73,11 +89,15 @@ function nameTag(name) {
 
 export class Game {
   constructor(canvas, ui) {
-    this.ui = ui; // callbacks: onDead(by), onLeft(), onFull()
+    this.ui = ui; // callbacks: onPlaying(), onDead(by, weapon), onLeft(reason), onFull()
     this.canvas = canvas;
-    this.world = generateWorld();
-    this.mobile = matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0;
-    this.controls = new Controls(canvas);
+    this.world = generateIsland(); // same seed as the server: the same island
+    this.moveOpts = {
+      radius: C.PLAYER_RADIUS, height: C.PLAYER_HEIGHT, stepHeight: C.STEP_HEIGHT,
+      gravity: C.GRAVITY, boundsRadius: this.world.playRadius,
+    };
+    this.mobile = isTouchDevice(window);
+    this.setupControls(canvas);
     this.mode = 'menu';
     this.time = 0;
 
@@ -114,10 +134,29 @@ export class Game {
     this.resize();
     this.clock = new THREE.Clock();
     r.setAnimationLoop(() => this.frame());
+  }
 
-    if (!this.controls.touch) $('btnOpen').addEventListener('click', () => this.controls.events.push('open'));
-    $('btnBandage').addEventListener('pointerdown', e => { e.preventDefault(); this.controls.events.push('bandage'); });
-    $('btnMedkit').addEventListener('pointerdown', e => { e.preventDefault(); this.controls.events.push('medkit'); });
+  // Joystick + buttons on phones, keyboard + mouse on computers (@pvp/touch-controls).
+  setupControls(canvas) {
+    const touch = this.mobile;
+    document.body.classList.toggle('desktop', !touch);
+    $('keysHelp').classList.toggle('hidden', touch);
+    this.input = createInputState({ enabled: false }); // switched on while playing
+    if (touch) {
+      attachTouchControls(this.input, {
+        canvas, stick: $('stick'), knob: $('knob'),
+        buttons: {
+          fire: $('btnFire'), jump: $('btnJump'), crouch: $('btnCrouch'), open: $('btnOpen'),
+          bandage: $('btnBandage'), medkit: $('btnMedkit'),
+        },
+      });
+    } else {
+      attachDesktopControls(this.input, { canvas, target: window });
+      const tap = name => { this.input.button(name, true); this.input.button(name, false); };
+      $('btnOpen').addEventListener('click', () => tap('open'));
+      $('btnBandage').addEventListener('pointerdown', e => { e.preventDefault(); tap('bandage'); });
+      $('btnMedkit').addEventListener('pointerdown', e => { e.preventDefault(); tap('medkit'); });
+    }
   }
 
   resize() {
@@ -161,6 +200,7 @@ export class Game {
     s.add(dir, dir.target);
 
     // island
+    const ISLAND_RADIUS = this.world.islandRadius;
     const ground = new THREE.CircleGeometry(ISLAND_RADIUS + 12, 96, 0, Math.PI * 2);
     ground.rotateX(-Math.PI / 2);
     const gp = ground.attributes.position, gc = [];
@@ -325,15 +365,31 @@ export class Game {
         if (this.ws === ws) this.ws = null;
         if (this.mode === 'play') { this.endPlay(); this.ui.onLeft('Lost connection to the server'); }
       };
-      ws.onmessage = e => this.onMessage(JSON.parse(e.data));
+      ws.onmessage = e => {
+        const r = decodeServerMessage(e.data);
+        if (r.ok) this.onMessage(r.msg);
+        else console.warn('Ignored a bad server message:', r.error);
+      };
     });
   }
 
-  send(msg) { if (this.ws && this.ws.readyState === 1) this.ws.send(JSON.stringify(msg)); }
+  // Build and check a message (@pvp/net-protocol), then send it.
+  send(type, fields) {
+    if (!this.ws || this.ws.readyState !== 1) return;
+    let text;
+    try { text = encodeClient(type, fields); } catch (e) { console.warn(e.message); return; }
+    this.ws.send(text);
+  }
 
-  join() { this.send({ t: 'join' }); }
+  join() { this.send('join'); }
 
-  leave() { this.send({ t: 'leave' }); this.endPlay(); }
+  leave() { this.send('leave'); this.endPlay(); }
+
+  // Small read-only view for tests and debugging.
+  debugState() {
+    const me = this.me;
+    return { mode: this.mode, id: this.myId, me: me ? { x: me.x, y: me.y, z: me.z, hp: me.hp } : null };
+  }
 
   onMessage(m) {
     switch (m.t) {
@@ -360,7 +416,11 @@ export class Game {
       case 'hurt': return this.onHurt(m);
       case 'ko': return this.onKO(m);
       case 'dead': this.endPlay(); return this.ui.onDead(m.by, m.weapon);
-      case 'left': return;
+      case 'left':
+        // We already left if we asked to; otherwise the server took us out
+        // (this account joined the arena again from another tab or device).
+        if (this.mode === 'play') { this.endPlay(); this.ui.onLeft('You joined the arena from somewhere else.'); }
+        return;
     }
   }
 
@@ -381,7 +441,8 @@ export class Game {
     if (this.preview) this.preview.root.visible = false;
     this.mode = 'play';
     this.lastSend = 0; this.lastFire = 0;
-    this.controls.enabled = true;
+    this.input.reset();
+    this.input.enabled = true;
     $('hud').classList.remove('hidden');
     this.ui.onPlaying();
   }
@@ -389,8 +450,8 @@ export class Game {
   endPlay() {
     if (this.mode !== 'play') return;
     this.mode = 'menu';
-    this.controls.enabled = false;
-    this.controls.reset();
+    this.input.enabled = false;
+    this.input.reset();
     if (this.me) { this.scene.remove(this.me.sm.root); this.me.sm.dispose(); this.me = null; }
     this.clearArena();
     $('hud').classList.add('hidden');
@@ -411,7 +472,8 @@ export class Game {
   onSnap(m) {
     $('hudPlayers').textContent = m.n;
     const seen = new Set();
-    for (const [id, x, y, z, ry, pitch, flags, weapon, hp, prot] of m.p) {
+    for (const packed of m.p) {
+      const { id, x, y, z, ry, pitch, flags, weapon, hp, protected: prot } = unpackSnapshotPlayer(packed);
       if (id === this.myId) { if (this.me) this.setHp(hp); continue; }
       seen.add(id);
       let r = this.remotes.get(id);
@@ -459,7 +521,7 @@ export class Game {
       const b = document.createElement('button');
       b.className = `slot ${i === m.slot ? 'active' : ''} ${C.WEAPONS[w].rarity}`;
       b.innerHTML = `${WEAPON_ICONS[w]}<small>${C.WEAPONS[w].name}</small>`;
-      b.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); this.send({ t: 'slot', i }); });
+      b.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); this.send('slot', { i }); });
       slots.appendChild(b);
     });
     if (m.picked) this.toast(`Picked up ${m.picked}`);
@@ -668,11 +730,11 @@ export class Game {
 
   updatePlay(dt) {
     const me = this.me;
-    const ctl = this.controls;
-    const { ev, look } = ctl.take();
+    const { ev, look, move, fire } = this.input.take();
 
-    // look
+    // look (yaw kept in -PI..PI so it always fits in a message)
     this.yaw -= look.x;
+    this.yaw = Math.atan2(Math.sin(this.yaw), Math.cos(this.yaw));
     this.pitch = Math.max(-1.2, Math.min(1.1, this.pitch - look.y));
 
     for (const e of ev) {
@@ -683,20 +745,20 @@ export class Game {
           me.slideDir = [Math.sin(me.moveYaw), Math.cos(me.moveYaw)];
         } else me.crouch = !me.crouch;
       }
-      if (e === 'open' && this.nearChest != null) this.send({ t: 'open', id: this.nearChest });
-      if (e === 'bandage' || e === 'medkit') this.send({ t: 'heal', kind: e });
+      if (e === 'open' && this.nearChest != null) this.send('open', { id: this.nearChest });
+      if (e === 'bandage' || e === 'medkit') this.send('heal', { kind: e });
       if (e.startsWith('slot:') && this.inv) {
         const n = this.inv.weapons.length;
         const arg = e.slice(5);
         const i = arg === '+' ? (this.inv.slot + 1) % n : arg === '-' ? (this.inv.slot + n - 1) % n : Number(arg);
-        if (i < n) this.send({ t: 'slot', i });
+        if (i >= 0 && i < n) this.send('slot', { i });
       }
     }
 
     // movement
     const fx = Math.sin(this.yaw), fz = Math.cos(this.yaw);
     const rx = -fz, rz = fx;
-    const mx = ctl.move.x, my = ctl.move.y;
+    const mx = move.x, my = move.y;
     const mag = Math.min(1, Math.hypot(mx, my));
     let dx = 0, dz = 0, speed = 0;
     if (me.slide > 0) {
@@ -715,7 +777,8 @@ export class Game {
     me.kx *= Math.max(0, 1 - dt * 6); me.kz *= Math.max(0, 1 - dt * 6);
     me.speed = speed;
     const height = me.crouch ? C.CROUCH_HEIGHT : C.PLAYER_HEIGHT;
-    movePlayer(this.world, me, dx, dz, dt, height);
+    this.moveOpts.height = height;
+    movePlayer(this.world.grid, me, dx, dz, dt, this.moveOpts);
 
     // body faces where the camera looks (like Fortnite)
     me.sm.root.position.set(me.x, me.y, me.z);
@@ -739,7 +802,7 @@ export class Game {
     const w = this.inv && this.inv.weapons[this.inv.slot];
     const def = C.WEAPONS[w];
     const now = performance.now();
-    if (ctl.fire && def && now - this.lastFire >= def.rate * 1000) {
+    if (fire && def && now - this.lastFire >= def.rate * 1000) {
       this.lastFire = now;
       const cam = this.camera.position;
       const range = def.type === 'gun' ? def.range : 60;
@@ -747,7 +810,7 @@ export class Game {
       let t = rayWorld(this.world, cam.x, cam.y, cam.z, dirX, dirY, dirZ, range + dist);
       for (const r of this.remotes.values()) {
         const p = r.sm.root.position;
-        const tt = rayPlayer(cam.x, cam.y, cam.z, dirX, dirY, dirZ, p.x, p.y, p.z, (r.flags & 1) ? C.CROUCH_HEIGHT : C.PLAYER_HEIGHT);
+        const tt = rayPlayer(cam.x, cam.y, cam.z, dirX, dirY, dirZ, p.x, p.y, p.z, readFlags(r.flags).crouch ? C.CROUCH_HEIGHT : C.PLAYER_HEIGHT);
         if (tt < t) t = tt;
       }
       const tx = cam.x + dirX * t, ty = cam.y + dirY * t, tz = cam.z + dirZ * t;
@@ -755,7 +818,7 @@ export class Game {
       let ax = tx - me.x, ay = ty - oy, az = tz - me.z;
       if (def.type === 'melee' || def.type === 'mine') { ax = dirX; ay = dirY; az = dirZ; }
       const len = Math.hypot(ax, ay, az) || 1;
-      this.send({ t: 'fire', d: [ax / len, ay / len, az / len] });
+      this.send('fire', { d: [ax / len, ay / len, az / len] });
       if (def.type === 'melee') me.sm.swing = 1;
     }
 
@@ -770,7 +833,7 @@ export class Game {
     this.nearChest = near;
     const ob = $('btnOpen');
     ob.classList.toggle('hidden', near == null);
-    ob.textContent = this.controls.touch ? 'OPEN' : 'OPEN (E)';
+    ob.textContent = this.mobile ? 'OPEN' : 'OPEN (E)';
 
     // golden chest pointer
     if (this.golden) {
@@ -785,8 +848,8 @@ export class Game {
     // send position 20 times a second
     if (now - this.lastSend > 50) {
       this.lastSend = now;
-      const f = (me.crouch ? 1 : 0) | (me.slide > 0 ? 2 : 0) | (speed > 0.3 ? 4 : 0) | (!me.onGround ? 8 : 0);
-      this.send({ t: 'state', x: +me.x.toFixed(2), y: +me.y.toFixed(2), z: +me.z.toFixed(2), ry: +me.sm.root.rotation.y.toFixed(3), pitch: +this.pitch.toFixed(2), f });
+      const f = makeFlags({ crouch: me.crouch, slide: me.slide > 0, moving: speed > 0.3, air: !me.onGround });
+      this.send('state', { x: +me.x.toFixed(2), y: +me.y.toFixed(2), z: +me.z.toFixed(2), ry: +me.sm.root.rotation.y.toFixed(3), pitch: +this.pitch.toFixed(2), f });
     }
 
     this.sun.target.position.set(me.x, 0, me.z);
@@ -806,7 +869,8 @@ export class Game {
       r.sm.root.rotation.y += d * k;
       const sp = Math.hypot(p.x - ox, p.z - oz) / Math.max(dt, 1e-3);
       r.speed += (sp - r.speed) * Math.min(1, dt * 8);
-      r.sm.animate(dt, { speed: r.speed, crouch: !!(r.flags & 1) && !(r.flags & 2), slide: !!(r.flags & 2), air: !!(r.flags & 8), pitch: r.pitch }, t);
+      const fl = readFlags(r.flags);
+      r.sm.animate(dt, { speed: r.speed, crouch: fl.crouch && !fl.slide, slide: fl.slide, air: fl.air, pitch: r.pitch }, t);
     }
     // chest lids
     for (const m of this.chestMeshes) {

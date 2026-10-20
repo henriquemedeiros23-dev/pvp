@@ -1,103 +1,61 @@
-// Stickman Ruins game server: serves the game files, handles accounts and the
-// shop, and runs the single always-on arena.
+// Stickman Ruins game server: thin glue around the packages.
+// - serves the game files (and the browser code of the @pvp packages)
+// - accounts and the shop: @pvp/accounts-shop
+// - the single always-on arena: @pvp/arena on the island from @pvp/world-gen
+// - every WebSocket message is checked with @pvp/net-protocol
 
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
-import crypto from 'node:crypto';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 import { WebSocketServer } from 'ws';
-import * as C from './shared/config.js';
-import { generateWorld, rayWorld, rayPlayer, findSpawn, nearbyBoxes, circleHitsBox } from './shared/world.js';
+import { RULES } from '@pvp/game-rules';
+import { createAccounts, createJsonFileStore, AccountError } from '@pvp/accounts-shop';
+import { generateIsland } from '@pvp/world-gen';
+import { createArena } from '@pvp/arena';
+import { createRandom } from '@pvp/seeded-random';
+import { parseClientMessage, encode, MAX_CLIENT_MESSAGE_SIZE } from '@pvp/net-protocol';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT) || 3000;
-const DATA_FILE = path.join(ROOT, 'data', 'accounts.json');
-// three.js may be installed here or hoisted to the workspace root.
-// Its "exports" hides package.json, so resolve the main file (build/three.cjs) and go up.
+// Where accounts are saved. Tests set DATA_FILE to a temp file so they never touch the real one.
+const DATA_FILE = process.env.DATA_FILE ? path.resolve(process.env.DATA_FILE) : path.join(ROOT, 'data', 'accounts.json');
+// Seed for the arena's random numbers (loot, spawns, golden chest, gun spread). Set it to replay a match.
+const ARENA_SEED = process.env.ARENA_SEED || String(Date.now());
+const TICK_MS = 50;
 // The monorepo's packages/ folder (read-only: the browser loads package src files from here).
 const PACKAGES_DIR = path.resolve(ROOT, '..', '..', 'packages');
+// three.js may be installed here or hoisted to the workspace root.
+// Its "exports" hides package.json, so resolve the main file (build/three.cjs) and go up.
 const THREE_DIR = path.resolve(path.dirname(createRequire(import.meta.url).resolve('three')), '..');
 
 // ---------------------------------------------------------------- accounts
-let accounts = {};
-try { accounts = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8')); } catch { accounts = {}; }
-let saveTimer = null;
-function saveAccounts() {
-  if (saveTimer) return;
-  saveTimer = setTimeout(() => {
-    saveTimer = null;
-    fs.mkdirSync(path.dirname(DATA_FILE), { recursive: true });
-    fs.writeFileSync(DATA_FILE, JSON.stringify(accounts, null, 1));
-  }, 1000);
-}
-const hashPw = (pw, salt) => crypto.scryptSync(pw, salt, 32).toString('hex');
-const byToken = token => Object.values(accounts).find(a => a.token && a.token === token);
-
-function publicAccount(a) {
-  return { name: a.name, coins: a.coins, owned: a.owned, skin: a.skin, stash: a.stash };
-}
-
-function priceOf(kind, id) {
-  if (kind === 'color') return C.COLORS[id]?.price;
-  if (kind === 'weapon') return C.WEAPONS[id] && C.WEAPONS[id].rarity !== 'basic' ? C.WEAPONS[id].price : undefined;
-  return C.OUTFITS[kind]?.[id]?.price;
-}
+const accounts = createAccounts({ store: createJsonFileStore(DATA_FILE, { saveDelayMs: 1000 }) });
+const playerKey = acc => acc.name.toLowerCase();
 
 function handleApi(req, res, body) {
   const send = (code, obj) => { res.writeHead(code, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(obj)); };
-  const url = req.url;
-  if (url === '/api/signup' || url === '/api/login') {
-    const name = String(body.name || '').trim().slice(0, 16);
-    const pw = String(body.password || '');
-    if (!/^[A-Za-z0-9_]{3,16}$/.test(name)) return send(400, { error: 'Name must be 3-16 letters, numbers or _' });
-    if (pw.length < 4) return send(400, { error: 'Password must be at least 4 characters' });
-    const key = name.toLowerCase();
-    if (url === '/api/signup') {
-      if (accounts[key]) return send(400, { error: 'That name is taken' });
-      const salt = crypto.randomBytes(8).toString('hex');
-      accounts[key] = {
-        name, salt, hash: hashPw(pw, salt), coins: 0,
-        owned: ['color:black', 'hat:none', 'face:none', 'back:none', 'shirt:none'],
-        skin: { ...C.DEFAULT_SKIN }, stash: {},
-      };
-    } else {
-      const a = accounts[key];
-      if (!a || hashPw(pw, a.salt) !== a.hash) return send(400, { error: 'Wrong name or password' });
+  try {
+    const url = req.url;
+    if (url === '/api/signup' || url === '/api/login') {
+      const { name, password } = body;
+      const { token, account } = url === '/api/signup' ? accounts.signup(name, password) : accounts.login(name, password);
+      return send(200, { token, account: accounts.publicView(account) });
     }
-    accounts[key].token = crypto.randomBytes(24).toString('hex');
-    saveAccounts();
-    return send(200, { token: accounts[key].token, account: publicAccount(accounts[key]) });
+
+    const acc = accounts.byToken(req.headers['x-token']);
+    if (!acc) return send(401, { error: 'Please log in again' });
+
+    if (url === '/api/me') return send(200, { account: accounts.publicView(acc), online: arena.playerCount() });
+    if (url === '/api/buy') return send(200, { account: accounts.buy(acc, body.kind, body.id) });
+    if (url === '/api/equip') return send(200, { account: accounts.equip(acc, body.kind, body.id) });
+    return send(404, { error: 'Not found' });
+  } catch (e) {
+    if (e instanceof AccountError) return send(400, { error: e.message });
+    throw e;
   }
-
-  const acc = byToken(req.headers['x-token']);
-  if (!acc) return send(401, { error: 'Please log in again' });
-
-  if (url === '/api/me') return send(200, { account: publicAccount(acc), online: arena.players.size });
-
-  if (url === '/api/buy') {
-    const { kind, id } = body;
-    const price = priceOf(kind, id);
-    if (price === undefined) return send(400, { error: 'Unknown item' });
-    if (kind !== 'weapon' && acc.owned.includes(kind + ':' + id)) return send(400, { error: 'You already own it' });
-    if (acc.coins < price) return send(400, { error: 'Not enough coins' });
-    acc.coins -= price;
-    if (kind === 'weapon') acc.stash[id] = (acc.stash[id] || 0) + 1;
-    else acc.owned.push(kind + ':' + id);
-    saveAccounts();
-    return send(200, { account: publicAccount(acc) });
-  }
-
-  if (url === '/api/equip') {
-    const { kind, id } = body;
-    if (!acc.owned.includes(kind + ':' + id)) return send(400, { error: 'Buy it first' });
-    acc.skin[kind] = id;
-    saveAccounts();
-    return send(200, { account: publicAccount(acc) });
-  }
-  send(404, { error: 'Not found' });
 }
 
 // ---------------------------------------------------------------- static files
@@ -107,9 +65,8 @@ function serveStatic(req, res) {
   try { p = decodeURIComponent(req.url.split('?')[0]); } catch { res.writeHead(400); return res.end('Bad Request'); }
   let file;
   if (p === '/') p = '/index.html';
-  let allowed = [path.join(ROOT, 'public'), path.join(ROOT, 'shared'), THREE_DIR];
-  if (p.startsWith('/shared/')) file = path.join(ROOT, p);
-  else if (p.startsWith('/three/')) file = path.join(THREE_DIR, p.slice(7));
+  let allowed = [path.join(ROOT, 'public'), THREE_DIR];
+  if (p.startsWith('/three/')) file = path.join(THREE_DIR, p.slice(7));
   else if (p.startsWith('/packages/')) {
     // Browser code of the @pvp packages: only /packages/<name>/src/... may be read.
     const m = /^\/packages\/([a-z0-9-]+)\/src\//.exec(p);
@@ -146,390 +103,110 @@ const server = http.createServer((req, res) => {
 });
 
 // ---------------------------------------------------------------- arena
-const world = generateWorld();
-let nextId = 1;
-const newId = () => nextId++;
+const arena = createArena({ island: generateIsland(), rules: RULES, random: createRandom(ARENA_SEED), now: Date.now() });
+const conns = new Map(); // arena player id -> connection { ws, acc, playerId }
 
-const arena = {
-  players: new Map(),   // id -> player
-  chests: world.chests.map(c => ({ ...c, openUntil: 0 })),
-  golden: null,         // { x, z } while a golden chest is waiting
-  nextGolden: Date.now() + 60000, // first one after 1 minute
-  items: new Map(),     // id -> { id, kind: 'weapon'|'bandage'|'medkit', weapon, x, y, z, expires }
-  projectiles: new Map(),
-  mines: new Map(),
-};
+const sendRaw = (conn, text) => { if (conn && conn.ws.readyState === 1) conn.ws.send(text); };
 
-function broadcast(msg, except) {
-  const s = JSON.stringify(msg);
-  for (const p of arena.players.values()) if (p !== except && p.ws.readyState === 1) p.ws.send(s);
+// Send everything the arena queued, and handle its events for the server.
+function pump() {
+  const gone = [];
+  for (const ev of arena.drain()) {
+    if (ev.to === 'server') {
+      const conn = conns.get(ev.playerId);
+      if (ev.kind === 'coins' && conn) accounts.addCoins(conn.acc, ev.amount);
+      // Knocked out: the weapons are lost (dropped on the island), nothing goes back to the backpack.
+      if (ev.kind === 'knockedOut') gone.push(ev.playerId);
+      continue;
+    }
+    const text = JSON.stringify(ev.msg);
+    if (ev.to === 'all') {
+      for (const id of arena.playerIds()) if (id !== ev.except) sendRaw(conns.get(id), text);
+    } else {
+      sendRaw(conns.get(ev.to), text); // also a player who was just knocked out ('dead')
+    }
+  }
+  for (const id of gone) {
+    const conn = conns.get(id);
+    if (conn && conn.playerId === id) conn.playerId = null;
+    conns.delete(id);
+  }
 }
-const sendTo = (p, msg) => p.ws.readyState === 1 && p.ws.send(JSON.stringify(msg));
 
-function inventoryMsg(p) {
-  return { t: 'inv', weapons: p.weapons, slot: p.slot, bandages: p.bandages, medkits: p.medkits, coins: p.acc.coins, hp: p.hp };
+// Leave the arena alive: carried weapons go back into the backpack.
+function leaveAlive(conn) {
+  const id = conn.playerId;
+  if (id == null) return;
+  conn.playerId = null;
+  conns.delete(id);
+  if (arena.hasPlayer(id)) accounts.returnLoadout(conn.acc, arena.leave(id, { alive: true }));
 }
 
-function playerInfo(p) {
-  return { id: p.id, name: p.acc.name, skin: p.acc.skin };
-}
-
-function joinArena(conn) {
+function join(conn, now) {
   const acc = conn.acc;
-  if (arena.players.size >= C.MAX_PLAYERS) return sendTo(conn, { t: 'full' });
-  for (const p of arena.players.values()) if (p.acc === acc) leaveArena(p, true);
-
-  // Bought weapons come out of the backpack, best first, as many as fit.
-  const weapons = [C.BASIC_WEAPON];
-  const owned = Object.keys(acc.stash).filter(k => acc.stash[k] > 0).sort((a, b) => C.WEAPONS[b].price - C.WEAPONS[a].price);
-  for (const w of owned) {
-    if (weapons.length >= C.MAX_SLOTS) break;
-    weapons.push(w);
-    acc.stash[w]--;
-    if (!acc.stash[w]) delete acc.stash[w];
+  // Same account already in (another tab or device): that player leaves alive first,
+  // so its weapons are back in the backpack before the new loadout is taken.
+  const oldId = arena.idOf(playerKey(acc));
+  if (oldId !== undefined) {
+    const old = conns.get(oldId);
+    if (old) { leaveAlive(old); if (old !== conn) sendRaw(old, encode('left')); }
+    else accounts.returnLoadout(acc, arena.leave(oldId, { alive: true }));
   }
-  saveAccounts();
 
-  const spot = findSpawn(world, [...arena.players.values()]);
-  const p = {
-    id: newId(), ws: conn.ws, acc, x: spot.x, y: 0, z: spot.z, ry: 0, pitch: 0, flags: 0,
-    hp: C.MAX_HP, weapons, slot: 0, bandages: 1, medkits: 0, lastFire: 0, lastHeal: 0,
-    protectUntil: Date.now() + C.SPAWN_PROTECT_MS, lastState: Date.now(),
-  };
-  conn.player = p;
-  arena.players.set(p.id, p);
-
-  sendTo(p, {
-    t: 'welcome', id: p.id, x: p.x, z: p.z,
-    players: [...arena.players.values()].map(playerInfo),
-    chests: arena.chests.filter(c => c.openUntil > Date.now()).map(c => c.id),
-    golden: arena.golden,
-    items: [...arena.items.values()].map(itemMsg),
-    mines: [...arena.mines.values()].map(m => ({ id: m.id, x: m.x, z: m.z, owner: m.owner })),
-  });
-  sendTo(p, inventoryMsg(p));
-  broadcast({ t: 'pjoin', ...playerInfo(p) }, p);
-}
-
-function leaveArena(p, keepWeapons) {
-  if (!arena.players.has(p.id)) return;
-  arena.players.delete(p.id);
-  if (keepWeapons) {
-    // Left the game alive: weapons go back into the backpack.
-    for (const w of p.weapons) if (w !== C.BASIC_WEAPON) p.acc.stash[w] = (p.acc.stash[w] || 0) + 1;
-    saveAccounts();
-  }
-  broadcast({ t: 'pleave', id: p.id });
-}
-
-const itemMsg = it => ({ id: it.id, kind: it.kind, weapon: it.weapon, x: it.x, y: it.y, z: it.z });
-
-function dropItem(kind, weapon, x, z, spread = 1.2) {
-  const a = Math.random() * Math.PI * 2, d = Math.random() * spread;
-  let ix = x + Math.cos(a) * d, iz = z + Math.sin(a) * d;
-  if ([...nearbyBoxes(world.grid, ix, iz, 1)].some(b => b.h > 0.5 && circleHitsBox(ix, iz, 0.3, b))) { ix = x; iz = z; }
-  let y = 0;
-  for (const b of nearbyBoxes(world.grid, ix, iz, 0.5)) if (circleHitsBox(ix, iz, 0.2, b) && b.h <= 1.4) y = Math.max(y, b.y + b.h);
-  const it = { id: newId(), kind, weapon, x: ix, y, z: iz, expires: Date.now() + C.ITEM_LIFETIME_MS };
-  arena.items.set(it.id, it);
-  broadcast({ t: 'item+', ...itemMsg(it) });
-}
-
-function rollLoot(x, z) {
-  if (Math.random() < 0.5) {
-    const roll = Math.random();
-    const rarity = roll < 0.68 ? 'common' : roll < 0.95 ? 'rare' : 'legendary';
-    const list = C.LOOT_TABLE[rarity];
-    dropItem('weapon', list[Math.floor(Math.random() * list.length)], x, z);
-  } else {
-    dropItem(Math.random() < 0.75 ? 'bandage' : 'medkit', null, x, z);
-  }
-}
-
-function giveCoins(p, n) {
-  p.acc.coins += n;
-  saveAccounts();
-  sendTo(p, { t: 'coins', amount: n, total: p.acc.coins });
-}
-
-function openChest(p, id) {
-  if (id === 'golden') {
-    const g = arena.golden;
-    if (!g || Math.hypot(g.x - p.x, g.z - p.z) > 3.2) return;
-    arena.golden = null;
-    arena.nextGolden = Date.now() + C.GOLDEN_CHEST_EVERY_MS;
-    giveCoins(p, 80 + Math.floor(Math.random() * 41));
-    const legends = C.LOOT_TABLE.legendary;
-    dropItem('weapon', legends[Math.floor(Math.random() * legends.length)], g.x, g.z);
-    dropItem('medkit', null, g.x, g.z);
-    broadcast({ t: 'golden', golden: null, by: p.acc.name });
+  const loadout = accounts.takeLoadout(acc);
+  const r = arena.join(playerKey(acc), { name: acc.name, skin: { ...acc.skin }, loadout, coins: acc.coins }, now);
+  if (!r.ok) {
+    accounts.returnLoadout(acc, loadout);
+    sendRaw(conn, encode('full'));
     return;
   }
-  const c = arena.chests[id];
+  // Give back any loadout weapons the arena didn't take.
+  const rest = [...loadout];
+  for (const w of r.weapons) { const i = rest.indexOf(w); if (i >= 0) rest.splice(i, 1); }
+  if (rest.length) accounts.returnLoadout(acc, rest);
+  if (r.replaced) {
+    const old = conns.get(r.replaced.id);
+    if (old) { old.playerId = null; conns.delete(r.replaced.id); }
+    accounts.returnLoadout(acc, r.replaced.weapons);
+  }
+  conn.playerId = r.id;
+  conns.set(r.id, conn);
+}
+
+function onMessage(conn, m) {
   const now = Date.now();
-  if (!c || c.openUntil > now || Math.hypot(c.x - p.x, c.z - p.z) > 3.2) return;
-  c.openUntil = now + C.CHEST_RESPAWN_MS;
-  giveCoins(p, 5 + Math.floor(Math.random() * 11));
-  rollLoot(c.x, c.z);
-  broadcast({ t: 'chest', id: c.id, open: true });
+  const id = conn.playerId != null && arena.hasPlayer(conn.playerId) ? conn.playerId : null;
+  switch (m.t) {
+    case 'join': if (id == null) join(conn, now); break;
+    case 'leave': if (id != null) { leaveAlive(conn); sendRaw(conn, encode('left')); } break;
+    case 'state': if (id != null) arena.setState(id, { x: m.x, y: m.y, z: m.z, ry: m.ry, pitch: m.pitch, f: m.f }, now); break;
+    case 'fire': if (id != null) arena.fire(id, m.d, now); break;
+    case 'slot': if (id != null) arena.selectSlot(id, m.i); break;
+    case 'open': if (id != null) arena.openChest(id, m.id, now); break;
+    case 'heal': if (id != null) arena.heal(id, m.kind, now); break;
+  }
+  pump();
 }
 
-function damage(victim, amount, attacker, weapon, kx = 0, kz = 0) {
-  if (!arena.players.has(victim.id) || victim.hp <= 0) return;
-  if (Date.now() < victim.protectUntil) return;
-  victim.hp = Math.max(0, victim.hp - Math.round(amount));
-  if (attacker) sendTo(attacker, { t: 'hitmark', dead: victim.hp <= 0 });
-  sendTo(victim, { t: 'hurt', hp: victim.hp, kx, kz, from: attacker ? [attacker.x, attacker.z] : null });
-  if (victim.hp > 0) return;
-
-  // Knocked out: drop everything except the basic weapon, back to the menu.
-  for (const w of victim.weapons) if (w !== C.BASIC_WEAPON) dropItem('weapon', w, victim.x, victim.z, 2);
-  if (victim.medkits) dropItem('medkit', null, victim.x, victim.z, 2);
-  if (victim.bandages) dropItem('bandage', null, victim.x, victim.z, 2);
-  arena.players.delete(victim.id);
-  broadcast({ t: 'ko', id: victim.id, x: victim.x, y: victim.y, z: victim.z, victim: victim.acc.name, by: attacker ? attacker.acc.name : null, weapon });
-  sendTo(victim, { t: 'dead', by: attacker ? attacker.acc.name : null, weapon });
-}
-
-function explode(x, y, z, def, owner, weaponId) {
-  broadcast({ t: 'boom', x, y, z, r: def.radius });
-  for (const v of [...arena.players.values()]) {
-    if (v === owner) continue; // no self damage
-    const d = Math.hypot(v.x - x, v.y + 0.9 - y, v.z - z);
-    if (d > def.radius) continue;
-    const f = 1 - (d / def.radius) * 0.7;
-    const len = Math.hypot(v.x - x, v.z - z) || 1;
-    damage(v, def.dmg * f, owner, weaponId, ((v.x - x) / len) * 8, ((v.z - z) / len) * 8);
-  }
-}
-
-function fire(p, msg) {
-  const w = p.weapons[p.slot];
-  const def = C.WEAPONS[w];
-  const now = Date.now();
-  if (!def || now - p.lastFire < def.rate * 1000 * 0.9) return;
-  p.lastFire = now;
-  p.protectUntil = 0; // attacking ends spawn protection
-
-  const height = (p.flags & 1) ? C.CROUCH_HEIGHT : C.PLAYER_HEIGHT;
-  const ox = p.x, oy = p.y + height - 0.3, oz = p.z;
-  let [dx, dy, dz] = Array.isArray(msg.d) ? msg.d.map(Number) : [0, 0, 1];
-  let len = Math.hypot(dx, dy, dz);
-  if (!len || !isFinite(len)) return;
-  dx /= len; dy /= len; dz /= len;
-
-  if (def.type === 'melee') {
-    broadcast({ t: 'swing', id: p.id });
-    let target = null, best = def.range;
-    for (const v of arena.players.values()) {
-      if (v === p) continue;
-      const vx = v.x - p.x, vz = v.z - p.z, d = Math.hypot(vx, vz);
-      if (d > best || Math.abs(v.y - p.y) > 2) continue;
-      const fx = Math.sin(p.ry), fz = Math.cos(p.ry);
-      if (d > 0.6 && (vx * fx + vz * fz) / d < 0.45) continue; // must be in front
-      best = d; target = v;
-    }
-    if (target) {
-      const d = best || 1, k = def.knock || 3;
-      damage(target, def.dmg, p, w, ((target.x - p.x) / d) * k, ((target.z - p.z) / d) * k);
-    }
-    return;
-  }
-
-  if (def.type === 'gun') {
-    const tracers = [];
-    for (let i = 0; i < def.pellets; i++) {
-      let sx = dx + (Math.random() - 0.5) * 2 * def.spread;
-      let sy = dy + (Math.random() - 0.5) * 2 * def.spread;
-      let sz = dz + (Math.random() - 0.5) * 2 * def.spread;
-      const l = Math.hypot(sx, sy, sz); sx /= l; sy /= l; sz /= l;
-      let dist = rayWorld(world, ox, oy, oz, sx, sy, sz, def.range);
-      let hit = null;
-      for (const v of arena.players.values()) {
-        if (v === p) continue;
-        const h = (v.flags & 1) ? C.CROUCH_HEIGHT : C.PLAYER_HEIGHT;
-        const t = rayPlayer(ox, oy, oz, sx, sy, sz, v.x, v.y, v.z, h);
-        if (t < dist) { dist = t; hit = v; }
-      }
-      if (hit) damage(hit, def.dmg, p, w);
-      tracers.push([+(ox + sx * dist).toFixed(2), +(oy + sy * dist).toFixed(2), +(oz + sz * dist).toFixed(2)]);
-    }
-    broadcast({ t: 'shot', id: p.id, w, from: [+ox.toFixed(2), +oy.toFixed(2), +oz.toFixed(2)], to: tracers });
-    return;
-  }
-
-  if (def.type === 'throw' || def.type === 'rocket') {
-    const pr = {
-      id: newId(), kind: w, owner: p,
-      x: ox + dx * 0.8, y: oy + dy * 0.8, z: oz + dz * 0.8,
-      vx: dx * def.speed, vy: dy * def.speed + (def.type === 'throw' ? 4 : 0), vz: dz * def.speed,
-      born: now,
-    };
-    arena.projectiles.set(pr.id, pr);
-    broadcast({ t: 'proj', id: pr.id, kind: w, x: pr.x, y: pr.y, z: pr.z, vx: pr.vx, vy: pr.vy, vz: pr.vz });
-    return;
-  }
-
-  if (def.type === 'mine') {
-    const mine = [...arena.mines.values()].filter(m => m.ownerId === p.id);
-    if (mine.length >= def.maxActive) {
-      arena.mines.delete(mine[0].id);
-      broadcast({ t: 'mine-', id: mine[0].id });
-    }
-    const m = { id: newId(), x: p.x, y: p.y, z: p.z, ownerId: p.id, owner: p, armAt: now + 1000, born: now };
-    arena.mines.set(m.id, m);
-    broadcast({ t: 'mine+', id: m.id, x: m.x, y: m.y, z: m.z, owner: p.id });
-  }
-}
-
-function heal(p, kind) {
-  const now = Date.now();
-  if (now - p.lastHeal < 800 || p.hp >= C.MAX_HP) return;
-  if (kind === 'bandage' && p.bandages > 0) { p.bandages--; p.hp = Math.min(C.MAX_HP, p.hp + C.BANDAGE_HEAL); }
-  else if (kind === 'medkit' && p.medkits > 0) { p.medkits--; p.hp = Math.min(C.MAX_HP, p.hp + C.MEDKIT_HEAL); }
-  else return;
-  p.lastHeal = now;
-  sendTo(p, inventoryMsg(p));
-}
-
-function onState(p, m) {
-  const now = Date.now();
-  const dt = Math.max(0.03, (now - p.lastState) / 1000);
-  p.lastState = now;
-  const x = Number(m.x), y = Number(m.y), z = Number(m.z);
-  if (![x, y, z].every(isFinite)) return;
-  // Light anti-cheat: refuse impossible teleports.
-  const maxMove = C.SLIDE_SPEED * dt * 1.6 + 2;
-  if (Math.hypot(x - p.x, z - p.z) > maxMove || Math.abs(y - p.y) > 25 * dt + 3) {
-    sendTo(p, { t: 'pos', x: p.x, y: p.y, z: p.z });
-    return;
-  }
-  p.x = x; p.y = Math.max(0, y); p.z = z;
-  p.ry = Number(m.ry) || 0;
-  p.pitch = Number(m.pitch) || 0;
-  p.flags = m.f | 0;
-  if (p.flags & 4) p.protectUntil = Math.min(p.protectUntil, now + 300); // moving soon ends protection
-}
-
-// ---------------------------------------------------------------- tick
-const TICK = 50;
-setInterval(() => {
-  const now = Date.now();
-  const dt = TICK / 1000;
-
-  // chests come back
-  for (const c of arena.chests) {
-    if (c.openUntil && c.openUntil <= now) { c.openUntil = 0; broadcast({ t: 'chest', id: c.id, open: false }); }
-  }
-  // golden chest
-  if (!arena.golden && now >= arena.nextGolden) {
-    const spot = world.goldenSpots[Math.floor(Math.random() * world.goldenSpots.length)];
-    arena.golden = { x: spot.x, z: spot.z };
-    broadcast({ t: 'golden', golden: arena.golden });
-  }
-  // items expire / get picked up
-  for (const it of arena.items.values()) {
-    if (now > it.expires) { arena.items.delete(it.id); broadcast({ t: 'item-', id: it.id }); continue; }
-    for (const p of arena.players.values()) {
-      if (Math.hypot(p.x - it.x, p.z - it.z) > 1.5 || Math.abs(p.y - it.y) > 2) continue;
-      let took = false;
-      if (it.kind === 'weapon' && !p.weapons.includes(it.weapon) && p.weapons.length < C.MAX_SLOTS) { p.weapons.push(it.weapon); took = true; }
-      if (it.kind === 'bandage' && p.bandages < C.MAX_BANDAGES) { p.bandages++; took = true; }
-      if (it.kind === 'medkit' && p.medkits < C.MAX_MEDKITS) { p.medkits++; took = true; }
-      if (took) {
-        arena.items.delete(it.id);
-        broadcast({ t: 'item-', id: it.id, by: p.id });
-        sendTo(p, { ...inventoryMsg(p), picked: it.kind === 'weapon' ? C.WEAPONS[it.weapon].name : C.HEALS[it.kind].name });
-        break;
-      }
-    }
-  }
-  // projectiles
-  for (const pr of arena.projectiles.values()) {
-    const def = C.WEAPONS[pr.kind];
-    const steps = 3;
-    let boom = false;
-    for (let s = 0; s < steps && !boom; s++) {
-      const sdt = dt / steps;
-      if (pr.kind === 'grenade') pr.vy -= C.GRAVITY * sdt;
-      const nx = pr.x + pr.vx * sdt, ny = pr.y + pr.vy * sdt, nz = pr.z + pr.vz * sdt;
-      const sp = Math.hypot(pr.vx, pr.vy, pr.vz) * sdt;
-      const wall = rayWorld(world, pr.x, pr.y, pr.z, pr.vx * sdt / sp, pr.vy * sdt / sp, pr.vz * sdt / sp, sp);
-      if (wall < sp) {
-        if (pr.kind === 'grenade') { // bounce
-          pr.vx *= -0.4; pr.vz *= -0.4; pr.vy = Math.abs(pr.vy) * 0.35;
-          if (ny <= 0.05) { pr.vx *= -1; pr.vz *= -1; pr.y = 0.1; }
-          continue;
-        }
-        boom = true; break;
-      }
-      pr.x = nx; pr.y = ny; pr.z = nz;
-      if (pr.kind === 'rocket') {
-        for (const v of arena.players.values()) {
-          if (v === pr.owner) continue;
-          if (Math.hypot(v.x - pr.x, v.z - pr.z) < 0.7 && pr.y > v.y && pr.y < v.y + C.PLAYER_HEIGHT) { boom = true; break; }
-        }
-      }
-    }
-    const age = (now - pr.born) / 1000;
-    if (pr.kind === 'grenade' && age >= def.fuse) boom = true;
-    if (age > 6) boom = true;
-    if (boom) {
-      arena.projectiles.delete(pr.id);
-      broadcast({ t: 'proj-', id: pr.id });
-      explode(pr.x, Math.max(0.3, pr.y), pr.z, def, pr.owner, pr.kind);
-    }
-  }
-  // mines
-  for (const m of arena.mines.values()) {
-    if (now - m.born > 180000) { arena.mines.delete(m.id); broadcast({ t: 'mine-', id: m.id }); continue; }
-    if (now < m.armAt) continue;
-    for (const v of arena.players.values()) {
-      if (v.id === m.ownerId) continue;
-      if (Math.hypot(v.x - m.x, v.z - m.z) < 1.6 && Math.abs(v.y - m.y) < 1.5) {
-        arena.mines.delete(m.id);
-        broadcast({ t: 'mine-', id: m.id });
-        explode(m.x, m.y + 0.3, m.z, C.WEAPONS.mine, m.owner, 'mine');
-        break;
-      }
-    }
-  }
-
-  // snapshot: each player only gets players near them
-  const list = [...arena.players.values()];
-  for (const p of list) {
-    const near = [];
-    for (const o of list) {
-      if (o !== p && Math.hypot(o.x - p.x, o.z - p.z) > 160) continue;
-      near.push([o.id, +o.x.toFixed(2), +o.y.toFixed(2), +o.z.toFixed(2), +o.ry.toFixed(2), +o.pitch.toFixed(2), o.flags, o.weapons[o.slot], o.hp, now < o.protectUntil ? 1 : 0]);
-    }
-    sendTo(p, { t: 'snap', p: near, n: list.length });
-  }
-}, TICK);
+const ticker = setInterval(() => {
+  arena.tick(Date.now());
+  pump();
+}, TICK_MS);
 
 // ---------------------------------------------------------------- sockets
-const wss = new WebSocketServer({ server, maxPayload: 4096 });
+const wss = new WebSocketServer({ server, maxPayload: MAX_CLIENT_MESSAGE_SIZE });
 wss.on('connection', (ws, req) => {
   const token = new URL(req.url, 'http://x').searchParams.get('token');
-  const acc = byToken(token);
+  const acc = accounts.byToken(token);
   if (!acc) { ws.close(4001, 'login'); return; }
-  const conn = { ws, acc, player: null };
+  const conn = { ws, acc, playerId: null };
 
   ws.on('message', raw => {
-    let m;
-    try { m = JSON.parse(raw); } catch { return; }
-    const p = conn.player && arena.players.has(conn.player.id) ? conn.player : null;
-    switch (m.t) {
-      case 'join': if (!p) joinArena(conn); break;
-      case 'leave': if (p) { leaveArena(p, true); conn.player = null; sendTo(conn, { t: 'left' }); } break;
-      case 'state': if (p) onState(p, m); break;
-      case 'fire': if (p) fire(p, m); break;
-      case 'slot': if (p && m.i >= 0 && m.i < p.weapons.length) { p.slot = m.i | 0; sendTo(p, inventoryMsg(p)); } break;
-      case 'open': if (p) openChest(p, m.id); break;
-      case 'heal': if (p) heal(p, m.kind); break;
-    }
+    const r = parseClientMessage(raw);
+    if (!r.ok) return; // bad or unknown message: drop it
+    try { onMessage(conn, r.msg); } catch (e) { console.error('Message error:', e); }
   });
-  ws.on('close', () => { if (conn.player) leaveArena(conn.player, true); });
+  ws.on('close', () => { leaveAlive(conn); pump(); });
 });
 
 server.listen(PORT, () => {
@@ -538,5 +215,17 @@ server.listen(PORT, () => {
   for (const list of Object.values(os.networkInterfaces())) {
     for (const n of list || []) if (n.family === 'IPv4' && !n.internal) console.log(`  On phones (same Wi-Fi): http://${n.address}:${PORT}`);
   }
+  console.log(`  Arena seed: ${ARENA_SEED}`);
 });
 
+// Save accounts before stopping.
+let stopping = false;
+async function shutdown() {
+  if (stopping) return;
+  stopping = true;
+  clearInterval(ticker);
+  try { await accounts.flush(); } catch (e) { console.error('Could not save accounts:', e); }
+  process.exit(0);
+}
+process.on('SIGINT', shutdown);
+process.on('SIGTERM', shutdown);

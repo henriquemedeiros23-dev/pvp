@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import net from 'node:net';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -36,6 +37,9 @@ function chromiumPath() {
   return undefined; // let Playwright decide
 }
 
+// Never touch the real accounts file (issue #19): every run gets its own temp file.
+const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pvp-test-'));
+const dataFile = path.join(dataDir, 'accounts.json');
 let child, port, browser, page;
 const errors = [];      // console errors and page crashes
 const badResponses = []; // HTTP answers >= 400 (the wrong-password login is expected)
@@ -43,7 +47,7 @@ const badResponses = []; // HTTP answers >= 400 (the wrong-password login is exp
 before(async () => {
   if (!RUN) return;
   port = await freePort();
-  child = spawn(process.execPath, [SERVER], { env: { ...process.env, PORT: String(port) }, stdio: ['ignore', 'pipe', 'inherit'] });
+  child = spawn(process.execPath, [SERVER], { env: { ...process.env, PORT: String(port), DATA_FILE: dataFile }, stdio: ['ignore', 'pipe', 'inherit'] });
   await new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error('server did not start')), 10000);
     child.stdout.on('data', d => { if (String(d).includes('running')) { clearTimeout(timer); resolve(); } });
@@ -63,9 +67,19 @@ before(async () => {
   page.on('pageerror', e => errors.push(String(e)));
 });
 
+// stop the server (it saves accounts on SIGTERM), then remove the temp data
+const stopServer = async () => {
+  if (child && child.exitCode === null && child.signalCode === null) {
+    const exited = new Promise(resolve => child.once('exit', resolve));
+    child.kill();
+    await exited;
+  }
+  fs.rmSync(dataDir, { recursive: true, force: true });
+};
+
 after(async () => {
   await browser?.close();
-  child?.kill();
+  await stopServer();
 });
 
 const shot = async name => {
