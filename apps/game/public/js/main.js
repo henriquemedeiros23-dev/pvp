@@ -3,7 +3,8 @@
 import { createApiClient } from '@pvp/api-client';
 import { shopTabs, shopItems, backpackSummary, swatchBackground } from '@pvp/shop-catalog';
 import { WEAPONS } from '@pvp/game-rules';
-import { Game, WEAPON_ICONS } from './game.js';
+import { WEAPON_ICONS } from '@pvp/hud-model';
+import { Game } from './game.js';
 
 const $ = id => document.getElementById(id);
 const SCREENS = ['login', 'menu', 'shop', 'dead'];
@@ -65,8 +66,13 @@ function handleError(e, where) {
   if (where) where.textContent = (e && e.message) || 'Something went wrong';
 }
 
+// Only the newest refresh may update the screen, so an older, slower answer
+// (for example one sent before leaving the arena) cannot overwrite a fresh one.
+let refreshSeq = 0;
 async function refresh() {
+  const seq = ++refreshSeq;
   const res = await api.me();
+  if (seq !== refreshSeq) return res;
   setAccount(res.account);
   $('menuOnline').textContent = res.online ?? 0;
   return res;
@@ -103,17 +109,17 @@ $('loginPass').addEventListener('keydown', e => { if (e.key === 'Enter') enter('
 $('loginName').addEventListener('keydown', e => { if (e.key === 'Enter') $('loginPass').focus(); });
 
 // ------------------------------------------------------------ menu
-function showMenu(message = '') {
+function showMenu(message = '', { refresh: doRefresh = true } = {}) {
   const msg = $('menuMessage');
   msg.textContent = message;
   msg.classList.toggle('hidden', !message);
   show('menu');
   preview();
-  refresh().catch(e => handleError(e));
+  if (doRefresh) refresh().catch(e => handleError(e));
 }
 
 setInterval(() => {
-  if (visible('menu') && !document.hidden) refresh().catch(e => handleError(e));
+  if (visible('menu') && !document.hidden && !leaving) refresh().catch(e => handleError(e));
 }, ONLINE_REFRESH_MS);
 
 $('btnShop').addEventListener('click', () => { $('shopError').textContent = ''; show('shop'); renderShop(); });
@@ -125,16 +131,23 @@ $('btnJoin').addEventListener('click', async () => {
   show(null);
   loading(true);
   try {
-    await game.connect(api.token);
-    game.join(); // the server answers 'welcome' (onPlaying) or 'full' (onFull)
+    // 'welcome' calls onPlaying, 'full' calls onFull; no answer in time (or no connection) throws.
+    await game.joinArena(api.token);
   } catch (e) {
     showMenu(e.message || 'Could not connect to the server');
   }
 });
 
-$('btnLeave').addEventListener('click', () => {
-  if (game) game.leave();
-  showMenu();
+// Leaving: show the menu right away, but ask for the account only after the server
+// confirms 'left' (it puts the backpack weapons and coins back first).
+let leaving = false;
+$('btnLeave').addEventListener('click', async () => {
+  const left = game ? game.leave() : Promise.resolve();
+  leaving = true;
+  refreshSeq++; // an older refresh that is still on its way must not win
+  showMenu('', { refresh: false });
+  try { await left; } finally { leaving = false; }
+  if (visible('menu')) refresh().catch(e => handleError(e));
 });
 
 $('btnDeadMenu').addEventListener('click', () => showMenu());

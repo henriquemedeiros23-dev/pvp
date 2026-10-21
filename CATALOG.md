@@ -23,6 +23,7 @@ graph LR
   worldgen --> random
   accounts["@pvp/accounts-shop"] --> rules
   shop["@pvp/shop-catalog"] --> rules
+  hud["@pvp/hud-model"] --> rules
   stickman["@pvp/stickman-3d"] --> rules
   stickman --> three(["three (outside)"])
   scene["@pvp/island-scene"] --> random
@@ -47,6 +48,7 @@ graph LR
 | `@pvp/accounts-shop` | Accounts, log in, coins, buying skins and weapons, the backpack. | Node | partly: logic is pure, tokens/clock are passed in, file saving is real I/O | 25 |
 | `@pvp/arena` | The fight itself: players, chests, loot, weapons, damage, knockouts. | both | fully: time and seeded random are passed in (replay test) | 27 |
 | `@pvp/shop-catalog` | Turns the rules and an account into the cards the shop screen shows. | both | fully: pure functions of their inputs | 9 |
+| `@pvp/hud-model` | Turns your inventory and health into the in-game HUD: 5 slots, durability bars, health bar. | both | fully: pure functions of their inputs | 9 |
 | `@pvp/api-client` | Talks to the server's account and shop API and keeps the login token. | both | fully: fetch and storage are passed in | 10 |
 | `@pvp/stickman-3d` | A three.js stickman with skins, outfits, weapons and animation. | browser (pose math also in Node) | partly: pose math is pure, how it looks depends on the renderer | 16 |
 | `@pvp/island-scene` | The 3D island: sky, sun, ground, water, palms, ruins and chests. | browser (also builds in Node) | partly: all placement and colors from a seed, how it looks depends on the renderer | 8 |
@@ -182,6 +184,22 @@ graph LR
 
 **Depends on:** `@pvp/game-rules`.
 **Determinism:** fully. Pure functions of their inputs; fixed sort order.
+
+## `@pvp/hud-model`
+
+**Purpose:** pure functions that turn the `inv` message and your health into what the in-game HUD shows: always all 5 weapon slots (empty ones too), a durability bar per weapon, the health bar, and which slot a key picks.
+
+| Export | Example |
+|---|---|
+| `slotBar(inv, rules)` | `slotBar(inv); // 5 slots: { index, key, weapon, name, icon, rarity, active, empty, durability }` |
+| `durabilityView(id, usesLeft)` | `durabilityView('pistol', 9); // { ratio: 0.15, level: 'critical', … } or null` |
+| `healthView(hp)` | `healthView(30); // { hp: 30, percent: 30, low: true, text: '30', … }` |
+| `pickSlot(inv, action)` | `pickSlot(inv, '+'); // next filled slot, or null` |
+| `brokeMessage(id)` | `brokeMessage('pistol'); // 'Your Pistol broke!'` |
+| `WEAPON_ICONS` | `WEAPON_ICONS.rocket; // '🚀'` |
+
+**Depends on:** `@pvp/game-rules`.
+**Determinism:** fully. Pure functions of their inputs; durability levels: green above 50 %, yellow 20-50 %, red below 20 %.
 
 ## `@pvp/api-client`
 

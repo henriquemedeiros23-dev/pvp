@@ -1,0 +1,17 @@
+{
+  "name": "@pvp/hud-model",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Pure functions that turn the player's inventory and health into what the in-game HUD shows.",
+  "type": "module",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "scripts": {
+    "test": "node --test"
+  },
+  "dependencies": {
+    "@pvp/game-rules": "1.0.0"
+  }
+}

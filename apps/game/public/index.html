@@ -17,6 +17,7 @@
       "@pvp/game-rules": "/packages/game-rules/src/index.js",
       "@pvp/api-client": "/packages/api-client/src/index.js",
       "@pvp/shop-catalog": "/packages/shop-catalog/src/index.js",
+      "@pvp/hud-model": "/packages/hud-model/src/index.js",
       "@pvp/seeded-random": "/packages/seeded-random/src/index.js",
       "@pvp/collision": "/packages/collision/src/index.js",
       "@pvp/world-gen": "/packages/world-gen/src/index.js",
@@ -96,13 +97,15 @@
       </div>
     </div>
     <div id="compass" class="compass hidden">★ <span id="compassDist"></span></div>
-    <div id="slots" class="slots"></div>
-    <div class="health">
-      <div class="hpbar"><div id="hpFill"></div><span id="hpText">100</span></div>
-      <div class="heals">
-        <button id="btnBandage" class="heal">🩹 <b id="bandageCount">0</b></button>
-        <button id="btnMedkit" class="heal">💊 <b id="medkitCount">0</b></button>
+    <div id="hotbar" class="hotbar">
+      <div class="health">
+        <div class="hpbar" role="progressbar" aria-label="Health" aria-valuemin="0" aria-valuemax="100"><div id="hpFill"></div><span id="hpText">100</span></div>
+        <div class="heals">
+          <button id="btnBandage" class="heal" title="Bandage (Q)">🩹 <b id="bandageCount">0</b></button>
+          <button id="btnMedkit" class="heal" title="Medkit (F)">💊 <b id="medkitCount">0</b></button>
+        </div>
       </div>
+      <div id="slots" class="slots"></div>
     </div>
     <div id="toast" class="toast"></div>
 

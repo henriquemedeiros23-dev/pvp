@@ -8,12 +8,13 @@ import { Stickman, buildWeapon } from '@pvp/stickman-3d';
 import { createIslandScene } from '@pvp/island-scene';
 import { createInputState, attachTouchControls, attachDesktopControls, isTouchDevice } from '@pvp/touch-controls';
 import { decodeServerMessage, encodeClient, unpackSnapshotPlayer, makeFlags, readFlags } from '@pvp/net-protocol';
+import { slotBar, healthView, pickSlot, brokeMessage, WEAPON_ICONS } from '@pvp/hud-model';
 
 const $ = id => document.getElementById(id);
-export const WEAPON_ICONS = {
-  woodsword: '🗡️', sword: '⚔️', bat: '🏏', spear: '🔱', axe: '🪓', pistol: '🔫', shotgun: '💥',
-  rifle: '🎯', sniper: '🔭', grenade: '💣', rocket: '🚀', mine: '🧨',
-};
+const JOIN_TIMEOUT_MS = 8000;  // give up joining if 'welcome' does not come
+const LEAVE_TIMEOUT_MS = 3000; // stop waiting for the server's 'left'
+const MENU_PREVIEW_SHIFT_X = 0.27; // menu stickman this part of the screen right of the middle (landscape)
+const MENU_PREVIEW_SHIFT_Y = 0.2;  // ... or below the middle (portrait)
 
 const HIT_RADIUS = C.PLAYER_RADIUS + 0.1; // a bit wider than the body, like the server
 const v3 = (x, y, z) => ({ x, y, z });
@@ -63,6 +64,7 @@ export class Game {
     };
     this.mobile = isTouchDevice(window);
     this.setupControls(canvas);
+    this.buildSlots();
     this.mode = 'menu';
     this.time = 0;
 
@@ -130,7 +132,18 @@ export class Game {
     this.renderer.setSize(w, h, false);
     this.camera.aspect = w / h;
     this.camera.fov = w < h ? 85 : 70;
-    this.camera.updateProjectionMatrix();
+    this.frameMenu();
+  }
+
+  // In the menu the stickman stands next to the buttons, not behind them: the picture is shifted so
+  // it shows on the right (landscape: buttons on the left) or low (portrait: buttons on top).
+  // See the matching #menu layout in style.css.
+  frameMenu() {
+    const w = innerWidth, h = innerHeight, cam = this.camera;
+    if (this.mode === 'play') cam.clearViewOffset();
+    else if (w >= h * 1.1) cam.setViewOffset(w, h, -w * MENU_PREVIEW_SHIFT_X, 0, w, h);
+    else cam.setViewOffset(w, h, 0, -h * MENU_PREVIEW_SHIFT_Y, w, h);
+    cam.updateProjectionMatrix();
   }
 
   // ------------------------------------------------------------ menu preview
@@ -147,10 +160,15 @@ export class Game {
     return new Promise((resolve, reject) => {
       if (this.ws && this.ws.readyState === 1) return resolve();
       const ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/?token=${encodeURIComponent(token)}`);
-      ws.onopen = () => { this.ws = ws; resolve(); };
+      this.opening = ws; // a socket that is still opening (closed if the join gives up)
+      ws.onopen = () => { if (this.opening === ws) this.opening = null; this.ws = ws; resolve(); };
       ws.onerror = () => reject(new Error('Could not connect to the server'));
       ws.onclose = () => {
         if (this.ws === ws) this.ws = null;
+        if (this.opening === ws) this.opening = null;
+        reject(new Error('Could not connect to the server')); // no effect if it opened before
+        this.settleJoin(new Error('Lost connection to the server. Try again!'));
+        this.settleLeave();
         if (this.mode === 'play') { this.endPlay(); this.ui.onLeft('Lost connection to the server'); }
       };
       ws.onmessage = e => {
@@ -171,7 +189,57 @@ export class Game {
 
   join() { this.send('join'); }
 
-  leave() { this.send('leave'); this.endPlay(); }
+  /**
+   * Connect and join. Resolves 'playing' on 'welcome' or 'full' on a full arena (the ui callbacks
+   * run as before). Rejects with a friendly message if the socket fails or nothing comes back in time;
+   * the socket is then closed so a late 'welcome' cannot pull you into the arena.
+   */
+  joinArena(token, timeoutMs = JOIN_TIMEOUT_MS) {
+    this.settleJoin(new Error('Join was cancelled'));
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        this.settleJoin(new Error("The arena didn't answer. Try again in a moment!"));
+      }, timeoutMs);
+      this.pendingJoin = { resolve, reject, timer };
+      this.connect(token).then(
+        () => { if (this.pendingJoin) this.join(); },
+        e => this.settleJoin(e),
+      );
+    });
+  }
+
+  // Finish the pending join: a result string resolves it, an Error rejects it (and closes the socket).
+  settleJoin(result) {
+    const p = this.pendingJoin;
+    if (!p) return;
+    this.pendingJoin = null;
+    clearTimeout(p.timer);
+    if (result instanceof Error) {
+      for (const ws of [this.ws, this.opening]) if (ws) ws.close();
+      this.ws = this.opening = null;
+      p.reject(result);
+    } else p.resolve(result);
+  }
+
+  /** Leave the arena. Resolves when the server confirms with 'left' (or the socket closes, or after a short wait). */
+  leave(timeoutMs = LEAVE_TIMEOUT_MS) {
+    this.settleLeave();
+    const open = this.ws && this.ws.readyState === 1;
+    this.send('leave');
+    this.endPlay();
+    if (!open) return Promise.resolve();
+    return new Promise(resolve => {
+      this.pendingLeave = { resolve, timer: setTimeout(() => this.settleLeave(), timeoutMs) };
+    });
+  }
+
+  settleLeave() {
+    const p = this.pendingLeave;
+    if (!p) return;
+    this.pendingLeave = null;
+    clearTimeout(p.timer);
+    p.resolve();
+  }
 
   // Small read-only view for tests and debugging.
   debugState() {
@@ -181,8 +249,8 @@ export class Game {
 
   onMessage(m) {
     switch (m.t) {
-      case 'welcome': return this.startPlay(m);
-      case 'full': return this.ui.onFull();
+      case 'welcome': this.startPlay(m); return this.settleJoin('playing');
+      case 'full': this.settleJoin('full'); return this.ui.onFull();
       case 'snap': return this.onSnap(m);
       case 'inv': return this.onInventory(m);
       case 'pjoin': this.infos.set(m.id, { name: m.name, skin: m.skin }); return;
@@ -202,10 +270,11 @@ export class Game {
       case 'mine-': { const x = this.mines.get(m.id); if (x) { this.scene.remove(x); this.mines.delete(m.id); } return; }
       case 'hitmark': return this.hitmark(m.dead);
       case 'hurt': return this.onHurt(m);
-      case 'broke': return this.toast(`Your ${C.WEAPONS[m.weapon]?.name || 'weapon'} broke!`); // an 'inv' follows
+      case 'broke': this.flashSlot(m.slot); return this.toast(brokeMessage(m.weapon)); // an 'inv' follows
       case 'ko': return this.onKO(m);
       case 'dead': this.endPlay(); return this.ui.onDead(m.by, m.weapon);
       case 'left':
+        this.settleLeave();
         // We already left if we asked to; otherwise the server took us out
         // (this account joined the arena again from another tab or device).
         if (this.mode === 'play') { this.endPlay(); this.ui.onLeft('You joined the arena from somewhere else.'); }
@@ -216,6 +285,9 @@ export class Game {
   startPlay(m) {
     this.clearArena();
     this.myId = m.id;
+    this.inv = null; // the server sends 'inv' right after 'welcome'
+    this.renderSlots();
+    this.setHp(C.MAX_HP);
     for (const p of m.players) this.infos.set(p.id, { name: p.name, skin: p.skin });
     const info = this.infos.get(m.id);
     const sm = new Stickman(info.skin);
@@ -229,6 +301,7 @@ export class Game {
     for (const mi of m.mines) this.addMine(mi);
     if (this.preview) this.preview.root.visible = false;
     this.mode = 'play';
+    this.frameMenu();
     this.lastSend = 0; this.lastFire = 0;
     this.input.reset();
     this.input.enabled = true;
@@ -246,6 +319,7 @@ export class Game {
     $('hud').classList.add('hidden');
     $('btnOpen').classList.add('hidden');
     if (this.preview) this.preview.root.visible = true;
+    this.frameMenu();
   }
 
   clearArena() {
@@ -304,23 +378,69 @@ export class Game {
     $('medkitCount').textContent = m.medkits;
     this.setHp(m.hp);
     if (this.me) this.me.sm.setWeapon(m.weapons[m.slot]);
-    const slots = $('slots');
-    slots.innerHTML = '';
-    m.weapons.forEach((w, i) => {
-      const b = document.createElement('button');
-      b.className = `slot ${i === m.slot ? 'active' : ''} ${C.WEAPONS[w].rarity}`;
-      b.innerHTML = `${WEAPON_ICONS[w]}<small>${C.WEAPONS[w].name}</small>`;
-      b.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); this.send('slot', { i }); });
-      slots.appendChild(b);
-    });
+    this.renderSlots();
     if (m.picked) this.toast(`Picked up ${m.picked}`);
   }
 
+  // ------------------------------------------------------------ HUD (view-models from @pvp/hud-model)
+  // The 5 slot buttons are made once and updated in place, so a slot can flash when its weapon breaks.
+  buildSlots() {
+    const make = (tag, cls) => { const e = document.createElement(tag); e.className = cls; return e; };
+    this.slotEls = slotBar(null).map(s => {
+      const b = make('button', 'slot empty');
+      b.dataset.slot = s.index;
+      const dur = make('span', 'dur');
+      dur.append(make('i', ''));
+      b.append(make('span', 'key'), make('span', 'icon'), make('small', 'name'), dur);
+      b.querySelector('.key').textContent = s.key;
+      b.addEventListener('pointerdown', e => {
+        e.preventDefault(); e.stopPropagation();
+        const i = pickSlot(this.inv, s.index);
+        if (i != null) this.send('slot', { i });
+      });
+      return b;
+    });
+    $('slots').replaceChildren(...this.slotEls);
+    this.renderSlots();
+  }
+
+  renderSlots() {
+    for (const s of slotBar(this.inv)) {
+      const b = this.slotEls[s.index];
+      b.classList.toggle('empty', s.empty);
+      b.classList.toggle('active', s.active);
+      for (const r of ['basic', 'common', 'rare', 'legendary']) b.classList.toggle(r, s.rarity === r);
+      b.querySelector('.icon').textContent = s.icon;
+      b.querySelector('.name').textContent = s.name;
+      const dur = b.querySelector('.dur');
+      dur.hidden = !s.durability;
+      if (s.durability) {
+        dur.dataset.level = s.durability.level;
+        dur.firstChild.style.width = s.durability.percent + '%';
+      }
+      const label = s.empty ? `Slot ${s.key}: empty` : `${s.key}: ${s.name}${s.durability ? ` (${s.durability.percent}%)` : ''}`;
+      b.title = label;
+      b.setAttribute('aria-label', label);
+    }
+  }
+
+  flashSlot(i) {
+    const b = this.slotEls[i];
+    if (!b) return;
+    b.classList.remove('broke');
+    void b.offsetWidth; // restart the animation
+    b.classList.add('broke');
+    clearTimeout(b.flashTimer);
+    b.flashTimer = setTimeout(() => b.classList.remove('broke'), 900);
+  }
+
   setHp(hp) {
-    if (this.me) this.me.hp = hp;
-    $('hpFill').style.width = hp + '%';
-    $('hpFill').classList.toggle('low', hp <= 35);
-    $('hpText').textContent = hp;
+    const h = healthView(hp);
+    if (this.me) this.me.hp = h.hp;
+    $('hpFill').style.width = h.percent + '%';
+    $('hpFill').classList.toggle('low', h.low);
+    $('hpText').textContent = h.text;
+    $('hpFill').parentElement.setAttribute('aria-valuenow', h.hp);
   }
 
   onHurt(m) {
@@ -507,8 +627,8 @@ export class Game {
   updateMenu(dt) {
     const t = this.time * 0.12;
     const c = this.previewSpot;
-    this.camera.position.set(c.x + Math.sin(t) * 5.5, 2.4, c.z + Math.cos(t) * 5.5);
-    this.camera.lookAt(c.x, 1.2, c.z);
+    this.camera.position.set(c.x + Math.sin(t) * 3.7, 1.75, c.z + Math.cos(t) * 3.7);
+    this.camera.lookAt(c.x, 1.0, c.z);
     if (this.preview) {
       this.preview.root.rotation.y = t + Math.PI * 0.15;
       this.preview.animate(dt, {}, this.time);
@@ -535,11 +655,9 @@ export class Game {
       }
       if (e === 'open' && this.nearChest != null) this.send('open', { id: this.nearChest });
       if (e === 'bandage' || e === 'medkit') this.send('heal', { kind: e });
-      if (e.startsWith('slot:') && this.inv) {
-        const n = this.inv.weapons.length;
-        const arg = e.slice(5);
-        const i = arg === '+' ? (this.inv.slot + 1) % n : arg === '-' ? (this.inv.slot + n - 1) % n : Number(arg);
-        if (i >= 0 && i < n) this.send('slot', { i });
+      if (e.startsWith('slot:')) {
+        const i = pickSlot(this.inv, e.slice(5));
+        if (i != null) this.send('slot', { i });
       }
     }
 
