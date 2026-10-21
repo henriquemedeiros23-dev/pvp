@@ -425,6 +425,7 @@ export class Game {
       return b;
     });
     $('slots').replaceChildren(...this.slotEls);
+    $('btnDrop').addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); this.send('drop'); });
     this.renderSlots();
   }
 
@@ -446,6 +447,7 @@ export class Game {
       b.setAttribute('aria-label', label);
     }
     this.renderDurability();
+    $('btnDrop').classList.toggle('hidden', heldDurabilityView(this.inv).empty); // something in your hand to drop
   }
 
   // The big Durability bar: the weapon in your hand (full with ∞ if it never breaks, '–' if the hand is empty).
@@ -685,6 +687,7 @@ export class Game {
         } else me.crouch = !me.crouch;
       }
       if (e === 'open' && this.nearChest != null) this.send('open', { id: this.nearChest });
+      if (e === 'drop') this.send('drop');
       if (e === 'bandage' || e === 'medkit') this.send('heal', { kind: e });
       if (e.startsWith('slot:')) {
         const i = pickSlot(this.inv, e.slice(5));

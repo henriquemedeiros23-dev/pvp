@@ -91,10 +91,10 @@ test('keys: WASD, diagonal normalised, shift does not slow you down any more', (
 test('keys: actions, repeat ignored, slots 1-5', () => {
   const s = createInputState();
   s.key(' ', true); s.key(' ', true, true); s.key(' ', false);
-  s.key('c', true); s.key('Control', true); s.key('e', true); s.key('q', true); s.key('f', true);
+  s.key('c', true); s.key('Control', true); s.key('e', true); s.key('g', true); s.key('q', true); s.key('f', true);
   for (const n of ['1', '2', '3', '4', '5']) s.key(n, true);
   s.key('6', true);
-  assert.deepEqual(s.take().ev, ['jump', 'crouch', 'crouch', 'open', 'bandage', 'medkit',
+  assert.deepEqual(s.take().ev, ['jump', 'crouch', 'crouch', 'open', 'drop', 'bandage', 'medkit',
     'slot:0', 'slot:1', 'slot:2', 'slot:3', 'slot:4']);
 });
 

@@ -316,6 +316,7 @@ test('weapon bar: Durability bar follows the held weapon, tap to switch, a broke
     // talk to the real server, but let the test send extra messages to the page
     let toPage = null;
     const sentSlots = [], sentShield = [];
+    let sentDrop = 0;
     await p.routeWebSocket(/\/\?token=/, ws => {
       const server = ws.connectToServer();
       toPage = msg => ws.send(msg);
@@ -323,6 +324,7 @@ test('weapon bar: Durability bar follows the held weapon, tap to switch, a broke
         const msg = JSON.parse(String(m));
         if (msg.t === 'slot') sentSlots.push(msg.i);
         if (msg.t === 'shield') sentShield.push(msg.up);
+        if (msg.t === 'drop') sentDrop++;
         server.send(m);
       });
     });
@@ -374,6 +376,12 @@ test('weapon bar: Durability bar follows the held weapon, tap to switch, a broke
     for (let i = 0; i < 40 && sentShield.at(-1) !== false; i++) await p.waitForTimeout(50);
     assert.deepEqual(sentShield, [true, false]);
 
+    // the ⬇️ button drops the weapon in your hand (#34): tapping it asks the server
+    assert.equal(await p.locator('#btnDrop').isVisible(), true);
+    await p.locator('#btnDrop').tap();
+    for (let i = 0; i < 40 && !sentDrop; i++) await p.waitForTimeout(50);
+    assert.equal(sentDrop, 1);
+
     // tap a slot: the game asks the server for it
     await p.locator('#slots .slot').nth(1).tap();
     for (let i = 0; i < 40 && !sentSlots.includes(1); i++) await p.waitForTimeout(50);
@@ -396,6 +404,7 @@ test('weapon bar: Durability bar follows the held weapon, tap to switch, a broke
     // every weapon broke (the Gun too): 5 empty slots and no errors
     toPage(encode('inv', { ...inv, weapons: [], dur: [], slot: 0 }));
     await p.waitForFunction(() => document.querySelectorAll('#slots .slot.empty').length === 5);
+    assert.equal(await p.locator('#btnDrop').isVisible(), false, 'nothing in your hand: nothing to drop');
     assert.equal(await p.textContent('#durText'), '–'); // nothing in hand
 
     await p.click('#btnLeave');

@@ -92,7 +92,7 @@ function take(A, p, it) {
     if (p.weapons.length >= A.rules.MAX_SLOTS) return null; // a copy of a weapon you have is fine
     p.weapons.push(it.weapon);
     p.dur.push(it.dur === undefined ? maxDurability(A, it.weapon) : it.dur); // what the ground item had
-    p.free.push(false);
+    p.free.push(!!it.free); // a dropped free starting Gun stays free (never goes into a backpack)
     return weaponDef(A, it.weapon)?.name ?? it.weapon;
   }
   const slot = HEAL_SLOTS[it.kind];
@@ -106,7 +106,9 @@ export function tickItems(A, now) {
   for (const it of A.items.values()) {
     if (now > it.expires) { A.items.delete(it.id); send(A, 'all', { t: 'item-', id: it.id }); continue; }
     for (const p of A.players.values()) {
-      if (Math.hypot(p.x - it.x, p.z - it.z) > T.pickupRadius || Math.abs(p.y - it.y) > T.pickupHeight) continue;
+      const near = Math.hypot(p.x - it.x, p.z - it.z) <= T.pickupRadius && Math.abs(p.y - it.y) <= T.pickupHeight;
+      if (it.ignore === p.id) { if (!near) delete it.ignore; continue; } // you dropped it: step away first
+      if (!near) continue;
       const picked = take(A, p, it);
       if (picked === null) continue;
       A.items.delete(it.id);

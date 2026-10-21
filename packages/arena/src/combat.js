@@ -50,6 +50,7 @@ function knockOut(A, victim, attacker, weapon, byName) {
   tellServer(A, 'knockedOut', { playerId: victim.id, playerKey: victim.key, weapons: lost, by, byId: attacker ? attacker.id : null });
 }
 
+// Returns true if the swing hit someone (a player, or a raised shield); a swing at the air returns false.
 function melee(A, p, w, def) {
   const T = A.tune;
   send(A, 'all', { t: 'swing', id: p.id });
@@ -62,9 +63,10 @@ function melee(A, p, w, def) {
     if (d > T.meleeCloseRange && (vx * fx + vz * fz) / d < T.meleeFrontDot) continue; // must be in front
     best = d; target = v;
   }
-  if (!target) return;
+  if (!target) return false;
   const d = best || 1, k = def.knock || T.meleeKnock;
   strike(A, p, target, w, def, ((target.x - p.x) / d) * k, ((target.z - p.z) / d) * k);
+  return true;
 }
 
 function gun(A, p, w, def, o, dir) {
@@ -111,14 +113,38 @@ export function fire(A, id, dir, now) {
   const o = { x: p.x, y: p.y + heightOf(A, p) - A.tune.muzzleDrop, z: p.z };
 
   const slot = p.slot;
+  let used = true; // a gun shot always wears; a melee swing only when it hits someone (#34)
   switch (def.type) {
-    case 'melee': melee(A, p, w, def); break;
+    case 'melee': used = melee(A, p, w, def); break;
     case 'gun': gun(A, p, w, def, o, d); break;
     default: return false;
   }
   if (!A.players.has(p.id)) return true; // knocked out by a reflected hit: everything already dropped
-  wear(A, p, slot);
+  if (used) wear(A, p, slot);
   return true;
+}
+
+/**
+ * Drop the weapon in your hand (#34) where you stand, with exactly the durability it has (no half rule:
+ * that is only for knockouts). Anyone can pick it up; you only after you stepped away from it once.
+ * The free starting Gun can be dropped too (it stays free: it never goes into a backpack).
+ * Not while frozen. Returns the ground item id, or null if there is nothing in your hand.
+ */
+export function dropWeapon(A, id, now) {
+  const p = A.players.get(id);
+  if (!p) return null;
+  at(A, now);
+  if (isFrozen(A, p) || p.slot >= p.weapons.length) return null;
+  const slot = p.slot;
+  const [weapon] = p.weapons.splice(slot, 1);
+  const [dur] = p.dur.splice(slot, 1);
+  const [free] = p.free.splice(slot, 1);
+  p.slot = Math.max(0, Math.min(slot, p.weapons.length - 1));
+  const it = dropItem(A, 'weapon', weapon, p.x, p.z, A.tune.dropSpread, dur);
+  it.ignore = p.id; // not picked straight back up by the one who dropped it
+  if (free) it.free = true;
+  send(A, p.id, inventoryMsg(p));
+  return it.id;
 }
 
 /** One use of the weapon in `slot`: lose wearPerUse durability; at 0 it breaks and is gone. */

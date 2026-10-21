@@ -51,9 +51,11 @@ test('wearPerUse is used', () => {
   assert.equal(durOf(arena, id)[1], 7);
 });
 
-test('every weapon wears out: each swing or shot costs 1', () => {
+test('every weapon wears out: each shot, and each swing that hits someone, costs 1', () => {
   for (const w of ['shootbm', 'electricsword', 'icesword', 'supersword']) {
     const { arena, id } = holder(w);
+    const v = arena.join('v', {}).id;
+    arena.teleport(v, { x: 0, z: 2 }); // right in front
     assert.equal(arena.fire(id, [0, 0, 1], READY), true, w);
     assert.equal(durOf(arena, id)[1], RULES.WEAPONS[w].durability - 1, w);
   }

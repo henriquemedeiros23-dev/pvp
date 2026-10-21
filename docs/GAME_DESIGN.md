@@ -50,7 +50,11 @@ Decided by the boss through 22 questions.
   own slot with its own durability. When you join you get the free Gun in slot 1, then your backpack weapons,
   most expensive first (copies too), up to 5 slots. You can pick up a weapon you already have if a slot is free.
   When you leave alive, every weapon except the free Gun goes back into your backpack.
-- **Durability:** every weapon wears out a little each time you use it (each swing or shot; a shield each time it blocks).
+- **Durability:** every weapon wears out a little each time you use it: each shot, each sword hit on a player or a
+  raised shield (a swing that hits only air costs nothing, #34), and a shield each time it blocks.
+- **Drop weapon (#34):** press **G** (computer) or the small **⬇️** button next to the slots (phone) to drop the weapon
+  in your hand. It keeps exactly the durability it has, and anyone can pick it up (you too, after stepping away).
+  The free Gun can be dropped too.
   When it reaches 0 it **breaks and disappears** from your inventory. There is no repair.
   The Gun breaks too: then you may have **no weapon at all** until you find or pick one up.
 - **Health:** heal only with bandages and medkits (for now chests give no heals; the boss decides later where they come from).

@@ -197,6 +197,7 @@ export function createLocalServer({
       case 'open': if (id != null) arena.openChest(id, m.id, t); break;
       case 'heal': if (id != null) arena.heal(id, m.kind, t); break;
       case 'shield': if (id != null) arena.setShield(id, m.up, t); break;
+      case 'drop': if (id != null) arena.dropWeapon(id, t); break;
     }
     pump();
   }

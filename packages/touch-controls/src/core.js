@@ -26,6 +26,7 @@ export const DEFAULT_CONFIG = Object.freeze({
     c: 'crouch',
     control: 'crouch',
     e: 'open',
+    g: 'drop',
     q: 'bandage',
     f: 'medkit',
     1: 'slot:0',

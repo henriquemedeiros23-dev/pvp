@@ -53,7 +53,7 @@ graph LR
 | `@pvp/world-gen` | Builds the island of ruins (houses, towers, chests) from a seed. | both | fully: all random comes from the seed | 12 |
 | `@pvp/net-protocol` | Every message between phone and server, with builders and checks. | both | fully: pure functions and frozen data | 18 |
 | `@pvp/accounts-shop` | Accounts, log in, coins, buying skins and weapons, the backpack. | Node (browser via `/browser`) | partly: logic is pure, tokens/clock are passed in, file saving is real I/O | 32 |
-| `@pvp/arena` | The fight itself: players, chests, loot, weapons, shields, shock and freeze, damage, knockouts. | both | fully: time and seeded random are passed in (replay tests) | 61 |
+| `@pvp/arena` | The fight itself: players, chests, loot, weapons, shields, shock and freeze, damage, knockouts. | both | fully: time and seeded random are passed in (replay tests) | 68 |
 | `@pvp/shop-catalog` | Turns the rules and an account into the cards the shop screen shows. | both | fully: pure functions of their inputs | 9 |
 | `@pvp/hud-model` | Turns your inventory and health into the in-game HUD: Durability bar of the held weapon, H.P bar, 5 slots, shield pill. | both | fully: pure functions of their inputs | 12 |
 | `@pvp/api-client` | Talks to the server's account and shop API and keeps the login token. | both | fully: fetch and storage are passed in | 10 |
@@ -179,6 +179,7 @@ graph LR
 | `arena.join` / `arena.leave` | `const r = arena.join('alice', { name: 'Alice', skin, loadout: ['shootbm', 'shield'] }, now);` |
 | `arena.setState` / `arena.fire` | `arena.fire(id, [dx, dy, dz], now);` |
 | `arena.setShield` | `arena.setShield(id, true, now); // raise the shield (no firing while up)` |
+| `arena.dropWeapon` | `arena.dropWeapon(id, now); // drop the weapon in hand, exact durability (#34)` |
 | `arena.openChest` | `arena.openChest(id, 3, now); // or 'golden'` |
 | `arena.setCoins` | `arena.setCoins(id, account.coins); // the account's total wins, queues an 'inv'` |
 | `arena.tick` / `arena.drain` | `arena.tick(now); for (const ev of arena.drain()) send(ev);` |

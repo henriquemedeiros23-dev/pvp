@@ -29,6 +29,7 @@ const r = arena.join('alice', { name: 'Alice', skin, loadout: ['icesword', 'shoo
 arena.setState(id, { x, y, z, ry, pitch, f }, now); // false + a 'pos' correction if it moved too far
 arena.fire(id, [dx, dy, dz], now);                  // or { x, y, z }
 arena.selectSlot(id, i);
+arena.dropWeapon(id, now);                          // drop the weapon in hand (#34): exact durability, returns the item id
 arena.setShield(id, true, now);                     // raise the shield (Shift / shield button), false lowers it
 arena.openChest(id, 3, now);                        // chest index, or 'golden'
 arena.heal(id, 'bandage', now);
@@ -71,7 +72,11 @@ setInterval(() => {
   takes all HP that is left. The snapshot shows the shield id and status bits (1 shield up, 2 shocked, 4 frozen).
 - **Durability** (from the rules' `durability` / `wearPerUse`, see `@pvp/game-rules`): each player weapon has
   uses left (`getPlayer(id).dur`, parallel to `weapons`; `null` = never breaks). Every fire that passes the rate
-  check (swing or shot) costs `wearPerUse` and queues an `inv` (with `dur`) for that player.
+  check costs `wearPerUse` and queues an `inv` (with `dur`) for that player: every shot, but a melee swing only
+  when it hits a player or a raised shield (a swing at the air is free, #34; it still waits `rate`).
+- **Drop (#34):** `dropWeapon(id)` puts the weapon in hand on the ground with exactly its durability (the half rule
+  is only for knockouts). The dropper picks it up again only after stepping out of pickup range once; a dropped
+  free starting Gun stays free (never goes into a backpack). Not while frozen.
   At 0 the weapon is removed, the player gets `{ t: 'broke', slot, weapon }` then an `inv`, and the hand stays
   on the same slot number (or the last slot if that one is gone). Its last use still fires.
   The starting Gun breaks like any weapon; a player may then have no weapons at all (firing does nothing,

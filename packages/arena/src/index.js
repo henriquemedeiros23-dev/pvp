@@ -6,7 +6,7 @@ import { createState, at, send } from './state.js';
 import * as players from './players.js';
 import { openChest, tickChests } from './chests.js';
 import { tickItems } from './loot.js';
-import { fire } from './combat.js';
+import { fire, dropWeapon } from './combat.js';
 import { setShield, tickEffects, isFrozen, isShocked } from './effects.js';
 import { snapshotFor, welcomeFor } from './snapshot.js';
 
@@ -47,6 +47,8 @@ export function createArena(o = {}) {
     isFrozen: id => isFrozen(A, A.players.get(id)),
     isShocked: id => isShocked(A, A.players.get(id)),
     selectSlot: (id, i) => players.selectSlot(A, id, i),
+    /** Drop the weapon in hand on the ground with its exact durability (#34). Returns the item id or null. */
+    dropWeapon: (id, now) => dropWeapon(A, id, now),
     openChest: (id, chest, now) => openChest(A, id, chest, now),
     heal: (id, kind, now) => players.heal(A, id, kind, now),
     teleport: (id, pos) => players.teleport(A, id, pos),
@@ -83,6 +85,6 @@ export function createArena(o = {}) {
     chests: () => A.chests.map(c => ({ id: c.id, x: c.x, z: c.z, open: c.openUntil > A.now, openUntil: c.openUntil })),
     golden: () => (A.golden ? { ...A.golden } : null),
     nextGoldenAt: () => A.nextGolden,
-    items: () => [...A.items.values()].map(it => ({ ...it })),
+    items: () => [...A.items.values()].map(({ ignore, ...it }) => ({ ...it })),
   };
 }

@@ -88,6 +88,7 @@ export const CLIENT_MESSAGES = deepFreeze({
   open: m('Open the chest I am standing next to.', {
     id: [{ oneOf: [{ type: 'int', min: 0, max: 100000 }, { enum: ['golden'] }] }, 'Chest index, or "golden" for the golden chest'],
   }),
+  drop: m('Drop the weapon in my hand on the ground (it keeps its durability; anyone can pick it up).'),
   shield: m('Raise (up: true) or lower my shield. Ignored without a shield or while frozen.', {
     up: ['bool', 'true = raise the shield, false = lower it'],
   }),

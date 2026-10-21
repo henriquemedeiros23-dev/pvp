@@ -18,6 +18,7 @@ The exact rules live in `src/messages.js`.
 | `slot` | `i` int 0–31 | Switch to weapon slot `i` (0 = the first slot; it may hold nothing if your weapons broke). |
 | `open` | `id` int or `"golden"` | Open the chest next to me (chest index, or the golden chest). |
 | `heal` | `kind` `"bandage"` or `"medkit"` | Use a heal item. |
+| `drop` | – | Drop the weapon in my hand on the ground, with exactly the durability it has (#34). Anyone can pick it up. |
 | `shield` | `up` bool | Raise (`true`, Shift / the shield button held) or lower my shield. Ignored without a shield or while frozen. |
 
 ## Server → phone

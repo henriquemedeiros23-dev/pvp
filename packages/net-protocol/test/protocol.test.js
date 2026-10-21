@@ -20,6 +20,7 @@ const CLIENT_EXAMPLES = {
   open: { t: 'open', id: 7 },
   heal: { t: 'heal', kind: 'bandage' },
   shield: { t: 'shield', up: true },
+  drop: { t: 'drop' },
 };
 
 // One valid example per server message, shaped exactly like apps/game/server.js sends them.

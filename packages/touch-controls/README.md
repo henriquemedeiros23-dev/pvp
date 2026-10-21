@@ -4,7 +4,7 @@
 
 Game controls for phones and computers: a joystick on the left, drag on the
 screen (or on the fire button) to aim, tap buttons for actions, plus keyboard
-(WASD / arrows, hold Shift = raise the shield, space / C / E / Q / F / 1-5), mouse look with
+(WASD / arrows, hold Shift = raise the shield, G = drop weapon, space / C / E / Q / F / 1-5), mouse look with
 pointer lock and the mouse wheel. A pure core keeps the input state; thin
 DOM adapters feed it real browser events. No dependencies.
 
