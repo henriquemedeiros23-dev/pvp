@@ -17,7 +17,7 @@ await api.buy('hat', 'crown');       // kind: 'color' | 'hat' | 'face' | 'back' 
 await api.equip('hat', 'crown');     // each resolves { account }
 api.logout();                         // forgets the token on this device
 
-try { await api.buy('weapon', 'rocket'); }
+try { await api.buy('weapon', 'icesword'); }
 catch (e) { showError(e.message); }   // ApiError: e.message is friendly, e.status is the HTTP status (0 = no connection)
 ```
 
