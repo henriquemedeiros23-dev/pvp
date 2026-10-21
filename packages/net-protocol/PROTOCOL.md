@@ -15,7 +15,7 @@ The exact rules live in `src/messages.js`.
 | `leave` | – | Leave alive; weapons go back to the backpack. Server answers `left`. |
 | `state` | `x, y, z` number, `ry, pitch` number (radians), `f` int 0–255 | My position and look, ~20 times a second. `f` = movement flags (below). |
 | `fire` | `d` vec3 | Use the weapon in my hand, aiming in direction `d`. |
-| `slot` | `i` int 0–31 | Switch to weapon slot `i` (0 = basic weapon). |
+| `slot` | `i` int 0–31 | Switch to weapon slot `i` (0 = the first slot; it may hold nothing if your weapons broke). |
 | `open` | `id` int or `"golden"` | Open the chest next to me (chest index, or the golden chest). |
 | `heal` | `kind` `"bandage"` or `"medkit"` | Use a heal item. |
 

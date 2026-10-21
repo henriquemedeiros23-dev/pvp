@@ -75,7 +75,7 @@ export const CLIENT_MESSAGES = deepFreeze({
     d: ['vec3', 'Aim direction [x, y, z] (server normalizes it)'],
   }),
   slot: m('Switch to weapon slot i.', {
-    i: [{ type: 'int', min: 0, max: MAX_SLOT_INDEX }, 'Slot index, 0 = basic weapon'],
+    i: [{ type: 'int', min: 0, max: MAX_SLOT_INDEX }, 'Slot index, 0 = the first slot'],
   }),
   open: m('Open the chest I am standing next to.', {
     id: [{ oneOf: [{ type: 'int', min: 0, max: 100000 }, { enum: ['golden'] }] }, 'Chest index, or "golden" for the golden chest'],

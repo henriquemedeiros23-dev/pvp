@@ -41,16 +41,16 @@ graph LR
 | Package | What it does | Runs in | Determinism | Tests |
 |---|---|---|---|---|
 | `@pvp/seeded-random` | Random numbers from a seed: same seed, same numbers. | both | fully: only the seed and the calls decide | 11 |
-| `@pvp/game-rules` | All the game's numbers (weapons, heals, skins, prices, limits) as frozen data. | both | fully: constant data and pure helpers | 12 |
+| `@pvp/game-rules` | All the game's numbers (weapons, rarities and their colors, chest chances, heals, skins, prices, limits) as frozen data. | both | fully: constant data and pure helpers | 17 |
 | `@pvp/collision` | Walls, jumping, landing and ray hits in a world made of boxes. | both | fully: pure math, no random, no time | 18 |
 | `@pvp/world-gen` | Builds the island of ruins (houses, towers, chests) from a seed. | both | fully: all random comes from the seed | 12 |
 | `@pvp/net-protocol` | Every message between phone and server, with builders and checks. | both | fully: pure functions and frozen data | 16 |
-| `@pvp/accounts-shop` | Accounts, log in, coins, buying skins and weapons, the backpack. | Node | partly: logic is pure, tokens/clock are passed in, file saving is real I/O | 25 |
-| `@pvp/arena` | The fight itself: players, chests, loot, weapons, damage, knockouts. | both | fully: time and seeded random are passed in (replay test) | 27 |
+| `@pvp/accounts-shop` | Accounts, log in, coins, buying skins and weapons, the backpack. | Node | partly: logic is pure, tokens/clock are passed in, file saving is real I/O | 26 |
+| `@pvp/arena` | The fight itself: players, chests, loot, weapons, damage, knockouts. | both | fully: time and seeded random are passed in (replay test) | 51 |
 | `@pvp/shop-catalog` | Turns the rules and an account into the cards the shop screen shows. | both | fully: pure functions of their inputs | 9 |
 | `@pvp/hud-model` | Turns your inventory and health into the in-game HUD: Durability bar of the held weapon, H.P bar, 5 slots. | both | fully: pure functions of their inputs | 11 |
 | `@pvp/api-client` | Talks to the server's account and shop API and keeps the login token. | both | fully: fetch and storage are passed in | 10 |
-| `@pvp/stickman-3d` | A three.js stickman with skins, outfits, weapons and animation. | browser (pose math also in Node) | partly: pose math is pure, how it looks depends on the renderer | 16 |
+| `@pvp/stickman-3d` | A three.js stickman with skins, outfits, weapons (a detailed pistol for the Gun) and animation. | browser (pose math also in Node) | partly: pose math is pure, how it looks depends on the renderer | 17 |
 | `@pvp/island-scene` | The 3D island: sky, sun, ground, water, palms, ruins and chests. | browser (also builds in Node) | partly: all placement and colors from a seed, how it looks depends on the renderer | 8 |
 | `@pvp/touch-controls` | Joystick, aim by dragging, buttons, keyboard and mouse. | browser (core also in Node) | partly: the core is pure, the DOM part depends on real fingers and mice | 18 |
 
@@ -76,13 +76,17 @@ graph LR
 
 ## `@pvp/game-rules`
 
-**Purpose:** all the game's rules as frozen plain data (limits, movement, weapons, heals, loot, colors, outfits, prices), plus small helpers.
+**Purpose:** all the game's rules as frozen plain data (limits, movement, weapons, the starting weapon, rarities and their colors, chest chances and coins, heals, colors, outfits, prices), plus small helpers.
 
 | Export | Example |
 |---|---|
 | `WEAPONS`, `HEALS`, `COLORS`, `OUTFITS`, `MAX_HP` | `WEAPONS.sniper.dmg` |
+| `STARTING_WEAPON` | `'gun'`: everyone gets it on join |
+| `RARITIES`, `RARITY_COLORS`, `rarityStyle(r)` | `RARITY_COLORS.epic.color; // purple` |
+| `chestChance(id)`, `CHEST_COINS`, `GOLDEN_CHEST_COINS`, `GOLDEN_CHEST_BOOST` | `chestChance('gun'); // 15 (percent)` |
+| `droppedDurability(id, usesLeft)` | `droppedDurability('gun', 3); // 8 (half, rounded up)` |
 | `RULES` | `createArena({ rules: RULES, ... }) // everything in one object` |
-| `weaponPrice(id)` / `skinPrice(slot, id)` | `weaponPrice('sniper'); // 200` |
+| `weaponPrice(id)` / `skinPrice(slot, id)` | `weaponPrice('gun'); // 3` |
 | `isBuyable(kind, id)` | `isBuyable('weapon', 'rocket'); // true` |
 | `weaponsByRarity(rarity)` | `weaponsByRarity('legendary'); // ['sniper', 'rocket', 'mine']` |
 | `validateRules(rules)` | `validateRules(RULES); // [] means valid` |
@@ -155,7 +159,7 @@ graph LR
 
 ## `@pvp/arena`
 
-**Purpose:** the fight as a simulation with no sockets and no clock: join and leave, movement checks, weapons (melee, guns, grenades, rockets, mines), chests and the golden chest, loot, damage and knockouts. The server calls methods and `tick(now)`, then sends what `drain()` returns.
+**Purpose:** the fight as a simulation with no sockets and no clock: join and leave, movement checks, weapons (melee, guns, grenades, rockets, mines), chests and the golden chest (one weapon each, picked by the weapons' chest chances), loot, damage and knockouts (dropped weapons with half or less durability come back at half). Everyone joins with the starting Gun. The server calls methods and `tick(now)`, then sends what `drain()` returns.
 
 | Export | Example |
 |---|---|
@@ -178,7 +182,7 @@ graph LR
 |---|---|
 | `shopTabs()` | `shopTabs(); // [{ id: 'color', label: 'Colors', hint }, ...]` |
 | `shopItems(tab, account)` | `shopItems('hat', account); // cards with action 'buy' / 'equip' / 'equipped'` |
-| `shopWeaponIds(rules)` | `shopWeaponIds(); // sorted by rarity, then price` |
+| `shopWeaponIds(rules)` | `shopWeaponIds(); // every weapon, sorted by rarity, then price` |
 | `backpackSummary(account)` | `backpackSummary(account); // 'Backpack: 2× Pistol, 1× Sniper'` |
 | `swatchBackground(card)` | `el.style.background = swatchBackground(card);` |
 | `OUTFIT_ICONS` | `OUTFIT_ICONS.hat.crown; // '👑'` |

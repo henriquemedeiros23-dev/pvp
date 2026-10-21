@@ -5,7 +5,7 @@ import { RULES } from '@pvp/game-rules';
 
 /** One emoji per weapon id, for slots, the kill feed and the shop. */
 export const WEAPON_ICONS = Object.freeze({
-  woodsword: '🗡️', sword: '⚔️', bat: '🏏', spear: '🔱', axe: '🪓', pistol: '🔫', shotgun: '💥',
+  gun: '🔫', sword: '⚔️', bat: '🏏', spear: '🔱', axe: '🪓', pistol: '🔫', shotgun: '💥',
   rifle: '🎯', sniper: '🔭', grenade: '💣', rocket: '🚀', mine: '🧨',
 });
 

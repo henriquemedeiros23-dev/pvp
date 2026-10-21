@@ -16,7 +16,7 @@ export { ARENA_DEFAULTS } from './tuning.js';
 const copyPlayer = p => p && {
   id: p.id, key: p.key, name: p.name, skin: { ...p.skin }, coins: p.coins,
   x: p.x, y: p.y, z: p.z, ry: p.ry, pitch: p.pitch, flags: p.flags,
-  hp: p.hp, weapons: [...p.weapons], dur: [...p.dur], slot: p.slot, bandages: p.bandages, medkits: p.medkits,
+  hp: p.hp, weapons: [...p.weapons], dur: [...p.dur], free: [...p.free], slot: p.slot, bandages: p.bandages, medkits: p.medkits,
   protectUntil: p.protectUntil,
 };
 
@@ -36,7 +36,7 @@ export function createArena(o = {}) {
   return {
     /** Join. Returns { ok: true, id, weapons, replaced } or { ok: false, reason: 'full' }. */
     join: (playerKey, info, now) => players.join(A, playerKey, info, now),
-    /** Leave. alive (default true): returns the non-basic weapons for the backpack; else []. */
+    /** Leave. alive (default true): returns the weapons for the backpack (not the free starting weapon); else []. */
     leave: (id, opts) => players.leave(A, id, opts),
     setState: (id, state, now) => players.setState(A, id, state, now),
     fire: (id, dir, now) => fire(A, id, dir, now),

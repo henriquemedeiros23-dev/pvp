@@ -228,14 +228,16 @@ body.desktop .hotbar { bottom: 26px; --slot: 72px; --label-w: 88px; --bar-w: 180
 
 /* Small phones in landscape (e.g. 667x375): labels go above the bars, the controls move a bit closer to the edges. */
 @media (max-height: 430px) and (max-width: 740px) {
-  .hotbar { --slot: 42px; --bar-w: 104px; gap: 6px; }
-  .meter { grid-template-columns: 1fr auto; grid-template-areas: "label val" "bar bar"; row-gap: 2px; }
+  .hotbar { --slot: 40px; --bar-w: 100px; gap: 6px; }
+  /* fixed width, so the bar group does not grow when the value text changes (100% vs ∞) */
+  .meter { width: var(--bar-w); grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "label val" "bar bar"; row-gap: 2px; }
+  .meter .mlabel { overflow: hidden; white-space: nowrap; }
   .meter .mlabel { grid-area: label; } .meter .mbar { grid-area: bar; } .meter .mval { grid-area: val; }
   .meters { gap: 3px; padding: 4px 8px 6px; }
   .meter.dur.infinite .mval { line-height: 0.7; }
   .stick { width: 108px; height: 108px; left: calc(14px + var(--safe-l)); bottom: calc(14px + var(--safe-b)); }
   .knob { width: 52px; height: 52px; margin: -26px 0 0 -26px; }
-  .jump { right: calc(104px + var(--safe-r)); width: 60px; height: 60px; }
+  .jump { right: calc(96px + var(--safe-r)); width: 60px; height: 60px; }
   .crouch { right: calc(24px + var(--safe-r)); width: 60px; height: 60px; }
   .fire { right: calc(24px + var(--safe-r)); }
 }

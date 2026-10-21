@@ -1,5 +1,5 @@
 // Checks that a set of rules is consistent. Pure: never changes its input.
-import { WEAPON_TYPES, RARITIES } from './weapons.js';
+import { WEAPON_TYPES, RARITIES as KNOWN_RARITIES } from './weapons.js';
 
 const REQUIRED_WEAPON_FIELDS = ['name', 'type', 'dmg', 'rate', 'rarity', 'price'];
 const GUN_FIELDS = ['range', 'spread', 'pellets'];
@@ -9,29 +9,54 @@ const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
 const isObject = v => v !== null && typeof v === 'object';
 const isPrice = v => typeof v === 'number' && Number.isFinite(v) && v >= 0;
 const isPosInt = v => Number.isInteger(v) && v > 0;
+const isPercent = v => typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= 100;
 
 /**
  * Validate a rules object shaped like this package's exports
- * ({ WEAPONS, BASIC_WEAPON, COLORS, OUTFITS, DEFAULT_SKIN, LOOT_TABLE? }).
+ * ({ WEAPONS, STARTING_WEAPON, RARITIES?, RARITY_COLORS?, COLORS, OUTFITS, DEFAULT_SKIN, LOOT_TABLE? }).
  * Returns a list of problems as strings; an empty list means the rules are valid.
  */
 export function validateRules(rules) {
   const problems = [];
   if (!isObject(rules)) return ['rules must be an object'];
-  const { WEAPONS, BASIC_WEAPON, COLORS, OUTFITS, DEFAULT_SKIN, LOOT_TABLE } = rules;
+  const { WEAPONS, STARTING_WEAPON, COLORS, OUTFITS, DEFAULT_SKIN, LOOT_TABLE, RARITY_COLORS } = rules;
+  const RARITIES = rules.RARITIES ?? KNOWN_RARITIES;
+
+  // Rarities: a list of names, each with a color
+  if (!Array.isArray(RARITIES) || RARITIES.length === 0) problems.push('RARITIES must be a non-empty list');
+  else if (RARITY_COLORS !== undefined) {
+    if (!isObject(RARITY_COLORS)) problems.push('RARITY_COLORS must be an object');
+    else {
+      for (const r of RARITIES) {
+        const c = Object.hasOwn(RARITY_COLORS, r) ? RARITY_COLORS[r] : undefined;
+        if (!isObject(c)) { problems.push(`RARITY_COLORS: missing rarity "${r}"`); continue; }
+        for (const f of ['color', 'color2']) {
+          if (typeof c[f] !== 'string' || !HEX_COLOR.test(c[f])) problems.push(`RARITY_COLORS.${r}.${f}: "${c[f]}" is not a valid hex color`);
+        }
+      }
+      for (const r of Object.keys(RARITY_COLORS)) if (!RARITIES.includes(r)) problems.push(`RARITY_COLORS.${r}: unknown rarity`);
+    }
+  }
+  const rarities = Array.isArray(RARITIES) ? RARITIES : [];
+  if (isObject(rules.GOLDEN_CHEST_BOOST)) {
+    for (const [r, n] of Object.entries(rules.GOLDEN_CHEST_BOOST)) {
+      if (!rarities.includes(r)) problems.push(`GOLDEN_CHEST_BOOST.${r}: unknown rarity`);
+      if (!isPrice(n)) problems.push(`GOLDEN_CHEST_BOOST.${r}: must be a number >= 0`);
+    }
+  }
 
   // Weapons
   if (!isObject(WEAPONS)) {
     problems.push('WEAPONS must be an object');
   } else {
-    const basics = [];
+    let chanceTotal = 0;
     for (const [id, w] of Object.entries(WEAPONS)) {
       if (!isObject(w)) { problems.push(`weapon ${id}: must be an object`); continue; }
       for (const f of REQUIRED_WEAPON_FIELDS) {
         if (w[f] === undefined) problems.push(`weapon ${id}: missing ${f}`);
       }
       if (w.type !== undefined && !WEAPON_TYPES.includes(w.type)) problems.push(`weapon ${id}: unknown type "${w.type}"`);
-      if (w.rarity !== undefined && !RARITIES.includes(w.rarity)) problems.push(`weapon ${id}: unknown rarity "${w.rarity}"`);
+      if (w.rarity !== undefined && !rarities.includes(w.rarity)) problems.push(`weapon ${id}: unknown rarity "${w.rarity}"`);
       if (w.price !== undefined && !isPrice(w.price)) problems.push(`weapon ${id}: price must be a number >= 0`);
       if (w.durability === undefined) problems.push(`weapon ${id}: missing durability (null = never breaks)`);
       else if (w.durability !== null && !isPosInt(w.durability)) problems.push(`weapon ${id}: durability must be null or a whole number > 0`);
@@ -40,14 +65,16 @@ export function validateRules(rules) {
         for (const f of GUN_FIELDS) if (w[f] === undefined) problems.push(`weapon ${id}: gun missing ${f}`);
       }
       if (EXPLOSIVE_TYPES.includes(w.type) && w.radius === undefined) problems.push(`weapon ${id}: explosive missing radius`);
-      if (w.rarity === 'basic') basics.push(id);
+      if (w.chestChance === undefined) problems.push(`weapon ${id}: missing chestChance (percent, 0 = never in chests)`);
+      else if (!isPercent(w.chestChance)) problems.push(`weapon ${id}: chestChance must be a number from 0 to 100`);
+      else chanceTotal += w.chestChance;
     }
-    if (basics.length !== 1) problems.push(`there must be exactly one basic weapon, found ${basics.length}${basics.length ? ` (${basics.join(', ')})` : ''}`);
-    if (!Object.hasOwn(WEAPONS, BASIC_WEAPON)) problems.push(`BASIC_WEAPON "${BASIC_WEAPON}" is not a weapon`);
-    else if (WEAPONS[BASIC_WEAPON]?.rarity !== 'basic') problems.push(`BASIC_WEAPON "${BASIC_WEAPON}" is not the basic weapon`);
+    if (Math.abs(chanceTotal - 100) > 1e-9) problems.push(`weapon chestChance values must add up to 100, they add up to ${+chanceTotal.toFixed(4)}`);
+    if (!Object.hasOwn(WEAPONS, STARTING_WEAPON)) problems.push(`STARTING_WEAPON "${STARTING_WEAPON}" is not a weapon`);
 
     if (isObject(LOOT_TABLE)) {
       for (const [rarity, ids] of Object.entries(LOOT_TABLE)) {
+        if (!rarities.includes(rarity)) problems.push(`LOOT_TABLE.${rarity}: unknown rarity`);
         for (const id of ids) {
           if (WEAPONS[id]?.rarity !== rarity) problems.push(`LOOT_TABLE.${rarity}: "${id}" is not a ${rarity} weapon`);
         }

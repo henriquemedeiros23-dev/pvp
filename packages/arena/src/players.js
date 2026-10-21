@@ -29,11 +29,13 @@ export function join(A, key, { name, skin, loadout = [], coins = 0 } = {}, now) 
   let replaced = null;
   if (oldId !== undefined) replaced = { id: oldId, weapons: leave(A, oldId, { alive: true }) };
 
-  // Weapons from the loadout (best first is the server's choice), as many as fit.
-  const weapons = [R.BASIC_WEAPON];
+  // The starting weapon (free, slot 1), then weapons from the loadout in its order (best first is the
+  // server's choice), copies of the same weapon too, as many as fit.
+  const freeStart = Boolean(weaponDef(A, R.STARTING_WEAPON));
+  const weapons = freeStart ? [R.STARTING_WEAPON] : [];
   for (const w of Array.isArray(loadout) ? loadout : []) {
     if (weapons.length >= R.MAX_SLOTS) break;
-    if (weaponDef(A, w) && !weapons.includes(w)) weapons.push(w);
+    if (weaponDef(A, w)) weapons.push(w);
   }
 
   const spot = findSpawn(A.island, [...A.players.values()], A.rnd.spawn);
@@ -44,6 +46,8 @@ export function join(A, key, { name, skin, loadout = [], coins = 0 } = {}, now) 
     // dur: uses left per slot (parallel to weapons), null = never breaks. Loadout weapons start full.
     hp: R.MAX_HP, weapons, dur: weapons.map(w => maxDurability(A, w)), slot: 0, bandages: 1, medkits: 0, lastFire: -Infinity, lastHeal: -Infinity,
     protectUntil: now + R.SPAWN_PROTECT_MS, lastState: now,
+    // free: per slot (parallel to weapons), true for the free starting weapon (not put in the backpack on leave)
+    free: weapons.map((w, i) => freeStart && i === 0),
   };
   A.players.set(p.id, p);
   A.byKey.set(key, p.id);
@@ -51,7 +55,7 @@ export function join(A, key, { name, skin, loadout = [], coins = 0 } = {}, now) 
   send(A, p.id, welcomeFor(A, p.id));
   send(A, p.id, inventoryMsg(p));
   send(A, 'all', { t: 'pjoin', ...playerInfo(p) }, p.id);
-  return { ok: true, id: p.id, weapons: weapons.slice(1), replaced };
+  return { ok: true, id: p.id, weapons: weapons.slice(freeStart ? 1 : 0), replaced };
 }
 
 /**
@@ -73,7 +77,8 @@ export function removePlayer(A, p) {
 }
 
 /**
- * Leaves the arena. Alive: returns the non-basic weapons to put back in the backpack.
+ * Leaves the arena. Alive: returns the weapons to put back in the backpack: everything carried
+ * except the free starting weapon given at join (if it has not broken).
  * Broken weapons are already gone; worn ones go back as plain ids (the backpack keeps no durability,
  * so they are full again next time).
  */
@@ -82,7 +87,8 @@ export function leave(A, id, { alive = true } = {}) {
   if (!p) return [];
   removePlayer(A, p);
   send(A, 'all', { t: 'pleave', id: p.id });
-  return alive ? p.weapons.filter(w => w !== A.rules.BASIC_WEAPON) : [];
+  if (!alive) return [];
+  return p.weapons.filter((w, i) => !p.free[i]);
 }
 
 /** A movement update from the player. Returns false if refused (a `pos` correction is queued). */

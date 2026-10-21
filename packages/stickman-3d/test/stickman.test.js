@@ -60,6 +60,25 @@ test('setWeapon works for every weapon id, keeping the special models', () => {
   assert.equal(sm.armR.hand.children.length, 0);
 });
 
+test('the Gun is a detailed pistol: slide, barrel, trigger guard and a tilted grip below the slide', () => {
+  const gun = buildWeapon('gun');
+  assert.equal(gun.userData.model, 'special:gun');
+  assert.ok(meshCount(gun) >= 15, `only ${meshCount(gun)} parts`);
+  const meshes = [];
+  gun.traverse(o => { if (o.isMesh) meshes.push(o); });
+  assert.ok(meshes.some(m => m.geometry.type === 'TorusGeometry'), 'trigger guard');
+  assert.ok(meshes.some(m => m.geometry.type === 'CylinderGeometry'), 'barrel');
+  // L shape: forward is -y and up is +z in the hand; the grip goes down (-z), the barrel forward (-y)
+  gun.updateMatrixWorld(true);
+  const box = new THREE.Box3().setFromObject(gun);
+  assert.ok(box.min.y < -0.3 && box.max.y < 0.2, 'long forward, short back');
+  assert.ok(box.min.z < -0.15 && box.max.z > 0.15, 'grip below, slide above');
+  const sm = new Stickman(DEFAULT_SKIN);
+  sm.setWeapon('gun');
+  assert.equal(sm.weaponType, 'gun');
+  sm.dispose();
+});
+
 test('unknown weapon ids get a generic model by type', () => {
   const weapons = { ...WEAPONS };
   for (const type of WEAPON_TYPES) weapons['new_' + type] = { name: 'New', type, dmg: 1, range: 10 };

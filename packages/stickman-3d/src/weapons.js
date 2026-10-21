@@ -25,13 +25,60 @@ function kit(g, def) {
     o.position.set(x, y, z); g.add(o); return o;
   };
   const box = (w, h, d, mat, x, y, z) => mesh(new THREE.BoxGeometry(w, h, d), mat, x, y, z);
-  return { m, mesh, box };
+  return { g, m, mesh, box };
+}
+
+// The Gun (starting weapon): a realistic pistol, L-shaped like the boss's drawing
+// (straight slide on top, grip straight down at the back, a small trigger area).
+// Gun frame: forward is -y, up is +z (when aiming), x is the side. The hand holds the grip at the origin.
+function buildGun({ g, mesh, box }) {
+  const slideMat = std('#8b939e', { metalness: 0.7, roughness: 0.3 });
+  const frameMat = std('#3a3e45', { metalness: 0.3, roughness: 0.55 });
+  const gripMat = std('#6b4428', { roughness: 0.85 });
+  const darkMat = std('#16181c', { roughness: 0.8 });
+  const steelMat = std('#c3c9d1', { metalness: 0.85, roughness: 0.2 });
+  g.scale.setScalar(1.3); // a bit bigger than real, so it reads well on a phone
+
+  // slide on top, with the barrel sticking out a little at the front
+  box(0.062, 0.3, 0.066, slideMat, 0, -0.095, 0.098);
+  mesh(new THREE.CylinderGeometry(0.017, 0.017, 0.03, 14), steelMat, 0, -0.255, 0.1);
+  mesh(new THREE.CylinderGeometry(0.009, 0.009, 0.032, 10), darkMat, 0, -0.257, 0.1); // muzzle hole
+  // grip lines at the back of the slide, ejection port on the right
+  for (let i = 0; i < 5; i++) box(0.064, 0.006, 0.05, darkMat, 0, 0.012 + i * 0.01, 0.098);
+  box(0.004, 0.06, 0.026, darkMat, 0.032, -0.04, 0.11);
+  // sights and hammer
+  box(0.01, 0.014, 0.018, darkMat, 0, -0.232, 0.138);
+  box(0.044, 0.012, 0.016, darkMat, 0, 0.044, 0.137);
+  box(0.022, 0.02, 0.03, frameMat, 0, 0.066, 0.085);
+
+  // frame under the slide (front part with the rail)
+  box(0.056, 0.28, 0.034, frameMat, 0, -0.075, 0.05); // runs back over the grip: one clean L
+  box(0.044, 0.07, 0.012, darkMat, 0, -0.165, 0.028); // rail
+
+  // trigger guard (a ring whose top half is hidden in the frame) and the trigger
+  const guard = mesh(new THREE.TorusGeometry(0.034, 0.0075, 8, 24), frameMat, 0, -0.062, 0.036);
+  guard.rotation.y = Math.PI / 2;
+  box(0.012, 0.012, 0.036, steelMat, 0, -0.05, 0.026).rotation.x = -0.25;
+
+  // grip: tilted back like a real pistol, with side panels and a magazine plate at the bottom
+  const grip = new THREE.Group();
+  grip.position.set(0, 0.012, 0.045);
+  grip.rotation.x = 0.1; // almost straight down, like the drawing
+  g.add(grip);
+  const part = (w, h, d, mat, z) => {
+    const o = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+    o.position.set(0, 0.004, z);
+    grip.add(o);
+  };
+  part(0.056, 0.088, 0.17, frameMat, -0.085);
+  part(0.064, 0.07, 0.13, gripMat, -0.09);    // side panels
+  part(0.062, 0.098, 0.016, darkMat, -0.175); // magazine plate
 }
 
 // Melee weapons are held like a sword: handle in hand, blade forward (+z).
 // Ranged weapons point along -y (the direction the arm points when aiming).
 const SPECIAL = {
-  woodsword: { type: 'melee', build: ({ m, box }) => { box(0.06, 0.06, 0.2, m.wood()); box(0.22, 0.05, 0.05, m.wood(), 0, 0, 0.1); box(0.07, 0.03, 0.75, std('#b98a50'), 0, 0, 0.5); } },
+  gun: { type: 'gun', build: buildGun },
   sword: { type: 'melee', build: ({ m, box }) => { box(0.06, 0.06, 0.2, m.dark()); box(0.28, 0.05, 0.05, std('#d4a531', { metalness: 0.8 }), 0, 0, 0.1); box(0.08, 0.02, 0.9, m.steel(), 0, 0, 0.58); } },
   bat: { type: 'melee', build: ({ m, mesh }) => { mesh(new THREE.CylinderGeometry(0.07, 0.035, 0.95, 10), m.wood(), 0, 0, 0.4).rotation.x = Math.PI / 2; } },
   spear: { type: 'melee', build: ({ m, mesh }) => {

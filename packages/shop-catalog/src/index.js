@@ -1,6 +1,6 @@
 // @pvp/shop-catalog: pure functions that turn the game rules and an account into
 // what the shop screen shows. Plain ES module: works in Node and in the browser.
-import { RULES } from '@pvp/game-rules';
+import { RULES, rarityStyle } from '@pvp/game-rules';
 
 const TABS = Object.freeze([
   Object.freeze({ id: 'color', label: 'Colors', hint: 'Pick the color of your stickman.' }),
@@ -27,11 +27,10 @@ export function shopTabs() {
   return TABS.map(t => ({ ...t }));
 }
 
-/** Weapon ids the shop sells, sorted by rarity (rules order), then price, then id. */
+/** Weapon ids the shop sells (every weapon, the starting Gun too), sorted by rarity (rules order), then price, then id. */
 export function shopWeaponIds(rules = RULES) {
   const rank = r => { const i = rules.RARITIES.indexOf(r); return i < 0 ? Infinity : i; };
   return Object.keys(rules.WEAPONS)
-    .filter(id => id !== rules.BASIC_WEAPON && rules.WEAPONS[id].rarity !== 'basic')
     .sort((a, b) => {
       const wa = rules.WEAPONS[a], wb = rules.WEAPONS[b];
       return rank(wa.rarity) - rank(wb.rarity) || wa.price - wb.price || (a < b ? -1 : a > b ? 1 : 0);
@@ -48,7 +47,8 @@ const stashOf = (account, id) => {
 /**
  * The cards for one shop tab.
  * Skin cards: { kind, id, name, price, owned, equipped, canAfford, action, icon?, color?, pattern? }
- * Weapon cards: { kind: 'weapon', id, name, price, owned, equipped: false, canAfford, action: 'buy', rarity, type, stashCount }
+ * Weapon cards: { kind: 'weapon', id, name, price, owned, equipped: false, canAfford, action: 'buy', rarity, type, stashCount,
+ *   rarityName, rarityColor, rarityBackground } (colors from RARITY_COLORS in @pvp/game-rules)
  * action is 'equipped' (wearing it), 'equip' (owned) or 'buy'.
  * Skins come in rules order; weapons by rarity, then price. Unknown tab gives [].
  */
@@ -58,10 +58,14 @@ export function shopItems(tab, account, rules = RULES) {
     return shopWeaponIds(rules).map(id => {
       const w = rules.WEAPONS[id];
       const stashCount = stashOf(account, id);
+      const look = rarityStyle(w.rarity, rules.RARITY_COLORS);
       return {
         kind: 'weapon', id, name: w.name, price: w.price,
         owned: stashCount > 0, equipped: false, canAfford: coins >= w.price, action: 'buy',
         rarity: w.rarity, type: w.type, stashCount,
+        rarityName: look ? look.name : String(w.rarity ?? ''),
+        rarityColor: look ? look.color : '#888888',
+        rarityBackground: look ? look.background : '#888888',
       };
     });
   }

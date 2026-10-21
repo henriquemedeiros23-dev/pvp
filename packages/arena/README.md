@@ -19,7 +19,10 @@ const arena = createArena({ island: generateIsland(), rules: RULES, random: crea
 // optional: tuning: { snapshotRadius: 200, ... } (see src/tuning.js), snapshots: false
 
 const r = arena.join('alice', { name: 'Alice', skin, loadout: ['rocket', 'pistol'], coins: 120 }, Date.now());
-// { ok: true, id, weapons: ['rocket', 'pistol'] (taken from the loadout: remove them from the backpack),
+// The player gets the rules' STARTING_WEAPON (the Gun) free in slot 1, then the loadout in its order
+// (copies of the same weapon too, each with its own durability).
+// { ok: true, id, weapons: ['rocket', 'pistol'] (taken from the loadout: remove them from the backpack;
+//   loadout weapons that do not fit in MAX_SLOTS are not taken),
 //   replaced: null | { id, weapons } (same key was already in: that player left alive) }
 // or { ok: false, reason: 'full' } (send 'full' yourself)
 
@@ -56,10 +59,21 @@ setInterval(() => {
   check (swing, shot, throw, rocket, mine) costs `wearPerUse` and queues an `inv` (with `dur`) for that player.
   At 0 the weapon is removed, the player gets `{ t: 'broke', slot, weapon }` then an `inv`, and the hand stays
   on the same slot number (or the last slot if that one is gone). Its last use still fires.
-  Loadout weapons and chest loot start full. Ground items carry `dur`: a weapon dropped on knockout keeps
-  what it had left, and whoever picks it up gets exactly that.
-- **Decision (the boss can change it):** `leave(id, { alive: true })` returns plain weapon ids, so weapons put
-  back in the backpack are **full again** next time. Broken weapons are gone for good (they were taken out of
+  The starting Gun breaks like any weapon; a player may then have no weapons at all (firing does nothing,
+  the snapshot shows `''`, picking up works). Loadout weapons and chest loot start full.
+- **Copies:** a player may carry the same weapon more than once (e.g. 2 Guns in 2 slots), each copy with its
+  own durability. Picking up a weapon only needs a free slot. On leave only the free starting Gun stays behind
+  (`getPlayer(id).free` marks it per slot); every other copy goes back.
+- **Knockout:** every weapon is dropped (the Gun too) with the heals. **Dropped weapons rule:** a dropped weapon
+  with more than half its durability keeps it; half or less is set to half, rounded up (`droppedDurability` in
+  `@pvp/game-rules`). Ground items carry `dur` and whoever picks one up gets exactly that.
+- **Chests:** a normal chest gives `CHEST_COINS` (3) coins and exactly one weapon, picked with each weapon's
+  `chestChance` as its weight (one draw from the seeded loot stream). Heals from normal chests are a separate
+  tuning value `chestHealChance` (0 = off for now). The golden chest gives `GOLDEN_CHEST_COINS` (10) coins and
+  one weapon, with the weights of Epic, Legendary and Megalegend weapons doubled (`GOLDEN_CHEST_BOOST`).
+  `chestWeights(rules, { golden })` and `rollChestWeapon(A, { golden })` live in `src/loot.js`.
+- **Decision (the boss can change it):** `leave(id, { alive: true })` returns plain weapon ids (not the free
+  starting Gun from `join`), so weapons put back in the backpack are **full again** next time. Broken weapons are gone for good (they were taken out of
   the backpack at `join` and are not returned).
 - **Coins:** the account (e.g. `@pvp/accounts-shop`) is the single source of truth. The arena only keeps a copy
   (from `join`) for the 'coins' and 'inv' messages, and only chests add to it. Whenever the coins change outside

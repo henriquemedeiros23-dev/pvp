@@ -34,7 +34,7 @@ export function createAccounts({
   randomBytes = crypto.randomBytes,
 } = {}) {
   if (!store) throw new TypeError('createAccounts needs a store');
-  const { BASIC_WEAPON, WEAPONS, MAX_SLOTS, DEFAULT_SKIN, COLORS, OUTFITS, SKIN_SLOTS } = rules;
+  const { STARTING_WEAPON, WEAPONS, MAX_SLOTS, DEFAULT_SKIN, COLORS, OUTFITS, SKIN_SLOTS } = rules;
   const itemPrice = rules.itemPrice ?? gameRules.itemPrice;
 
   // Records keyed by lower-case name. No prototype, so a name like "__proto__" is just a name.
@@ -49,6 +49,8 @@ export function createAccounts({
     rec.owned ??= freeItems();
     rec.skin ??= { ...DEFAULT_SKIN };
     rec.stash ??= {};
+    // Weapons that are no longer in the game (e.g. the old wooden sword) are dropped from the backpack.
+    for (const id of Object.keys(rec.stash)) if (!Object.hasOwn(WEAPONS, id)) delete rec.stash[id];
     for (const t of rec.tokens) tokens.set(t, rec);
   }
 
@@ -178,30 +180,33 @@ export function createAccounts({
   }
 
   /**
-   * Weapons to carry into the arena: the basic weapon first, then the most expensive
-   * stashed weapons (one of each kind) until MAX_SLOTS is full. They leave the stash.
+   * Weapons to carry into the arena from the backpack: the most expensive stashed weapons first,
+   * every copy counts (2 Shotguns take 2 slots), until the slots are full. They leave the stash.
+   * The arena gives the free starting weapon itself, so one slot is kept for it (when the rules have one).
    */
   function takeLoadout(account) {
     const a = own(account);
-    const weapons = [BASIC_WEAPON];
+    const weapons = [];
+    const room = MAX_SLOTS - (STARTING_WEAPON && Object.hasOwn(WEAPONS, STARTING_WEAPON) ? 1 : 0);
     const best = Object.keys(a.stash)
-      .filter(id => a.stash[id] > 0 && Object.hasOwn(WEAPONS, id) && id !== BASIC_WEAPON)
+      .filter(id => a.stash[id] > 0 && Object.hasOwn(WEAPONS, id))
       .sort((x, y) => WEAPONS[y].price - WEAPONS[x].price || (x < y ? -1 : x > y ? 1 : 0));
     for (const id of best) {
-      if (weapons.length >= MAX_SLOTS) break;
-      weapons.push(id);
-      a.stash[id]--;
+      while (weapons.length < room && a.stash[id] > 0) {
+        weapons.push(id);
+        a.stash[id]--;
+      }
       if (!a.stash[id]) delete a.stash[id];
     }
     save();
     return weapons;
   }
 
-  /** Left the arena alive: carried weapons go back into the stash (not the basic weapon). */
+  /** Left the arena alive (or the arena did not take them): weapons go back into the stash. Unknown ids are ignored. */
   function returnLoadout(account, weapons) {
     const a = own(account);
     for (const id of weapons ?? []) {
-      if (id === BASIC_WEAPON || typeof id !== 'string' || !Object.hasOwn(WEAPONS, id)) continue;
+      if (typeof id !== 'string' || !Object.hasOwn(WEAPONS, id)) continue;
       a.stash[id] = (a.stash[id] || 0) + 1;
     }
     save();

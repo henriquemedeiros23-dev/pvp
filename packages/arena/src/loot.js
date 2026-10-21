@@ -1,7 +1,8 @@
 // Items on the ground: dropping, rolling chest loot, expiring and auto pick up.
 
 import { circleHitsBox } from '@pvp/collision';
-import { send, randPick, weaponDef, maxDurability } from './state.js';
+import { chestChance } from '@pvp/game-rules';
+import { send, weaponDef, maxDurability } from './state.js';
 import { HEAL_SLOTS, inventoryMsg } from './players.js';
 
 export const itemMsg = it => {
@@ -28,22 +29,46 @@ export function dropItem(A, kind, weapon, x, z, spread = A.tune.dropSpread, dur)
   return it;
 }
 
-/** Pick a rarity from the odds list [[rarity, chance], ...] (chances add up to 1). */
-function rollRarity(A) {
-  const roll = A.rnd.loot.next();
-  const odds = A.tune.rarityOdds;
-  let sum = 0;
-  for (const [rarity, chance] of odds) { sum += chance; if (roll < sum) return rarity; }
-  return odds[odds.length - 1][0];
+/**
+ * The weight of each weapon in a chest: its chestChance (percent). For the golden chest
+ * (golden = true) the weight is multiplied by the rules' GOLDEN_CHEST_BOOST for its rarity
+ * (Epic, Legendary and Megalegend x2; Common stays the same). Returns [[id, weight], ...] in rules order.
+ */
+export function chestWeights(rules, { golden = false } = {}) {
+  const boost = (golden && rules.GOLDEN_CHEST_BOOST) || {};
+  return Object.keys(rules.WEAPONS).map(id => {
+    const b = Object.hasOwn(boost, rules.WEAPONS[id].rarity) ? boost[rules.WEAPONS[id].rarity] : 1;
+    return [id, chestChance(id, rules.WEAPONS) * b];
+  });
 }
 
-/** Loot from a normal chest: a weapon of a random rarity, or a heal. */
+/**
+ * Pick a chest weapon by the weights from chestWeights: a weapon with chestChance 15 comes out
+ * 15 times in 100 when they add up to 100 (they are normalized if they don't).
+ * One random draw. Returns a weapon id, or null if no weapon has a chance.
+ */
+export function rollChestWeapon(A, { golden = false } = {}, r = A.rnd.loot) {
+  const weights = chestWeights(A.rules, { golden }).filter(([, w]) => w > 0);
+  let total = 0;
+  for (const [, w] of weights) total += w;
+  if (!(total > 0)) return null;
+  let roll = r.next() * total;
+  for (const [id, w] of weights) {
+    if (roll < w) return id;
+    roll -= w;
+  }
+  return weights[weights.length - 1][0]; // rounding at the very end
+}
+
+/**
+ * Loot from a normal chest: exactly one weapon (full durability), picked by chestChance.
+ * Heals from chests are a separate setting (tuning chestHealChance, 0 = off for now).
+ */
 export function rollLoot(A, x, z) {
   const r = A.rnd.loot;
-  if (r.next() < A.tune.weaponChance) {
-    const list = A.rules.LOOT_TABLE[rollRarity(A)] ?? [];
-    if (list.length) dropItem(A, 'weapon', randPick(r, list), x, z);
-  } else {
+  const w = rollChestWeapon(A, {}, r);
+  if (w) dropItem(A, 'weapon', w, x, z);
+  if (A.tune.chestHealChance > 0 && r.next() < A.tune.chestHealChance) {
     dropItem(A, r.next() < A.tune.bandageChance ? 'bandage' : 'medkit', null, x, z);
   }
 }
@@ -51,9 +76,10 @@ export function rollLoot(A, x, z) {
 /** Try to put an item into a player's inventory. Returns the picked name, or null if no room. */
 function take(A, p, it) {
   if (it.kind === 'weapon') {
-    if (p.weapons.includes(it.weapon) || p.weapons.length >= A.rules.MAX_SLOTS) return null;
+    if (p.weapons.length >= A.rules.MAX_SLOTS) return null; // a copy of a weapon you have is fine
     p.weapons.push(it.weapon);
-    p.dur.push(it.dur === undefined ? maxDurability(A, it.weapon) : it.dur); // keeps the wear it had
+    p.dur.push(it.dur === undefined ? maxDurability(A, it.weapon) : it.dur); // what the ground item had
+    p.free.push(false);
     return weaponDef(A, it.weapon)?.name ?? it.weapon;
   }
   const slot = HEAL_SLOTS[it.kind];

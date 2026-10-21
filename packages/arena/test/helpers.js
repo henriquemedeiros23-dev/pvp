@@ -17,6 +17,13 @@ export function testIsland() {
   };
 }
 
+/** Rules where a normal chest always gives `weapon` (its chestChance is 100, every other weapon 0). */
+export function chestAlways(weapon, rules = RULES) {
+  const WEAPONS = Object.fromEntries(Object.entries(rules.WEAPONS)
+    .map(([id, w]) => [id, { ...w, chestChance: id === weapon ? 100 : 0 }]));
+  return { ...rules, WEAPONS };
+}
+
 export function makeArena({ seed = 42, rules = RULES, tuning, island = testIsland(), now = 0 } = {}) {
   return createArena({ island, rules, random: createRandom(seed), now, tuning, snapshots: false });
 }
