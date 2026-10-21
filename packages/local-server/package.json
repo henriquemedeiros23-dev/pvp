@@ -1,0 +1,24 @@
+{
+  "name": "@pvp/local-server",
+  "version": "1.0.0",
+  "private": true,
+  "description": "The game server's glue (accounts, shop, arena, tick, bots) running inside the page, with a fake WebSocket and fetch.",
+  "type": "module",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "scripts": {
+    "test": "node --test"
+  },
+  "dependencies": {
+    "@pvp/accounts-shop": "*",
+    "@pvp/api-client": "*",
+    "@pvp/arena": "*",
+    "@pvp/collision": "*",
+    "@pvp/game-rules": "*",
+    "@pvp/net-protocol": "*",
+    "@pvp/seeded-random": "*",
+    "@pvp/world-gen": "*"
+  }
+}

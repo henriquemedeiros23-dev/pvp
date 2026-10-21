@@ -2,11 +2,12 @@
   "name": "@pvp/accounts-shop",
   "version": "1.0.0",
   "private": true,
-  "description": "Player accounts, coins, the shop and the weapon backpack, with pluggable storage (Node only).",
+  "description": "Player accounts, coins, the shop and the weapon backpack, with pluggable storage (Node, or the browser via ./browser).",
   "type": "module",
   "main": "src/index.js",
   "exports": {
-    ".": "./src/index.js"
+    ".": "./src/index.js",
+    "./browser": "./src/browser.js"
   },
   "scripts": {
     "test": "node --test"

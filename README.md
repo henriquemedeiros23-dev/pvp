@@ -19,6 +19,14 @@ npm start
 Then open the address it prints. Phones on the same Wi-Fi can join too.
 Set `PORT` to use another port (default 3000). Run every test with `npm test`.
 
+### Practice mode (one file, no server)
+
+`npm run build:practice` makes `dist/practice/pvp-island.html`: the whole game in ONE html file that runs
+without the game server (`@pvp/local-server` runs the arena, accounts and a few bots inside the page; coins and
+shop are saved in the browser). Only three.js is loaded, from cdnjs. It also refreshes
+`apps/game/public/practice.html` (made from `index.html`; try it at `http://localhost:3000/practice.html`).
+Page options: `?seed=abc`, `?bots=0` to `?bots=5`.
+
 ### Browser tests
 
 `npm run test:e2e` (from the repo root) starts the real server and plays the game in Chromium:
