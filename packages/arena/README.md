@@ -28,6 +28,7 @@ arena.fire(id, [dx, dy, dz], now);                  // or { x, y, z }
 arena.selectSlot(id, i);
 arena.openChest(id, 3, now);                        // chest index, or 'golden'
 arena.heal(id, 'bandage', now);
+arena.setCoins(id, account.coins);                  // the account's coins changed (shop): queues an 'inv'
 const back = arena.leave(id, { alive: true });      // weapons to put back in the backpack ([] if not alive)
 
 setInterval(() => {
@@ -60,7 +61,13 @@ setInterval(() => {
 - **Decision (the boss can change it):** `leave(id, { alive: true })` returns plain weapon ids, so weapons put
   back in the backpack are **full again** next time. Broken weapons are gone for good (they were taken out of
   the backpack at `join` and are not returned).
-- Coins come only from chests. The arena keeps a player's coins (from `join`) for the 'coins' and 'inv' messages.
+- **Coins:** the account (e.g. `@pvp/accounts-shop`) is the single source of truth. The arena only keeps a copy
+  (from `join`) for the 'coins' and 'inv' messages, and only chests add to it. Whenever the coins change outside
+  the arena (a shop buy, maybe from another device during a match), the host calls
+  `arena.setCoins(id, account.coins)`, which sets the copy and queues an `inv` with the new total for that player
+  (unknown id or a total that is not a whole number >= 0: ignored, returns `false`). After a chest's
+  `{ kind: 'coins' }` server event, add the coins to the account and, if its new total differs from `ev.total`,
+  call `setCoins` with the account's total so both stay equal.
 
 Files: `src/state.js`, `src/players.js`, `src/chests.js`, `src/loot.js`, `src/combat.js`, `src/projectiles.js`,
 `src/mines.js`, `src/snapshot.js`, `src/tuning.js`, all wired in `src/index.js`.

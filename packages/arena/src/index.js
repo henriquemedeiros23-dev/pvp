@@ -44,6 +44,8 @@ export function createArena(o = {}) {
     openChest: (id, chest, now) => openChest(A, id, chest, now),
     heal: (id, kind, now) => players.heal(A, id, kind, now),
     teleport: (id, pos) => players.teleport(A, id, pos),
+    /** Set a player's coins from the account (the real total). Queues an 'inv'. False if unknown id. */
+    setCoins: (id, total) => players.setCoins(A, id, total),
 
     /** Advance the world to nowMs: chests, golden chest, items, projectiles, mines, snapshots. */
     tick(nowMs) {

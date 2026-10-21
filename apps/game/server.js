@@ -49,7 +49,11 @@ function handleApi(req, res, body) {
     if (!acc) return send(401, { error: 'Please log in again' });
 
     if (url === '/api/me') return send(200, { account: accounts.publicView(acc), online: arena.playerCount() });
-    if (url === '/api/buy') return send(200, { account: accounts.buy(acc, body.kind, body.id) });
+    if (url === '/api/buy') {
+      const account = accounts.buy(acc, body.kind, body.id);
+      syncCoins(acc); // in a match on another device: show the new total there too
+      return send(200, { account });
+    }
     if (url === '/api/equip') return send(200, { account: accounts.equip(acc, body.kind, body.id) });
     return send(404, { error: 'Not found' });
   } catch (e) {
@@ -108,13 +112,25 @@ const conns = new Map(); // arena player id -> connection { ws, acc, playerId }
 
 const sendRaw = (conn, text) => { if (conn && conn.ws.readyState === 1) conn.ws.send(text); };
 
+// The account is the single source of truth for coins. After any coin change from outside the arena
+// (a shop buy, maybe from another device), give the arena the account's total and send it.
+function syncCoins(acc) {
+  const id = arena.idOf(playerKey(acc));
+  if (id !== undefined && arena.setCoins(id, acc.coins)) pump();
+}
+
 // Send everything the arena queued, and handle its events for the server.
 function pump() {
   const gone = [];
   for (const ev of arena.drain()) {
     if (ev.to === 'server') {
       const conn = conns.get(ev.playerId);
-      if (ev.kind === 'coins' && conn) accounts.addCoins(conn.acc, ev.amount);
+      if (ev.kind === 'coins' && conn) {
+        // Chest coins: add them to the account; if the arena's total was off, the account's total wins
+        // (the corrected 'inv' goes out on the next pump).
+        const total = accounts.addCoins(conn.acc, ev.amount);
+        if (total !== ev.total) arena.setCoins(ev.playerId, total);
+      }
       // Knocked out: the weapons are lost (dropped on the island), nothing goes back to the backpack.
       if (ev.kind === 'knockedOut') gone.push(ev.playerId);
       continue;

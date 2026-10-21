@@ -161,6 +161,7 @@ graph LR
 | `arena.join` / `arena.leave` | `const r = arena.join('alice', { name: 'Alice', skin, loadout: ['pistol'] }, now);` |
 | `arena.setState` / `arena.fire` | `arena.fire(id, [dx, dy, dz], now);` |
 | `arena.openChest` | `arena.openChest(id, 3, now); // or 'golden'` |
+| `arena.setCoins` | `arena.setCoins(id, account.coins); // the account's total wins, queues an 'inv'` |
 | `arena.tick` / `arena.drain` | `arena.tick(now); for (const ev of arena.drain()) send(ev);` |
 | `ARENA_DEFAULTS` | `createArena({ ..., tuning: { ...ARENA_DEFAULTS, snapshotRadius: 200 } });` |
 

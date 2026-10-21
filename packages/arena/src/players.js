@@ -54,6 +54,18 @@ export function join(A, key, { name, skin, loadout = [], coins = 0 } = {}, now) 
   return { ok: true, id: p.id, weapons: weapons.slice(1), replaced };
 }
 
+/**
+ * The host sets a player's coin total (the account is the single source of truth, e.g. after a shop buy
+ * from another device). Queues an 'inv' with the new total. Unknown id or a bad total: ignored, returns false.
+ */
+export function setCoins(A, id, total) {
+  const p = A.players.get(id);
+  if (!p || !Number.isInteger(total) || total < 0) return false;
+  p.coins = total;
+  send(A, p.id, inventoryMsg(p));
+  return true;
+}
+
 /** Removes a player from the arena (no messages). */
 export function removePlayer(A, p) {
   A.players.delete(p.id);
