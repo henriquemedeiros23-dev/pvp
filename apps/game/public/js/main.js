@@ -10,7 +10,10 @@ const $ = id => document.getElementById(id);
 const SCREENS = ['login', 'menu', 'shop', 'dead'];
 const ONLINE_REFRESH_MS = 5000;
 
-const api = createApiClient({ storage: (() => { try { return window.localStorage; } catch { return undefined; } })() });
+// Practice mode (practice.html) sets globalThis.pvpInject = { api, openSocket } before this file runs,
+// so the game talks to a server inside the page (@pvp/local-server). Normally it is not set.
+const inject = globalThis.pvpInject || {};
+const api = inject.api || createApiClient({ storage: (() => { try { return window.localStorage; } catch { return undefined; } })() });
 let account = null;
 let tab = 'color';
 let busy = false;
@@ -38,7 +41,7 @@ try {
     },
     onLeft(reason) { showMenu(reason || ''); },
     onFull() { showMenu('Arena is full. Try again in a moment!'); },
-  });
+  }, { openSocket: inject.openSocket });
 } catch (e) {
   console.warn('3D view could not start:', e);
 }

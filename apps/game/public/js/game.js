@@ -55,8 +55,10 @@ function nameTag(name) {
 }
 
 export class Game {
-  constructor(canvas, ui) {
+  constructor(canvas, ui, { openSocket } = {}) {
     this.ui = ui; // callbacks: onPlaying(), onDead(by, weapon), onLeft(reason), onFull()
+    // token -> a WebSocket (or a WebSocket-like object, e.g. practice mode's @pvp/local-server)
+    this.openSocket = openSocket || (token => new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/?token=${encodeURIComponent(token)}`));
     this.canvas = canvas;
     this.world = generateIsland(); // same seed as the server: the same island
     this.moveOpts = {
@@ -162,7 +164,7 @@ export class Game {
   connect(token) {
     return new Promise((resolve, reject) => {
       if (this.ws && this.ws.readyState === 1) return resolve();
-      const ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/?token=${encodeURIComponent(token)}`);
+      const ws = this.openSocket(token);
       this.opening = ws; // a socket that is still opening (closed if the join gives up)
       ws.onopen = () => { if (this.opening === ws) this.opening = null; this.ws = ws; resolve(); };
       ws.onerror = () => reject(new Error('Could not connect to the server'));

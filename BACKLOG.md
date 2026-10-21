@@ -60,10 +60,14 @@ The live list is on GitHub Issues: https://github.com/henriquemedeiros23-dev/pvp
 |---|---|---|---|
 | 24 | ✅ | **HUD like the boss's drawing** | Durability bar + H.P bar with % on the left, 5 slots on the right, polished (docs/design/hud-sketch.jpg). |
 | 25 | ✅ | **Starting weapon: the Gun** | Gun from the boss's card (docs/design/weapon-card-gun.jpg) replaces the wooden sword. |
-| 26 | 🔲 | **Weapons from the boss's cards** | Every weapon card becomes a real weapon (stats, model, chest chance, price, rarity). |
+| 26 | 🔨 | **Weapons from the boss's cards** | Every weapon card becomes a real weapon (stats, model, chest chance, price, rarity). |
 | 27 | 🔲 | **One browser test sometimes fails** | The browser tests pass every time. |
-| 28 | 🔲 | **Healing Potion (the only heal)** | Potion: full H.P after 5 s of drinking, 15% extra in chests, 10 coins in the shop; no bandages/medkits. |
+| 28 | 🔨 | **Healing Potion (the only heal)** | Potion: full H.P after 5 s of drinking, 15% extra in chests, 10 coins in the shop; no bandages/medkits. |
 | 29 | 🔲 | **Coins look like the boss's drawing** | Square-ish yellow coin with sparkle everywhere coins are shown (docs/design/coin.jpg). |
+| 30 | 🔨 | **Practice mode you can open from a link** | One HTML page runs the whole game alone in the browser; published as a link. |
+| 31 | 🔲 | **Rename the game to PvP Island** | The game is called PvP Island everywhere players see it. |
+| 32 | 🔲 | **More weapons from the boss's cards (batch 2)** | Bomb and the next cards become real items. |
+| 33 | 🔲 | **Damage numbers above the head** | '-15' floats above a hurt player's head for 2 s, visible to everyone. |
 
 ## Later ideas
 - Sounds and music

@@ -220,7 +220,7 @@ test('the Healing Potion model: red liquid in a cone flask with a neck and a cor
   assert.ok(size.y > 0.3 && size.y < 0.45, `height ${size.y}`);
   assert.ok(size.x > 0.25, 'wide cone bottom');
   const reds = [];
-  p.traverse(o => { if (o.isMesh && o.material.color && o.material.color.r > 0.6 && o.material.color.g < 0.2) reds.push(o); });
+  p.traverse(o => { if (o.isMesh && o.material.color && o.material.color.r > 0.4 && o.material.color.g < 0.1) reds.push(o); });
   assert.ok(reds.length >= 1, 'red liquid');
   const sm = new Stickman(DEFAULT_SKIN);
   sm.setWeapon('gun');

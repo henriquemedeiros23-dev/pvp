@@ -10,3 +10,4 @@ The boss of this project is a 12-year-old game creator. Talk to him in simple, f
 - **Backlog first.** Every job is a GitHub issue (https://github.com/henriquemedeiros23-dev/pvp/issues), mirrored in `BACKLOG.md`.
   Close the issue and update `BACKLOG.md` when a job is merged.
 - **No deep reviews needed.** Run the tests, merge, push, then tell the boss in short simple words what changed.
+- **Practice link after every update.** After merging a job that changes the game, rebuild the practice page (`npm run build:practice`), republish it to the same artifact link, and post the link to the boss.
