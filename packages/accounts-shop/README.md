@@ -2,7 +2,7 @@
 
 ## What it does
 
-Player accounts (sign up, log in on up to 2 devices, log out), coins, the shop (buy and equip skins, buy weapons into the backpack/"stash") and the loadout a player carries into the arena. Storage is pluggable: in memory, or one JSON file. Node only (uses `node:crypto` and `node:fs`). Prices and limits come from `@pvp/game-rules`.
+Player accounts (sign up, log in on up to 2 devices, log out), coins, the shop (buy and equip skins, buy weapons into the backpack/"stash") and the loadout a player carries into the arena. Storage is pluggable: in memory, one JSON file, or `localStorage`. The main entry is for Node (uses `node:crypto` and `node:fs`); `@pvp/accounts-shop/browser` works in the browser. Prices and limits come from `@pvp/game-rules`.
 
 ## How to use
 
@@ -32,6 +32,7 @@ const weapons = accounts.takeLoadout(acc);  // most expensive stashed weapons fi
 accounts.returnLoadout(acc, weapons);       // left the arena alive: back into the stash
 // knocked out: just don't call returnLoadout, the weapons are lost
 
+accounts.rename(acc, 'New_Name');        // same name rules; tokens stay logged in
 accounts.logout(token);
 await accounts.flush();                     // on shutdown
 ```
@@ -45,6 +46,17 @@ Error codes: `BAD_NAME`, `BAD_PASSWORD`, `NAME_TAKEN`, `WRONG_LOGIN`, `UNKNOWN_I
 A store is any object with `load()` (all records), `save(data)` (may be delayed) and `flush()` (Promise). The JSON file store writes to `<file>.tmp`, then renames it over the file, so a crash can't leave half a file. A broken file throws on load instead of silently starting empty.
 
 Rules: names are 3-16 letters, numbers or `_`, unique ignoring case. Passwords need 4+ characters and are stored as scrypt hashes with a random salt. Logging in makes a new token; only the 2 newest tokens work.
+
+**In the browser** (practice mode, `@pvp/local-server`): no Node imports, so pass the hashing and random bytes in.
+
+```js
+import { createAccounts, createWebStorageStore } from '@pvp/accounts-shop/browser';
+const accounts = createAccounts({
+  store: createWebStorageStore(localStorage, 'pvp.accounts'), // try/catch inside: memory if storage is blocked
+  randomBytes: n => crypto.getRandomValues(new Uint8Array(n)),
+  hashPassword: (password, saltHex) => myHexHash(password, saltHex),
+});
+```
 
 ## Determinism
 

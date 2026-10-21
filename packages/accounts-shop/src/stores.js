@@ -5,15 +5,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-/** Keeps everything in memory. save() stores a copy right away, so a later load() sees it. */
-export function createMemoryStore(initial = {}) {
-  let saved = structuredClone(initial);
-  return {
-    load: () => structuredClone(saved),
-    save(data) { saved = structuredClone(data); },
-    flush: () => Promise.resolve(),
-  };
-}
+// The memory and localStorage stores have no Node imports (the browser entry uses them too).
+export { createMemoryStore, createWebStorageStore } from './web-stores.js';
 
 /**
  * Keeps everything in one JSON file. Writes are delayed by saveDelayMs and grouped,
