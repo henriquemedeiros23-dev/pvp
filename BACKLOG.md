@@ -65,6 +65,7 @@ The live list is on GitHub Issues: https://github.com/henriquemedeiros23-dev/pvp
 | 28 | 🔨 | **Healing Potion (the only heal)** | Potion: full H.P after 5 s of drinking, 15% extra in chests, 10 coins in the shop; no bandages/medkits. |
 | 29 | 🔲 | **Coins look like the boss's drawing** | Square-ish yellow coin with sparkle everywhere coins are shown (docs/design/coin.jpg). |
 | 30 | 🔨 | **Practice mode you can open from a link** | One HTML page runs the whole game alone in the browser; published as a link. |
+| 31 | 🔲 | **Rename the game to PvP Island** | The game is called PvP Island everywhere players see it. |
 
 ## Later ideas
 - Sounds and music
