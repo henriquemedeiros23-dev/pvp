@@ -1,7 +1,7 @@
 // Chests in fixed spots (back after CHEST_RESPAWN_MS) and the golden chest.
 
-import { at, send, tellServer, randInt, randPick } from './state.js';
-import { dropItem, rollLoot } from './loot.js';
+import { at, send, tellServer, randPick } from './state.js';
+import { dropItem, rollLoot, rollChestWeapon } from './loot.js';
 
 function giveCoins(A, p, amount) {
   p.coins += amount;
@@ -21,10 +21,10 @@ export function openChest(A, id, which, now) {
     if (!g || Math.hypot(g.x - p.x, g.z - p.z) > T.openDistance) return false;
     A.golden = null;
     A.nextGolden = now + A.rules.GOLDEN_CHEST_EVERY_MS;
-    giveCoins(A, p, randInt(A.rnd.loot, T.goldenCoins[0], T.goldenCoins[1]));
-    const legends = A.rules.LOOT_TABLE.legendary ?? [];
-    if (legends.length) dropItem(A, 'weapon', randPick(A.rnd.loot, legends), g.x, g.z);
-    dropItem(A, 'medkit', null, g.x, g.z);
+    // GOLDEN_CHEST_COINS coins and one weapon, with Epic and better weapons more likely.
+    giveCoins(A, p, A.rules.GOLDEN_CHEST_COINS ?? 0);
+    const w = rollChestWeapon(A, { golden: true });
+    if (w) dropItem(A, 'weapon', w, g.x, g.z);
     send(A, 'all', { t: 'golden', golden: null, by: p.name });
     return true;
   }
@@ -32,7 +32,7 @@ export function openChest(A, id, which, now) {
   const c = Number.isInteger(which) ? A.chests[which] : undefined;
   if (!c || c.openUntil > now || Math.hypot(c.x - p.x, c.z - p.z) > T.openDistance) return false;
   c.openUntil = now + A.rules.CHEST_RESPAWN_MS;
-  giveCoins(A, p, randInt(A.rnd.loot, T.chestCoins[0], T.chestCoins[1]));
+  giveCoins(A, p, A.rules.CHEST_COINS ?? 0);
   rollLoot(A, c.x, c.z);
   send(A, 'all', { t: 'chest', id: c.id, open: true });
   return true;

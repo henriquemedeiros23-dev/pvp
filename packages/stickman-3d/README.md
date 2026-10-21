@@ -28,7 +28,7 @@ Options for another game: `new Stickman(skin, { colors, weapons, limbRadius = 0.
 `colors` is `{ id: { color, pattern?, eyes? } }` and `weapons` is `{ id: { type } }`; both default to `COLORS` / `WEAPONS` from `@pvp/game-rules`.
 `buildWeapon(id, { weapons, castShadow })` takes the same table.
 
-Weapon models: the current weapon ids keep their own special models. Any other id (or a known id whose `type` changed) gets a generic model for its `type`: `melee`, `gun`, `throw`, `rocket` or `mine` (an unknown type looks like melee). Generic melee and gun models get longer with `range`, and use the weapon's `color` if it has one. An id missing from the table gives an empty group. `weaponModelKind(id, weapons)` tells which model is used.
+Weapon models: the current weapon ids keep their own special models. The Gun (starting weapon) is a detailed pistol: slide with grip lines and an ejection port, barrel, sights, hammer, frame with a rail, trigger guard and trigger, and a grip tilted back with wooden side panels, held in the right hand. Any other id (or a known id whose `type` changed) gets a generic model for its `type`: `melee`, `gun`, `throw`, `rocket` or `mine` (an unknown type looks like melee). Generic melee and gun models get longer with `range`, and use the weapon's `color` if it has one. An id missing from the table gives an empty group. `weaponModelKind(id, weapons)` tells which model is used.
 
 Pure pose: `computePose(state, prev, dt)` with `state = { speed, crouch, slide, air, pitch, time, weaponType, swing, recoil }` returns `{ walk, hipY, lean, legL, legR, headX, armL: {x, z}, armR: {x, z}, cape }`. Pass the last pose as `prev` (or `null` to start from `restPose()`). `stickman.applyPose(pose)` puts a body in a pose.
 

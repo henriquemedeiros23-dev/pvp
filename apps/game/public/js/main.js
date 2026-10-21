@@ -180,7 +180,12 @@ function cardElement(c) {
   card.append(el('div', 'name', c.name));
   if (c.kind === 'weapon') {
     const tag = el('div', 'tag');
-    tag.append(el('span', 'rar-' + c.rarity, c.rarity[0].toUpperCase() + c.rarity.slice(1)));
+    const rar = el('span', 'rar rar-' + c.rarity, c.rarityName);
+    rar.style.color = c.rarityColor; // colors from RARITY_COLORS in @pvp/game-rules
+    if (c.rarityBackground !== c.rarityColor) { // two colors (Megalegend): a small blue + black badge
+      Object.assign(rar.style, { color: '#fff', background: c.rarityBackground, padding: '0 6px', borderRadius: '6px' });
+    }
+    tag.append(rar);
     if (c.stashCount) tag.append(` · ${c.stashCount} in backpack`);
     card.append(tag);
   }

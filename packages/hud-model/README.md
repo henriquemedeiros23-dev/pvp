@@ -9,12 +9,12 @@ Pure functions that turn the player's inventory (the server's `inv` message) and
 ```js
 import { slotBar, healthView, pickSlot, brokeMessage, WEAPON_ICONS } from '@pvp/hud-model';
 
-const inv = { weapons: ['woodsword', 'pistol'], dur: [null, 9], slot: 1 };   // from the 'inv' message
+const inv = { weapons: ['gun', 'pistol'], dur: [15, 9], slot: 1 };         // from the 'inv' message
 
 slotBar(inv);
 // always MAX_SLOTS (5) slots:
-// [{ index: 0, key: '1', weapon: 'woodsword', name: 'Wooden Sword', icon: '🗡️', rarity: 'basic',
-//    active: false, empty: false, durability: null },                       // never breaks: no bar
+// [{ index: 0, key: '1', weapon: 'gun', name: 'Gun', icon: '🔫', rarity: 'common', active: false, empty: false,
+//    durability: { usesLeft: 15, max: 15, ratio: 1, percent: 100, level: 'good' } },  // null = never breaks: no bar
 //  { index: 1, key: '2', weapon: 'pistol', name: 'Pistol', icon: '🔫', rarity: 'common', active: true, empty: false,
 //    durability: { usesLeft: 9, max: 60, ratio: 0.15, percent: 15, level: 'critical' } },
 //  { index: 2, key: '3', weapon: null, name: '', icon: '', rarity: null, active: false, empty: true, durability: null }, …]

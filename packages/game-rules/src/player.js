@@ -2,12 +2,14 @@
 
 export const MAX_PLAYERS = 100;
 export const MAX_HP = 100;
-export const MAX_SLOTS = 5;          // weapon slots, including the basic weapon
+export const MAX_SLOTS = 5;          // weapon slots, including the starting weapon
 export const MAX_BANDAGES = 10;
 export const MAX_MEDKITS = 3;
 export const BANDAGE_HEAL = 25;
 export const MEDKIT_HEAL = 75;
 export const CHEST_RESPAWN_MS = 15000;
+export const CHEST_COINS = 3;       // coins from every normal chest (plus exactly one weapon)
+export const GOLDEN_CHEST_COINS = 10; // coins from the golden chest (plus exactly one weapon, rarer ones more likely)
 export const GOLDEN_CHEST_EVERY_MS = 3 * 60 * 1000;
 export const ITEM_LIFETIME_MS = 120000;
 export const SPAWN_PROTECT_MS = 3000;

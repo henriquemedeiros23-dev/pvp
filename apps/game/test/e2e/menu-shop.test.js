@@ -123,9 +123,9 @@ async function checkHud(p) {
   assert.equal(await p.locator('#slots .slot').count(), 5);
   assert.equal(await p.locator('#slots .slot.empty').count(), 4);
   const first = p.locator('#slots .slot').first();
-  assert.equal(await first.getAttribute('aria-label'), '1: Wooden Sword');
+  assert.equal(await first.getAttribute('aria-label'), '1: Gun (100%)'); // everyone starts with the Gun
   assert.match(await first.getAttribute('class'), /\bactive\b/);
-  assert.equal(await first.locator('.dur').isVisible(), false); // the basic weapon never breaks: no bar
+  assert.equal(await first.locator('.dur').isVisible(), true); // the Gun wears out: it has a bar
   assert.equal(await p.textContent('#hpText'), '100');
   assert.equal(await p.getAttribute('.hpbar', 'aria-valuenow'), '100');
 }
@@ -170,7 +170,8 @@ test('sign up, shop, join the arena, leave: no errors', { skip: !RUN && 'set E2E
     assert.ok(await page.locator(`#shop .tabs button[data-tab="${tab}"].active`).count() === 1, tab);
     assert.ok(await page.locator('#shopGrid .card').count() >= 3, tab);
   }
-  assert.equal(await page.textContent('#shopGrid .card:first-child .name'), 'Bat');
+  assert.equal(await page.textContent('#shopGrid .card:first-child .name'), 'Gun'); // cheapest Common first
+  assert.equal(await page.textContent('#shopGrid .card:first-child .tag .rar'), 'Common');
   // with 0 coins every weapon's buy button is disabled
   assert.equal(await page.locator('#shopGrid .card button:not([disabled])').count(), 0);
   await page.click('#shop .tabs button[data-tab="color"]');
@@ -306,11 +307,11 @@ test('weapon bar: durability colors, tap to switch, a broken weapon flashes', { 
     await p.locator('#hud').waitFor({ state: 'visible', timeout: 20000 });
     await checkHud(p);
 
-    const inv = { weapons: ['woodsword', 'pistol', 'shotgun', 'sniper'], dur: [null, 60, 10, 1], slot: 1, bandages: 2, medkits: 1, coins: 0, hp: 100 };
+    const inv = { weapons: ['gun', 'pistol', 'shotgun', 'sniper'], dur: [15, 60, 10, 1], slot: 1, bandages: 2, medkits: 1, coins: 0, hp: 100 };
     toPage(encode('inv', inv));
     await p.waitForFunction(() => document.querySelectorAll('#slots .slot.empty').length === 1);
     const levels = await p.$$eval('#slots .slot', els => els.map(b => (b.querySelector('.dur').hidden ? null : b.querySelector('.dur').dataset.level)));
-    assert.deepEqual(levels, [null, 'good', 'low', 'critical', null]);
+    assert.deepEqual(levels, ['good', 'good', 'low', 'critical', null]);
     assert.match(await p.locator('#slots .slot').nth(1).getAttribute('class'), /\bactive\b/);
     await shot('hud-phone-weapons.png', p);
 
@@ -326,6 +327,10 @@ test('weapon bar: durability colors, tap to switch, a broken weapon flashes', { 
     assert.equal(await p.textContent('#toast'), 'Your Sniper broke!');
     assert.equal(await p.locator('#slots .slot.empty').count(), 2);
     await p.waitForFunction(() => !document.querySelector('#slots .slot.broke'), null, { timeout: 3000 });
+
+    // every weapon broke (the Gun too): 5 empty slots and no errors
+    toPage(encode('inv', { ...inv, weapons: [], dur: [], slot: 0 }));
+    await p.waitForFunction(() => document.querySelectorAll('#slots .slot.empty').length === 5);
 
     await p.click('#btnLeave');
     await p.locator('#menu').waitFor({ state: 'visible' });

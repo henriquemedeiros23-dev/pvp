@@ -17,9 +17,11 @@ shopItems('hat', account);
 //    canAfford: true, action: 'equipped', icon: '🚫' }, { … id: 'cap', action: 'buy' }, …]
 
 shopItems('weapon', account);
-// sorted by rarity, then price; the basic weapon is not sold
-// [{ kind: 'weapon', id: 'bat', name: 'Bat', price: 25, rarity: 'common', type: 'melee',
-//    stashCount: 0, owned: false, equipped: false, canAfford: false, action: 'buy' }, …]
+// every weapon (the starting Gun too), sorted by rarity, then price
+// [{ kind: 'weapon', id: 'gun', name: 'Gun', price: 3, rarity: 'common', type: 'gun',
+//    rarityName: 'Common', rarityColor: '#3cc24a', rarityBackground: '#3cc24a',
+//    stashCount: 0, owned: false, equipped: false, canAfford: true, action: 'buy' }, …]
+// rarity colors come from RARITY_COLORS in @pvp/game-rules (Megalegend's background is blue + black)
 
 backpackSummary(account);   // 'Backpack: 2× Pistol, 1× Sniper' or 'Backpack is empty. Buy weapons in the shop!'
 swatchBackground(card);     // CSS background for a color card (gradients for patterns)

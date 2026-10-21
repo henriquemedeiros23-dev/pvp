@@ -4,16 +4,17 @@ import { RULES, MAX_SLOTS, WEAPONS } from '@pvp/game-rules';
 import { slotBar, durabilityView, healthView, pickSlot, brokeMessage, WEAPON_ICONS, DURABILITY_LEVELS } from '../src/index.js';
 
 test('slotBar always gives MAX_SLOTS slots, empty ones included', () => {
-  for (const inv of [undefined, null, {}, { weapons: [] }, { weapons: ['woodsword'], slot: 0 }]) {
+  for (const inv of [undefined, null, {}, { weapons: [] }, { weapons: ['gun'], slot: 0 }]) {
     const bar = slotBar(inv);
     assert.equal(bar.length, MAX_SLOTS);
     assert.deepEqual(bar.map(s => s.index), [0, 1, 2, 3, 4]);
     assert.deepEqual(bar.map(s => s.key), ['1', '2', '3', '4', '5']);
   }
-  const [first, second] = slotBar({ weapons: ['woodsword'], dur: [null], slot: 0 });
+  const [first, second] = slotBar({ weapons: ['gun'], dur: [15], slot: 0 });
   assert.deepEqual(first, {
-    index: 0, key: '1', weapon: 'woodsword', name: 'Wooden Sword', icon: WEAPON_ICONS.woodsword,
-    rarity: 'basic', active: true, empty: false, durability: null,
+    index: 0, key: '1', weapon: 'gun', name: 'Gun', icon: WEAPON_ICONS.gun,
+    rarity: 'common', active: true, empty: false,
+    durability: { usesLeft: 15, max: 15, ratio: 1, percent: 100, level: 'good' },
   });
   assert.deepEqual(second, {
     index: 1, key: '2', weapon: null, name: '', icon: '', rarity: null, active: false, empty: true, durability: null,
@@ -21,9 +22,10 @@ test('slotBar always gives MAX_SLOTS slots, empty ones included', () => {
 });
 
 test('slotBar marks the active slot and adds durability for weapons that can break', () => {
-  const bar = slotBar({ weapons: ['woodsword', 'pistol', 'sniper'], dur: [null, 30, 2], slot: 1 });
+  const rules = { ...RULES, WEAPONS: { ...RULES.WEAPONS, gun: { ...RULES.WEAPONS.gun, durability: null } } };
+  const bar = slotBar({ weapons: ['gun', 'pistol', 'sniper'], dur: [null, 30, 2], slot: 1 }, rules);
   assert.deepEqual(bar.map(s => s.active), [false, true, false, false, false]);
-  assert.equal(bar[0].durability, null);
+  assert.equal(bar[0].durability, null, 'a weapon that never breaks has no bar');
   assert.deepEqual(bar[1].durability, { usesLeft: 30, max: 60, ratio: 0.5, percent: 50, level: 'low' });
   assert.equal(bar[2].durability.level, 'critical');
   assert.equal(bar[2].rarity, 'legendary');
@@ -47,7 +49,7 @@ test('durability levels: green above 50%, yellow 20-50%, red below 20%', () => {
   assert.equal(level(0), 'critical');
   assert.equal(durabilityView('pistol', 999).usesLeft, max);
   assert.equal(durabilityView('pistol', -5).ratio, 0);
-  assert.equal(durabilityView('woodsword', 5), null);
+  assert.equal(durabilityView('x', 5, { ...RULES, WEAPONS: { x: { name: 'X', durability: null } } }), null);
   assert.equal(durabilityView('nope', 5), null);
   assert.deepEqual(DURABILITY_LEVELS, { good: 0.5, low: 0.2 });
 });
@@ -72,14 +74,14 @@ test('healthView clamps, rounds and flags low health', () => {
 });
 
 test('pickSlot: keys, next/previous and only filled slots', () => {
-  const inv = { weapons: ['woodsword', 'pistol', 'bat'], slot: 0 };
+  const inv = { weapons: ['gun', 'pistol', 'bat'], slot: 0 };
   assert.equal(pickSlot(inv, '1'), 1);
   assert.equal(pickSlot(inv, 2), 2);
   assert.equal(pickSlot(inv, '4'), null);   // empty slot
   assert.equal(pickSlot(inv, '0'), null);   // already holding it
   assert.equal(pickSlot(inv, '+'), 1);
   assert.equal(pickSlot(inv, '-'), 2);
-  assert.equal(pickSlot({ weapons: ['woodsword'], slot: 0 }, '+'), null);
+  assert.equal(pickSlot({ weapons: ['gun'], slot: 0 }, '+'), null);
   assert.equal(pickSlot(null, '1'), null);
   assert.equal(pickSlot(inv, 'x'), null);
   assert.equal(pickSlot(inv, ''), null);
@@ -91,6 +93,6 @@ test('brokeMessage names the weapon', () => {
 });
 
 test('same input, same output (deterministic)', () => {
-  const inv = { weapons: ['woodsword', 'shotgun'], dur: [null, 7], slot: 1 };
+  const inv = { weapons: ['gun', 'shotgun'], dur: [15, 7], slot: 1 };
   assert.deepEqual(slotBar(inv), slotBar(structuredClone(inv)));
 });

@@ -246,7 +246,7 @@ test('flags helpers', () => {
 test('durability fields: optional (old messages still work), null = never breaks, bad values rejected', () => {
   const { dur, ...oldInv } = SERVER_EXAMPLES.inv;
   assert.deepEqual(decodeServerMessage(encode('inv', oldInv)).msg, { t: 'inv', ...oldInv });
-  assert.ok(decodeServerMessage(encode('item+', { id: 1, kind: 'weapon', weapon: 'woodsword', x: 0, y: 0, z: 0, dur: null })).ok);
+  assert.ok(decodeServerMessage(encode('item+', { id: 1, kind: 'weapon', weapon: 'gun', x: 0, y: 0, z: 0, dur: null })).ok);
   assert.ok(decodeServerMessage(encode('item+', { id: 1, kind: 'bandage', weapon: null, x: 0, y: 0, z: 0 })).ok);
   const welcome = { ...SERVER_EXAMPLES.welcome, items: [{ id: 9, kind: 'weapon', weapon: 'pistol', x: 1, y: 0, z: 2, dur: 3 }] };
   assert.deepEqual(decodeServerMessage(encode('welcome', welcome)).msg.items[0].dur, 3);

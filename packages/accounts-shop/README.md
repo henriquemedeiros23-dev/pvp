@@ -25,13 +25,17 @@ accounts.buy(acc, 'hat', 'crown');          // kind: 'weapon' or a skin slot; re
 accounts.buy(acc, 'weapon', 'sniper');      // weapons stack in the stash: { sniper: 1 }
 accounts.equip(acc, 'hat', 'crown');        // must own it
 
-const weapons = accounts.takeLoadout(acc);  // ['woodsword', best stashed weapons..., up to MAX_SLOTS]
+const weapons = accounts.takeLoadout(acc);  // best stashed weapons, one of each kind, up to MAX_SLOTS - 1
+                                            // (the arena gives the free starting Gun in slot 1 itself)
 accounts.returnLoadout(acc, weapons);       // left the arena alive: back into the stash
 // knocked out: just don't call returnLoadout, the weapons are lost
 
 accounts.logout(token);
 await accounts.flush();                     // on shutdown
 ```
+
+Every weapon can be bought (the starting Gun too: it goes into the backpack like the others). A backpack weapon
+that is no longer in the rules (like the old wooden sword) is dropped when the accounts are loaded.
 
 Error codes: `BAD_NAME`, `BAD_PASSWORD`, `NAME_TAKEN`, `WRONG_LOGIN`, `UNKNOWN_ITEM`, `ALREADY_OWNED`, `NOT_ENOUGH_COINS`, `NOT_OWNED` (all `AccountError`). Passing an account object that didn't come from this service throws a `TypeError`.
 

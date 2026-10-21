@@ -105,7 +105,7 @@ test('sign up, join the arena, bad messages are dropped, leave', async () => {
   const w = await welcome;
   assert.equal(typeof w.id, 'number');
   assert.ok(w.players.some(p => p.id === w.id && p.name === NAME));
-  assert.deepEqual((await inv).weapons, ['woodsword']);
+  assert.deepEqual((await inv).weapons, ['gun']);
 
   const snap = await inbox.next('snap');
   assert.ok(snap.p.some(a => a[0] === w.id));

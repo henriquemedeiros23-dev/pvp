@@ -2,8 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as rules from '../src/index.js';
 import {
-  RULES, WEAPONS, COLORS, OUTFITS, DEFAULT_SKIN, LOOT_TABLE, HEALS, BASIC_WEAPON,
-  validateRules, weaponPrice, weaponDurability, weaponWear, skinPrice, isBuyable, itemPrice, weaponsByRarity,
+  RULES, WEAPONS, COLORS, OUTFITS, DEFAULT_SKIN, LOOT_TABLE, HEALS, STARTING_WEAPON, RARITIES, RARITY_COLORS,
+  CHEST_COINS, GOLDEN_CHEST_COINS, GOLDEN_CHEST_BOOST, rarityStyle, droppedDurability, chestChance, validateRules, weaponPrice, weaponDurability, weaponWear, skinPrice, isBuyable, itemPrice, weaponsByRarity,
 } from '../src/index.js';
 import { readFileSync } from 'node:fs';
 // Frozen copy of the old apps/game/shared/config.js (removed in #12), so the rules don't drift by accident.
@@ -15,32 +15,90 @@ test('real rules validate with zero problems', () => {
   assert.deepEqual(validateRules(RULES), []);
 });
 
-// The old file has no durability (issue #21 is packages only), so those fields are left out here.
-const withoutDurability = weapons => Object.fromEntries(Object.entries(weapons)
-  .map(([id, { durability, wearPerUse, ...w }]) => [id, w]));
+// The old file has no durability (#21), chest chances or the new rarities (#25), so those fields are left out.
+// #25 also removed the wooden sword, added the Gun and replaced BASIC_WEAPON / RARITIES / LOOT_TABLE.
+const CHANGED_IN_25 = ['BASIC_WEAPON', 'RARITIES', 'LOOT_TABLE'];
+const RENAMED_RARITY = { rare: 'epic' };
+const comparable = (weapons, { renameRarity }) => Object.fromEntries(Object.entries(weapons)
+  .filter(([id]) => id !== 'woodsword' && id !== 'gun')
+  .map(([id, { durability, wearPerUse, chestChance: _c, rarity, ...w }]) =>
+    [id, { ...w, rarity: renameRarity ? (RENAMED_RARITY[rarity] ?? rarity) : rarity }]));
 
-test('same named exports and values as the old apps/game/shared/config.js', () => {
+test('same named exports and values as the old apps/game/shared/config.js (except the #25 changes)', () => {
   for (const [name, value] of Object.entries(oldConfig)) {
+    if (CHANGED_IN_25.includes(name)) continue;
     assert.ok(name in rules, `missing export ${name}`);
-    const ours = name === 'WEAPONS' ? withoutDurability(rules[name]) : rules[name];
-    const theirs = name === 'WEAPONS' ? withoutDurability(value) : value;
+    const ours = name === 'WEAPONS' ? comparable(rules[name], { renameRarity: false }) : rules[name];
+    const theirs = name === 'WEAPONS' ? comparable(value, { renameRarity: true }) : value;
     assert.deepEqual(ours, theirs, `export ${name} differs`);
   }
 });
 
-test('every weapon has a durability; the basic weapon never breaks', () => {
-  for (const [id, w] of Object.entries(WEAPONS)) {
-    assert.ok(w.durability === null || (Number.isInteger(w.durability) && w.durability > 0), id);
-  }
-  assert.equal(WEAPONS[BASIC_WEAPON].durability, null);
-  assert.equal(weaponDurability(BASIC_WEAPON), null);
-  assert.equal(weaponDurability('sniper'), 12);
-  assert.equal(weaponDurability('rifle'), 150);
-  assert.equal(weaponDurability('laser'), null);
-  assert.equal(weaponDurability('toString'), null);
-  assert.equal(weaponWear('pistol'), 1);
-  assert.equal(weaponWear('x', { x: { wearPerUse: 3 } }), 3);
-  assert.equal(weaponDurability('x', { x: { durability: 7 } }), 7);
+test('the Gun is the starting weapon, from the boss\'s card', () => {
+  assert.equal(STARTING_WEAPON, 'gun');
+  const g = WEAPONS.gun;
+  assert.equal(g.type, 'gun');
+  assert.equal(g.dmg, 2);
+  assert.equal(g.rate, 2);
+  assert.equal(g.durability, 15);
+  assert.equal(g.chestChance, 15);
+  assert.equal(g.price, 3);
+  assert.equal(g.rarity, 'common');
+  assert.equal(weaponPrice('gun'), 3);
+  assert.equal(isBuyable('weapon', 'gun'), true);
+  assert.ok(!('woodsword' in WEAPONS), 'no wooden sword any more');
+  assert.equal(isBuyable('weapon', 'woodsword'), false);
+});
+
+test('rarities and their colors', () => {
+  assert.deepEqual(RARITIES, ['common', 'epic', 'legendary', 'megalegend']);
+  assert.equal(RARITY_COLORS.common.name, 'Common');
+  assert.deepEqual(Object.keys(RARITY_COLORS), RARITIES);
+  assert.equal(RARITY_COLORS.megalegend.color2, '#0b0b12'); // blue + black
+  assert.deepEqual(weaponsByRarity('megalegend'), []);
+  assert.deepEqual(rarityStyle('common'), { id: 'common', name: 'Common', color: '#3cc24a', color2: '#1f7a2b', background: '#3cc24a' });
+  assert.match(rarityStyle('megalegend').background, /linear-gradient.*#2f6fff.*#0b0b12/);
+  assert.equal(rarityStyle('rare'), null);
+  assert.equal(rarityStyle('toString'), null);
+  const r = copy();
+  r.RARITY_COLORS.epic.color = 'purple';
+  delete r.RARITY_COLORS.megalegend;
+  assert.deepEqual(validateRules(r), [
+    'RARITY_COLORS.epic.color: "purple" is not a valid hex color',
+    'RARITY_COLORS: missing rarity "megalegend"',
+  ]);
+});
+
+test('chest chances: every weapon has one and they add up to 100', () => {
+  let total = 0;
+  for (const id of Object.keys(WEAPONS)) total += chestChance(id);
+  assert.equal(total, 100);
+  assert.equal(chestChance('gun'), 15);
+  assert.equal(chestChance('laser'), 0);
+  assert.equal(CHEST_COINS, 3);
+  assert.equal(GOLDEN_CHEST_COINS, 10);
+  assert.deepEqual(GOLDEN_CHEST_BOOST, { epic: 2, legendary: 2, megalegend: 2 });
+  const r = copy();
+  r.WEAPONS.gun.chestChance = 20;
+  delete r.WEAPONS.sniper.chestChance;
+  r.WEAPONS.rocket.chestChance = -1;
+  assert.deepEqual(validateRules(r), [
+    'weapon sniper: missing chestChance (percent, 0 = never in chests)',
+    'weapon rocket: chestChance must be a number from 0 to 100',
+    'weapon chestChance values must add up to 100, they add up to 102',
+  ]);
+});
+
+test('dropped weapons: more than half keeps it, half or less becomes half (rounded up)', () => {
+  assert.equal(droppedDurability('gun', 15), 15);
+  assert.equal(droppedDurability('gun', 8), 8);   // 8 of 15 is more than half
+  assert.equal(droppedDurability('gun', 7), 8);   // 7.5 rounded up
+  assert.equal(droppedDurability('gun', 1), 8);
+  assert.equal(droppedDurability('sniper', 6), 6); // exactly half -> half
+  assert.equal(droppedDurability('sniper', 7), 7);
+  assert.equal(droppedDurability('sniper', 2), 6);
+  assert.equal(droppedDurability('x', 1, { x: { durability: null } }), null);
+  assert.equal(droppedDurability('gun', undefined), 15);
 });
 
 test('bad durability and wearPerUse are reported', () => {
@@ -66,11 +124,10 @@ test('gun without range is reported', () => {
   assert.deepEqual(validateRules(r), ['weapon pistol: gun missing range']);
 });
 
-test('two basic weapons are reported', () => {
+test('the starting weapon must exist', () => {
   const r = copy();
-  r.WEAPONS.sword.rarity = 'basic';
-  const problems = validateRules(r);
-  assert.ok(problems.includes('there must be exactly one basic weapon, found 2 (woodsword, sword)'), JSON.stringify(problems));
+  r.STARTING_WEAPON = 'woodsword';
+  assert.deepEqual(validateRules(r), ['STARTING_WEAPON "woodsword" is not a weapon']);
 });
 
 test('negative prices are reported', () => {
@@ -89,9 +146,9 @@ test('other broken rules are reported', () => {
   const r = copy();
   delete r.WEAPONS.rocket.radius;
   r.WEAPONS.bat.type = 'laser';
-  r.WEAPONS.spear.rarity = 'epic';
+  r.WEAPONS.spear.rarity = 'rare';
   delete r.WEAPONS.sword.dmg;
-  r.BASIC_WEAPON = 'sword';
+  r.STARTING_WEAPON = 'laser';
   r.COLORS.blue.color = 'blue';
   r.OUTFITS.face.none.price = 5;
   delete r.OUTFITS.back.none;
@@ -100,9 +157,9 @@ test('other broken rules are reported', () => {
   for (const expected of [
     'weapon rocket: explosive missing radius',
     'weapon bat: unknown type "laser"',
-    'weapon spear: unknown rarity "epic"',
+    'weapon spear: unknown rarity "rare"',
     'weapon sword: missing dmg',
-    'BASIC_WEAPON "sword" is not the basic weapon',
+    'STARTING_WEAPON "laser" is not a weapon',
     'color blue: "blue" is not a valid hex color',
     'outfit slot face: "none" must be free',
     'outfit slot back: missing "none"',
@@ -120,7 +177,7 @@ test('validateRules does not throw on garbage', () => {
 test('weaponPrice', () => {
   assert.equal(weaponPrice('sniper'), 200);
   assert.equal(weaponPrice('bat'), 25);
-  assert.equal(weaponPrice(BASIC_WEAPON), undefined);
+  assert.equal(weaponPrice(STARTING_WEAPON), 3);
   assert.equal(weaponPrice('laser'), undefined);
   assert.equal(weaponPrice('toString'), undefined);
 });
@@ -139,7 +196,7 @@ test('skinPrice', () => {
 
 test('isBuyable and itemPrice', () => {
   assert.equal(isBuyable('weapon', 'rocket'), true);
-  assert.equal(isBuyable('weapon', BASIC_WEAPON), false);
+  assert.equal(isBuyable('weapon', STARTING_WEAPON), true);
   assert.equal(isBuyable('weapon', 'nope'), false);
   assert.equal(isBuyable('color', 'gold'), true);
   assert.equal(isBuyable('hat', 'wizard'), true);
@@ -150,19 +207,20 @@ test('isBuyable and itemPrice', () => {
 });
 
 test('weaponsByRarity', () => {
-  assert.deepEqual(weaponsByRarity('basic'), ['woodsword']);
-  assert.deepEqual(weaponsByRarity('common'), ['sword', 'bat', 'pistol']);
+  assert.deepEqual(weaponsByRarity('basic'), []);
+  assert.deepEqual(weaponsByRarity('common'), ['gun', 'sword', 'bat', 'pistol']);
+  assert.deepEqual(weaponsByRarity('epic'), ['spear', 'axe', 'shotgun', 'rifle', 'grenade']);
   assert.deepEqual(weaponsByRarity('legendary'), ['sniper', 'rocket', 'mine']);
   assert.deepEqual(weaponsByRarity('mythic'), []);
-  assert.deepEqual(weaponsByRarity('rare'), LOOT_TABLE.rare);
+  assert.deepEqual(weaponsByRarity('epic'), LOOT_TABLE.epic);
 });
 
 test('exported data is deep-frozen', () => {
-  for (const obj of [RULES, WEAPONS, WEAPONS.pistol, HEALS.medkit, LOOT_TABLE, LOOT_TABLE.rare,
+  for (const obj of [RULES, WEAPONS, WEAPONS.pistol, HEALS.medkit, LOOT_TABLE, LOOT_TABLE.epic, RARITY_COLORS, RARITY_COLORS.epic,
     COLORS, COLORS.gold, OUTFITS, OUTFITS.hat, OUTFITS.hat.crown, DEFAULT_SKIN]) {
     assert.ok(Object.isFrozen(obj));
   }
   assert.throws(() => { WEAPONS.pistol.dmg = 999; }, TypeError);
-  assert.throws(() => { LOOT_TABLE.rare.push('sniper'); }, TypeError);
+  assert.throws(() => { LOOT_TABLE.epic.push('sniper'); }, TypeError);
   assert.equal(WEAPONS.pistol.dmg, 18);
 });

@@ -7,8 +7,8 @@ import { deepFreeze } from './freeze.js';
 
 export * from './player.js';
 export {
-  BASIC_WEAPON, WEAPON_TYPES, RARITIES, WEAPONS, HEALS, LOOT_TABLE,
-  weaponsByRarity, weaponPrice, weaponDurability, weaponWear,
+  STARTING_WEAPON, WEAPON_TYPES, RARITIES, RARITY_COLORS, WEAPONS, HEALS, LOOT_TABLE, GOLDEN_CHEST_BOOST,
+  weaponsByRarity, weaponPrice, weaponDurability, weaponWear, droppedDurability, chestChance, rarityStyle,
 } from './weapons.js';
 export { COLORS, OUTFITS, SKIN_SLOTS, DEFAULT_SKIN, skinPrice } from './skins.js';
 export { validateRules } from './validate.js';
@@ -20,7 +20,7 @@ export function itemPrice(kind, id) {
 }
 
 /**
- * True if the shop sells this item: any known non-basic weapon, or any known skin item
+ * True if the shop sells this item: any known weapon, or any known skin item
  * (free skin items count, they cost 0 coins). Same rule the server's shop uses today.
  */
 export function isBuyable(kind, id) {

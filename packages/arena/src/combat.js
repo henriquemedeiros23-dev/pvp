@@ -2,6 +2,7 @@
 // weapon's `type` (melee | gun | throw | rocket | mine) and its numbers in the rules.
 
 import { rayBoxes, rayCylinder } from '@pvp/collision';
+import { droppedDurability } from '@pvp/game-rules';
 import { at, send, tellServer, weaponDef, heightOf, wearOf } from './state.js';
 import { removePlayer, inventoryMsg } from './players.js';
 import { dropItem } from './loot.js';
@@ -21,14 +22,16 @@ export function damage(A, victim, amount, attacker, weapon, kx = 0, kz = 0) {
   knockOut(A, victim, attacker, weapon);
 }
 
-/** Knocked out: drop everything except the basic weapon, leave the arena. */
+/**
+ * Knocked out: drop every weapon (the starting weapon too) and the heals, leave the arena.
+ * A dropped weapon with more than half its durability keeps it; half or less is set to half
+ * (rounded up), see droppedDurability in @pvp/game-rules.
+ */
 function knockOut(A, victim, attacker, weapon) {
-  const R = A.rules, spread = A.tune.koDropSpread;
-  const lost = [];
+  const spread = A.tune.koDropSpread;
+  const lost = [...victim.weapons];
   victim.weapons.forEach((w, i) => {
-    if (w === R.BASIC_WEAPON) return;
-    lost.push(w);
-    dropItem(A, 'weapon', w, victim.x, victim.z, spread, victim.dur[i]); // keeps its wear
+    dropItem(A, 'weapon', w, victim.x, victim.z, spread, droppedDurability(w, victim.dur[i], A.rules.WEAPONS));
   });
   if (victim.medkits) dropItem(A, 'medkit', null, victim.x, victim.z, spread);
   if (victim.bandages) dropItem(A, 'bandage', null, victim.x, victim.z, spread);
@@ -130,6 +133,7 @@ function wear(A, p, slot) {
   if (p.dur[slot] === 0) {
     const [weapon] = p.weapons.splice(slot, 1);
     p.dur.splice(slot, 1);
+    if (weapon === A.rules.STARTING_WEAPON) p.freeStart = false;
     p.slot = Math.max(0, Math.min(p.slot, p.weapons.length - 1)); // same slot number, or the last one
     send(A, p.id, { t: 'broke', slot, weapon });
   }

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { RULES, COLORS, OUTFITS } from '@pvp/game-rules';
+import { RULES, COLORS, OUTFITS, RARITY_COLORS } from '@pvp/game-rules';
 import { shopTabs, shopItems, shopWeaponIds, backpackSummary, swatchBackground, OUTFIT_ICONS } from '../src/index.js';
 
 const fresh = () => ({
@@ -47,13 +47,18 @@ test('outfit cards have icons and follow rules order', () => {
   assert.equal(hats.find(c => c.id === 'none').action, 'equip');
 });
 
-test('weapons are sorted by rarity then price, skip the basic weapon, and show the stash', () => {
+test('weapons are sorted by rarity then price, include the starting Gun, and show the stash', () => {
   const acc = { ...fresh(), coins: 100, stash: { pistol: 2, sniper: 1, sword: 0 } };
   const cards = shopItems('weapon', acc);
-  assert.deepEqual(cards.map(c => c.id), ['bat', 'sword', 'pistol', 'spear', 'axe', 'shotgun', 'grenade', 'rifle', 'mine', 'sniper', 'rocket']);
-  assert.ok(!cards.some(c => c.id === RULES.BASIC_WEAPON));
+  assert.deepEqual(cards.map(c => c.id), ['gun', 'bat', 'sword', 'pistol', 'spear', 'axe', 'shotgun', 'grenade', 'rifle', 'mine', 'sniper', 'rocket']);
+  assert.ok(!cards.some(c => c.id === 'woodsword'), 'no wooden sword any more');
+  assert.equal(cards[0].price, 3);
   const pistol = cards.find(c => c.id === 'pistol');
-  assert.deepEqual(pistol, { kind: 'weapon', id: 'pistol', name: 'Pistol', price: 40, owned: true, equipped: false, canAfford: true, action: 'buy', rarity: 'common', type: 'gun', stashCount: 2 });
+  assert.deepEqual(pistol, { kind: 'weapon', id: 'pistol', name: 'Pistol', price: 40, owned: true, equipped: false, canAfford: true, action: 'buy', rarity: 'common', type: 'gun', stashCount: 2,
+    rarityName: 'Common', rarityColor: RARITY_COLORS.common.color, rarityBackground: RARITY_COLORS.common.color });
+  const epic = cards.find(c => c.id === 'shotgun');
+  assert.equal(epic.rarityName, 'Epic');
+  assert.equal(epic.rarityColor, RARITY_COLORS.epic.color);
   assert.equal(cards.find(c => c.id === 'sword').owned, false);
   assert.equal(cards.find(c => c.id === 'sniper').canAfford, false);
   assert.deepEqual(shopWeaponIds(), cards.map(c => c.id));
@@ -71,11 +76,11 @@ test('custom rules are used when passed in', () => {
   const rules = {
     ...RULES,
     COLORS: { pink: { name: 'Pink', price: 5, color: '#f0f' } },
-    WEAPONS: { stick: { name: 'Stick', rarity: 'basic', price: 0 }, b: { name: 'B', rarity: 'rare', price: 1 }, a: { name: 'A', rarity: 'rare', price: 1 }, z: { name: 'Z', rarity: 'common', price: 9 } },
-    BASIC_WEAPON: 'stick',
+    WEAPONS: { b: { name: 'B', rarity: 'epic', price: 1 }, a: { name: 'A', rarity: 'epic', price: 1 }, z: { name: 'Z', rarity: 'common', price: 9 }, q: { name: 'Q', rarity: 'weird', price: 0 } },
   };
   assert.deepEqual(shopItems('color', { coins: 5 }, rules).map(c => [c.id, c.canAfford]), [['pink', true]]);
-  assert.deepEqual(shopWeaponIds(rules), ['z', 'a', 'b']);
+  assert.deepEqual(shopWeaponIds(rules), ['z', 'a', 'b', 'q']);
+  assert.equal(shopItems('weapon', {}, rules).at(-1).rarityName, 'weird');
   assert.equal(backpackSummary({ stash: { b: 1, z: 3 } }, rules), 'Backpack: 3× Z, 1× B');
 });
 

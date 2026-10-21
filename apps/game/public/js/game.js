@@ -422,7 +422,12 @@ export class Game {
       const b = this.slotEls[s.index];
       b.classList.toggle('empty', s.empty);
       b.classList.toggle('active', s.active);
-      for (const r of ['basic', 'common', 'rare', 'legendary']) b.classList.toggle(r, s.rarity === r);
+      for (const r of C.RARITIES) b.classList.toggle(r, s.rarity === r);
+      // rarity accent, colors from RARITY_COLORS in @pvp/game-rules
+      const rc = !s.empty && C.RARITY_COLORS[s.rarity];
+      b.style.background = !rc ? ''
+        : rc.twoColors ? `radial-gradient(circle at 50% 40%, ${rc.color}aa, ${rc.color2}dd 75%)`
+        : `radial-gradient(circle at 50% 40%, ${rc.color}66, rgba(10,8,16,0.6) 70%)`;
       b.querySelector('.icon').textContent = s.icon;
       b.querySelector('.name').textContent = s.name;
       const dur = b.querySelector('.dur');
@@ -495,7 +500,7 @@ export class Game {
       if (def.type !== 'melee') w.rotation.x = Math.PI / 2; // lay guns flat-ish
       w.scale.setScalar(1.3);
       g.add(w);
-      color = { common: '#d6dde8', rare: '#3c8cff', legendary: '#ffc531' }[def.rarity];
+      color = C.RARITY_COLORS[def.rarity]?.color ?? '#d6dde8'; // ring in the rarity's color
     } else {
       const med = it.kind === 'medkit';
       const box = new THREE.Mesh(new THREE.BoxGeometry(med ? 0.5 : 0.4, med ? 0.35 : 0.15, med ? 0.35 : 0.25), new THREE.MeshStandardMaterial({ color: med ? '#e23b3b' : '#f4efe6' }));

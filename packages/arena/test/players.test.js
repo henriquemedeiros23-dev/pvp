@@ -2,14 +2,14 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { makeArena, drain, msgs, RULES } from './helpers.js';
 
-test('join gives the basic weapon plus the loadout, and sends welcome, inv, pjoin', () => {
+test('join gives the starting Gun plus the loadout, and sends welcome, inv, pjoin', () => {
   const arena = makeArena();
   const a = arena.join('ann', { name: 'Ann', loadout: ['rocket', 'pistol', 'nope', 'rocket'], coins: 30 });
   assert.equal(a.ok, true);
   assert.deepEqual(a.weapons, ['rocket', 'pistol']);
   const out = drain(arena);
   assert.equal(msgs(out, 'welcome', a.id)[0].id, a.id);
-  assert.deepEqual(msgs(out, 'inv', a.id)[0].weapons, [RULES.BASIC_WEAPON, 'rocket', 'pistol']);
+  assert.deepEqual(msgs(out, 'inv', a.id)[0].weapons, ['gun', 'rocket', 'pistol']);
   assert.equal(msgs(out, 'inv', a.id)[0].coins, 30);
   const pj = out.find(e => e.msg?.t === 'pjoin');
   assert.equal(pj.to, 'all');
@@ -67,4 +67,20 @@ test('slot switch and heal', () => {
   assert.equal(arena.selectSlot(a.id, 2), false);
   assert.equal(arena.heal(a.id, 'bandage', 100), false); // full health
   assert.equal(arena.getPlayer(a.id).slot, 1);
+});
+
+test('the free starting Gun is not put in the backpack on leave; a stashed Gun in the loadout is not taken twice', () => {
+  const arena = makeArena();
+  const a = arena.join('a', { loadout: ['gun', 'pistol'] });
+  assert.deepEqual(a.weapons, ['pistol'], 'the gun from the loadout was not taken (already has one)');
+  assert.deepEqual(arena.getPlayer(a.id).weapons, ['gun', 'pistol']);
+  assert.deepEqual(arena.leave(a.id, { alive: true }), ['pistol']);
+});
+
+test('join works with rules that have no starting weapon', () => {
+  const arena = makeArena({ rules: { ...RULES, STARTING_WEAPON: undefined } });
+  const a = arena.join('a', { loadout: ['pistol'] });
+  assert.deepEqual(a.weapons, ['pistol']);
+  assert.deepEqual(arena.getPlayer(a.id).weapons, ['pistol']);
+  assert.deepEqual(arena.leave(a.id, { alive: true }), ['pistol']);
 });

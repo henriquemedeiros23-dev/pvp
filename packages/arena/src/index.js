@@ -36,7 +36,7 @@ export function createArena(o = {}) {
   return {
     /** Join. Returns { ok: true, id, weapons, replaced } or { ok: false, reason: 'full' }. */
     join: (playerKey, info, now) => players.join(A, playerKey, info, now),
-    /** Leave. alive (default true): returns the non-basic weapons for the backpack; else []. */
+    /** Leave. alive (default true): returns the weapons for the backpack (not the free starting weapon); else []. */
     leave: (id, opts) => players.leave(A, id, opts),
     setState: (id, state, now) => players.setState(A, id, state, now),
     fire: (id, dir, now) => fire(A, id, dir, now),

@@ -43,15 +43,14 @@ test('fire rate is respected', () => {
 });
 
 test('melee needs the target in front', () => {
-  const { arena, s, v } = duel({ loadout: [], at: [[0, 0], [0, 2]] });
-  arena.selectSlot(s, 0);
+  const { arena, s, v } = duel({ loadout: ['sword'], at: [[0, 0], [0, 2]] });
   arena.teleport(s, { x: 0, z: 0, ry: Math.PI }); // facing -z, target is at +z
   arena.fire(s, [0, 0, -1], READY);
   assert.equal(hp(arena, v), RULES.MAX_HP);
   assert.deepEqual(msgs(drain(arena), 'swing'), [{ t: 'swing', id: s }]);
   arena.teleport(s, { x: 0, z: 0, ry: 0 }); // facing +z
   arena.fire(s, [0, 0, 1], READY + 1000);
-  assert.equal(hp(arena, v), RULES.MAX_HP - RULES.WEAPONS[RULES.BASIC_WEAPON].dmg);
+  assert.equal(hp(arena, v), RULES.MAX_HP - RULES.WEAPONS.sword.dmg);
   const hurt = msgs(drain(arena), 'hurt', v)[0];
   assert.ok(hurt.kz > 0, 'knocked away from the attacker');
 });
@@ -125,7 +124,7 @@ test('knockout drops weapons and heals, emits ko + dead + knockedOut', () => {
   assert.equal(arena.getPlayer(v), undefined);
   assert.equal(arena.playerCount(), 1);
   const drops = msgs(out, 'item+');
-  assert.deepEqual(drops.map(d => d.weapon ?? d.kind), ['rocket', 'pistol', 'bandage']);
+  assert.deepEqual(drops.map(d => d.weapon ?? d.kind), ['gun', 'rocket', 'pistol', 'bandage'], 'the Gun is dropped too');
   const ko = msgs(out, 'ko')[0];
   assert.equal(ko.id, v);
   assert.equal(ko.victim, 'victim');
@@ -135,14 +134,14 @@ test('knockout drops weapons and heals, emits ko + dead + knockedOut', () => {
   assert.deepEqual(msgs(out, 'hitmark', s).at(-1), { t: 'hitmark', dead: true });
   const k = serverEvents(out, 'knockedOut')[0];
   assert.equal(k.playerId, v);
-  assert.deepEqual(k.weapons, ['rocket', 'pistol']);
+  assert.deepEqual(k.weapons, ['gun', 'rocket', 'pistol']);
   assert.deepEqual(arena.leave(v, { alive: true }), [], 'nothing to give back after a knockout');
 });
 
 test('new weapons work by only editing the rules (behaviour comes from type)', () => {
   const rules = {
     ...RULES,
-    WEAPONS: { ...RULES.WEAPONS, laser: { name: 'Laser', type: 'gun', dmg: 40, range: 100, rate: 0.2, spread: 0, pellets: 1, rarity: 'rare', price: 1 } },
+    WEAPONS: { ...RULES.WEAPONS, laser: { name: 'Laser', type: 'gun', dmg: 40, range: 100, rate: 0.2, spread: 0, pellets: 1, rarity: 'epic', price: 1, chestChance: 0 } },
   };
   const { arena, s, v } = duel({ loadout: ['laser'], rules });
   arena.fire(s, aimAt(arena, s, v), READY);

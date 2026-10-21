@@ -111,7 +111,7 @@ test('play: sign up, join, open a chest, pick up the loot, leave', { skip: SKIP,
     await page.click('#btnOpen', { force: true }); // force: the button pulses on purpose, so it is never "stable"
     await page.waitForFunction(() => Number(document.getElementById('hudCoins').textContent) > 0, null, { timeout: 10000 });
     const coins = await hudNumber(page, '#hudCoins');
-    assert.ok(coins >= 5 && coins <= 15, `a chest gives 5-15 coins, got ${coins}`);
+    assert.equal(coins, 3, 'a chest gives exactly 3 coins');
     // the lid opens (it turns to about -1.9 radians)
     s = await waitDebug(page, x => x.openChests.some(c => c.id === chest.id && c.lid < -1.5), { what: 'the chest lid to open' });
     assert.equal(s.nearChest, null); // an open chest can't be opened again
@@ -121,6 +121,9 @@ test('play: sign up, join, open a chest, pick up the loot, leave', { skip: SKIP,
     assert.ok(Math.hypot(drop.x - chest.x, drop.z - chest.z) < 2, 'the item lands next to the chest');
     s = await waitDebug(page, x => x.items.some(it => it.id === drop.id) || h.received.some(m => m.t === 'item-' && m.id === drop.id), { what: 'the item to show' });
     assert.ok(s.items.some(it => it.id === drop.id), `the item was picked up before walking to it (stopped too close: ${JSON.stringify({ me: s.me, drop })})`);
+
+    assert.equal(drop.kind, 'weapon', 'a chest gives exactly one weapon');
+    assert.ok(!s.inv.weapons.includes(drop.weapon), `this seed should give a weapon we don't have yet, got ${drop.weapon}`);
 
     // walk onto it: it is picked up (a new weapon slot, or one more bandage / medkit)
     const inv0 = s.inv;
