@@ -1,5 +1,5 @@
 // @pvp/hud-model: pure functions that turn the player's inventory and health into
-// what the in-game HUD shows (weapon slots with durability bars, the health bar).
+// what the in-game HUD shows (weapon slots, the held weapon's Durability bar, the H.P bar).
 // Plain ES module: works in Node and directly in the browser (import map for @pvp/game-rules).
 import { RULES } from '@pvp/game-rules';
 
@@ -63,12 +63,35 @@ export function slotBar(inv, rules = RULES) {
   return out;
 }
 
-/** Health bar view: { hp, max, ratio, percent, low, text }. hp is clamped to 0..max and rounded. */
+/**
+ * Health bar view: { hp, max, ratio, percent, low, text, label }. hp is clamped to 0..max and rounded.
+ * text is the hp number ('30'), label the percent the H.P bar shows ('30%').
+ */
 export function healthView(hp, maxHp = RULES.MAX_HP) {
   const max = isPosInt(maxHp) ? maxHp : 100;
   const value = Number.isFinite(hp) ? Math.max(0, Math.min(max, Math.round(hp))) : 0;
   const ratio = value / max;
-  return { hp: value, max, ratio, percent: Math.round(ratio * 100), low: ratio <= HEALTH_LOW, text: String(value) };
+  const percent = Math.round(ratio * 100);
+  return { hp: value, max, ratio, percent, low: ratio <= HEALTH_LOW, text: String(value), label: `${percent}%` };
+}
+
+/**
+ * The big Durability bar: durability of the weapon you are HOLDING (inv.slot).
+ * { weapon, name, ratio, percent, level, label, infinite, empty }
+ * - a weapon that can break: ratio/percent from durabilityView, label '75%'
+ * - a weapon that never breaks: full bar, infinite: true, label '∞', level 'good'
+ * - no weapon in hand: empty: true, ratio 0, label '–', level null
+ */
+export function heldDurabilityView(inv, rules = RULES) {
+  const weapons = Array.isArray(inv?.weapons) ? inv.weapons : [];
+  const slot = Number.isInteger(inv?.slot) ? inv.slot : 0;
+  const id = weapons[slot];
+  const w = typeof id === 'string' ? own(rules.WEAPONS, id) : undefined;
+  if (!w) return { weapon: null, name: '', ratio: 0, percent: 0, level: null, label: '–', infinite: false, empty: true };
+  const dur = Array.isArray(inv.dur) ? inv.dur[slot] : undefined;
+  const d = durabilityView(id, dur, rules);
+  if (!d) return { weapon: id, name: w.name, ratio: 1, percent: 100, level: 'good', label: '∞', infinite: true, empty: false };
+  return { weapon: id, name: w.name, ratio: d.ratio, percent: d.percent, level: d.level, label: `${d.percent}%`, infinite: false, empty: false };
 }
 
 /**

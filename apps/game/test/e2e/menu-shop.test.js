@@ -117,7 +117,8 @@ async function signedIn(p, prefix) {
   return name;
 }
 
-// The weapon bar after joining: always 5 slots, the starting weapon in the first one, health 100.
+// The bottom bar after joining (the boss's drawing, #24): Durability and H.P bars, then exactly 5 slots,
+// the starting weapon in the first one, health 100%.
 async function checkHud(p) {
   await p.waitForFunction(() => document.querySelector('#slots .slot.active'));
   assert.equal(await p.locator('#slots .slot').count(), 5);
@@ -125,24 +126,40 @@ async function checkHud(p) {
   const first = p.locator('#slots .slot').first();
   assert.equal(await first.getAttribute('aria-label'), '1: Wooden Sword');
   assert.match(await first.getAttribute('class'), /\bactive\b/);
-  assert.equal(await first.locator('.dur').isVisible(), false); // the basic weapon never breaks: no bar
-  assert.equal(await p.textContent('#hpText'), '100');
+  assert.equal(await p.locator('#slots .slot .dur').count(), 0); // no small bars in the slots any more
+  assert.equal(await p.locator('#durBar').isVisible(), true);
+  assert.equal(await p.textContent('#durMeter .mlabel'), 'Durability');
+  assert.equal(await p.textContent('#durText'), '∞'); // the basic weapon never breaks: full bar
+  assert.equal(await p.getAttribute('#durBar', 'aria-valuenow'), '100');
+  assert.equal(await p.textContent('.meter.hp .mlabel'), 'H.P');
+  assert.equal(await p.textContent('#hpText'), '100%');
   assert.equal(await p.getAttribute('.hpbar', 'aria-valuenow'), '100');
+  // the bars are to the left of the slots, on the same bottom row
+  const [bars, slots] = await p.evaluate(() => ['.meters', '#slots'].map(sel => {
+    const r = document.querySelector(sel).getBoundingClientRect();
+    return { l: r.left, r: r.right, t: r.top, b: r.bottom };
+  }));
+  assert.ok(bars.r <= slots.l, 'the bars should be left of the slots');
+  assert.ok(bars.t < slots.b && slots.t < bars.b, 'the bars and the slots should be on one row');
 }
 
 // Nothing in the bottom HUD may cover another control, and all of it must be on screen.
-async function checkPhoneLayout(p, { width, height }) {
-  const boxes = await p.evaluate(() => Object.fromEntries(['hotbar', 'stick', 'btnFire', 'btnJump', 'btnCrouch', 'btnLeave'].map(id => {
+async function checkPhoneLayout(p, { width, height }, others = ['stick', 'btnFire', 'btnJump', 'btnCrouch', 'btnLeave']) {
+  const boxes = await p.evaluate(ids => Object.fromEntries(['hotbar', ...ids].map(id => {
     const r = document.getElementById(id).getBoundingClientRect();
     return [id, { l: r.left, t: r.top, r: r.right, b: r.bottom }];
-  })));
+  })), others);
   const overlap = (a, b) => a.l < b.r && b.l < a.r && a.t < b.b && b.t < a.b;
   for (const [id, b] of Object.entries(boxes)) {
     assert.ok(b.l >= 0 && b.t >= 0 && b.r <= width && b.b <= height, `${id} is off screen at ${width}x${height}`);
   }
-  for (const other of ['stick', 'btnFire', 'btnJump', 'btnCrouch', 'btnLeave']) {
+  for (const other of others) {
     assert.ok(!overlap(boxes.hotbar, boxes[other]), `the weapon bar covers ${other} at ${width}x${height}`);
   }
+  // the group sits in the bottom middle
+  const mid = (boxes.hotbar.l + boxes.hotbar.r) / 2;
+  assert.ok(Math.abs(mid - width / 2) < 2, `the weapon bar should be centered at ${width}x${height}`);
+  assert.ok(boxes.hotbar.b > height - 40, `the weapon bar should be at the bottom at ${width}x${height}`);
 }
 
 test('sign up, shop, join the arena, leave: no errors', { skip: !RUN && 'set E2E=1 to run (npm run test:e2e)', timeout: 120000 }, async () => {
@@ -184,6 +201,8 @@ test('sign up, shop, join the arena, leave: no errors', { skip: !RUN && 'set E2E
   assert.equal(await isVisible('#menu'), false);
   assert.equal(await isVisible('#loading'), false);
   await checkHud(page);
+  await page.setViewportSize({ width: 1280, height: 720 }); // a computer screen
+  await checkPhoneLayout(page, { width: 1280, height: 720 }, ['btnLeave', 'keysHelp']);
   await shot('in-game.png');
 
   // walk forward with the keyboard: the stickman must move more than 1 m.
@@ -290,7 +309,7 @@ test('join gives up after a few seconds when the arena does not answer', { skip:
   }
 });
 
-test('weapon bar: durability colors, tap to switch, a broken weapon flashes', { skip: !RUN && 'set E2E=1 to run (npm run test:e2e)', timeout: 90000 }, async () => {
+test('weapon bar: Durability bar follows the held weapon, tap to switch, a broken weapon flashes', { skip: !RUN && 'set E2E=1 to run (npm run test:e2e)', timeout: 90000 }, async () => {
   const { context, page: p, errors: errs } = await newPage({ viewport: { width: 844, height: 390 }, isMobile: true, hasTouch: true });
   try {
     // talk to the real server, but let the test send extra messages to the page
@@ -306,18 +325,31 @@ test('weapon bar: durability colors, tap to switch, a broken weapon flashes', { 
     await p.locator('#hud').waitFor({ state: 'visible', timeout: 20000 });
     await checkHud(p);
 
+    // the Durability bar shows the weapon in your hand: switch slots and it follows
     const inv = { weapons: ['woodsword', 'pistol', 'shotgun', 'sniper'], dur: [null, 60, 10, 1], slot: 1, bandages: 2, medkits: 1, coins: 0, hp: 100 };
-    toPage(encode('inv', inv));
-    await p.waitForFunction(() => document.querySelectorAll('#slots .slot.empty').length === 1);
-    const levels = await p.$$eval('#slots .slot', els => els.map(b => (b.querySelector('.dur').hidden ? null : b.querySelector('.dur').dataset.level)));
-    assert.deepEqual(levels, [null, 'good', 'low', 'critical', null]);
-    assert.match(await p.locator('#slots .slot').nth(1).getAttribute('class'), /\bactive\b/);
+    const durBar = async () => p.evaluate(() => ({
+      text: document.getElementById('durText').textContent,
+      level: document.getElementById('durMeter').dataset.level,
+      width: document.getElementById('durFill').style.width,
+    }));
+    const holding = async (slot, hp, want) => {
+      toPage(encode('inv', { ...inv, slot, hp }));
+      await p.waitForFunction(i => document.querySelector(`#slots .slot:nth-child(${i + 1})`).classList.contains('active'), slot);
+      assert.deepEqual(await durBar(), want, `holding slot ${slot + 1}`);
+      assert.equal(await p.textContent('#hpText'), `${hp}%`);
+    };
+    await holding(1, 100, { text: '100%', level: 'good', width: '100%' });     // a new pistol
+    await holding(3, 100, { text: '8%', level: 'critical', width: '8%' });     // sniper, 1 shot of 12 left
+    await holding(0, 90, { text: '∞', level: 'good', width: '100%' });         // the wooden sword never breaks
+    await holding(2, 72, { text: '40%', level: 'low', width: '40%' });         // shotgun, 10 of 25 left
+    assert.equal(await p.locator('#slots .slot.empty').count(), 1);
+    assert.equal(await p.textContent('#bandageCount'), '2');
     await shot('hud-phone-weapons.png', p);
 
     // tap a slot: the game asks the server for it
-    await p.locator('#slots .slot').nth(2).tap();
-    for (let i = 0; i < 40 && !sentSlots.includes(2); i++) await p.waitForTimeout(50);
-    assert.ok(sentSlots.includes(2), `tapping slot 3 should send it, sent ${JSON.stringify(sentSlots)}`);
+    await p.locator('#slots .slot').nth(1).tap();
+    for (let i = 0; i < 40 && !sentSlots.includes(1); i++) await p.waitForTimeout(50);
+    assert.ok(sentSlots.includes(1), `tapping slot 2 should send it, sent ${JSON.stringify(sentSlots)}`);
 
     // the sniper breaks: toast and a flash on its slot
     toPage(encode('broke', { slot: 3, weapon: 'sniper' }));
