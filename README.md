@@ -17,7 +17,21 @@ npm start
 ```
 
 Then open the address it prints. Phones on the same Wi-Fi can join too.
-Set `PORT` to use another port (default 3000). Run every test with `npm test`. Run the browser check of the menu and shop with `npm run test:e2e` (needs Chromium for Playwright; add `SCREENSHOTS=1` to update `docs/screenshots/`).
+Set `PORT` to use another port (default 3000). Run every test with `npm test`.
+
+### Browser tests
+
+`npm run test:e2e` (from the repo root) starts the real server and plays the game in Chromium:
+sign up, shop, join, walk, open a chest, pick up loot, leave, two players seeing each other,
+phone layout, and more (`apps/game/test/e2e/`). No console errors are allowed.
+
+- Needs Chromium for Playwright: it is found in `PLAYWRIGHT_BROWSERS_PATH` (default `/opt/pw-browsers`),
+  or set `CHROMIUM_PATH` to a Chrome/Chromium binary.
+- WebGL runs in software (swiftshader), so the game draws only a few frames a second; the tests wait for that.
+- Every test server uses a temp accounts file, never the real one.
+- The play test starts its server with `PVP_TEST_HOOKS=1`, which lets the test jump a player close to a chest
+  (`debugTeleport`). Never set it for real players: without it the server ignores that message.
+- Add `SCREENSHOTS=1` to update `docs/screenshots/`.
 
 ## Layout
 

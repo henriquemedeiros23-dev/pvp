@@ -244,7 +244,20 @@ export class Game {
   // Small read-only view for tests and debugging.
   debugState() {
     const me = this.me;
-    return { mode: this.mode, id: this.myId, me: me ? { x: me.x, y: me.y, z: me.z, hp: me.hp } : null };
+    const play = this.mode === 'play';
+    const pos = o => ({ x: +o.x.toFixed(2), y: +o.y.toFixed(2), z: +o.z.toFixed(2) });
+    return {
+      mode: this.mode,
+      id: this.myId,
+      me: me ? { x: me.x, y: me.y, z: me.z, hp: me.hp, yaw: this.yaw } : null,
+      // the other players I can see: id, name and where their stickman is drawn
+      others: play ? [...this.remotes].map(([id, r]) => ({ id, name: this.infos.get(id)?.name, ...pos(r.sm.root.position) })) : [],
+      // open chests and how far their lid has turned (0 = shut)
+      openChests: this.chests.meshes.flatMap((m, id) => (m.userData.open ? [{ id, lid: +m.userData.lid.rotation.x.toFixed(3) }] : [])),
+      nearChest: play ? this.nearChest ?? null : null,
+      items: [...this.items.values()].map(it => ({ id: it.id, kind: it.kind, weapon: it.weapon, x: it.x, y: it.y, z: it.z })),
+      inv: this.inv ? { weapons: [...this.inv.weapons], bandages: this.inv.bandages, medkits: this.inv.medkits, coins: this.inv.coins } : null,
+    };
   }
 
   onMessage(m) {

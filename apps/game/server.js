@@ -16,7 +16,7 @@ import { createAccounts, createJsonFileStore, AccountError } from '@pvp/accounts
 import { generateIsland } from '@pvp/world-gen';
 import { createArena } from '@pvp/arena';
 import { createRandom } from '@pvp/seeded-random';
-import { parseClientMessage, encode, MAX_CLIENT_MESSAGE_SIZE } from '@pvp/net-protocol';
+import { parseClientMessage, encode, check, MAX_CLIENT_MESSAGE_SIZE } from '@pvp/net-protocol';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT) || 3000;
@@ -25,6 +25,14 @@ const DATA_FILE = process.env.DATA_FILE ? path.resolve(process.env.DATA_FILE) : 
 // Seed for the arena's random numbers (loot, spawns, golden chest, gun spread). Set it to replay a match.
 const ARENA_SEED = process.env.ARENA_SEED || String(Date.now());
 const TICK_MS = 50;
+// Test-only hooks for the browser play test (issue #13). OFF unless the server is started with
+// PVP_TEST_HOOKS=1 (exactly). They are NOT in the game's message list (@pvp/net-protocol): only this
+// server knows them, and only when the flag is on. With the flag off such messages are dropped like junk.
+const TEST_HOOKS = process.env.PVP_TEST_HOOKS === '1';
+const TEST_MESSAGES = {
+  // Put me somewhere on the island (skips the anti-teleport check). The server answers with 'pos'.
+  debugTeleport: { obj: { x: { type: 'number', min: -1000, max: 1000 }, z: { type: 'number', min: -1000, max: 1000 } } },
+};
 // The monorepo's packages/ folder (read-only: the browser loads package src files from here).
 const PACKAGES_DIR = path.resolve(ROOT, '..', '..', 'packages');
 // three.js may be installed here or hoisted to the workspace root.
@@ -204,6 +212,24 @@ function onMessage(conn, m) {
   pump();
 }
 
+// A test-only message, or null. Never called unless TEST_HOOKS is on.
+function parseTestMessage(raw) {
+  try {
+    const data = JSON.parse(String(raw));
+    if (!data || typeof data.t !== 'string' || !Object.hasOwn(TEST_MESSAGES, data.t)) return null;
+    return { t: data.t, ...check(TEST_MESSAGES[data.t], data) };
+  } catch { return null; }
+}
+
+function onTestMessage(conn, m) {
+  const id = conn.playerId != null && arena.hasPlayer(conn.playerId) ? conn.playerId : null;
+  if (id == null) return;
+  if (m.t === 'debugTeleport' && arena.teleport(id, { x: m.x, y: 0, z: m.z })) {
+    sendRaw(conn, encode('pos', { x: m.x, y: 0, z: m.z }));
+  }
+  pump();
+}
+
 const ticker = setInterval(() => {
   arena.tick(Date.now());
   pump();
@@ -219,7 +245,14 @@ wss.on('connection', (ws, req) => {
 
   ws.on('message', raw => {
     const r = parseClientMessage(raw);
-    if (!r.ok) return; // bad or unknown message: drop it
+    if (!r.ok) {
+      // bad or unknown message: drop it (unless test hooks are on and it is a test message)
+      const t = TEST_HOOKS ? parseTestMessage(raw) : null;
+      if (t) {
+        try { onTestMessage(conn, t); } catch (e) { console.error('Test message error:', e); }
+      }
+      return;
+    }
     try { onMessage(conn, r.msg); } catch (e) { console.error('Message error:', e); }
   });
   ws.on('close', () => { leaveAlive(conn); pump(); });
@@ -231,6 +264,7 @@ server.listen(PORT, () => {
   for (const list of Object.values(os.networkInterfaces())) {
     for (const n of list || []) if (n.family === 'IPv4' && !n.internal) console.log(`  On phones (same Wi-Fi): http://${n.address}:${PORT}`);
   }
+  if (TEST_HOOKS) console.log('  TEST HOOKS ARE ON (PVP_TEST_HOOKS=1): only for automatic tests, never for real players!');
   console.log(`  Arena seed: ${ARENA_SEED}`);
 });
 
