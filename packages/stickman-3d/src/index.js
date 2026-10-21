@@ -3,5 +3,6 @@
 export { Stickman, DEFAULT_LIMB_RADIUS, disposeObject, collectResources } from './stickman.js';
 export { buildWeapon, weaponModelKind, MODEL_TYPES } from './weapons.js';
 export { buildOutfit, OUTFIT_MODELS } from './outfits.js';
+export { buildPotion, holdPotion } from './potion.js';
 export { bodyMaterial, colorDef, eyeColor } from './materials.js';
 export { computePose, restPose, rainbowHue, AIM_TYPES, STAND_HIP_Y, CROUCH_HIP_Y, SLIDE_HIP_Y } from './pose.js';

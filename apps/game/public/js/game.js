@@ -4,11 +4,12 @@ import * as THREE from 'three';
 import * as C from '@pvp/game-rules';
 import { generateIsland } from '@pvp/world-gen';
 import { movePlayer, rayBoxes, rayCylinder } from '@pvp/collision';
-import { Stickman, buildWeapon } from '@pvp/stickman-3d';
+import { Stickman, buildWeapon, buildPotion, holdPotion } from '@pvp/stickman-3d';
 import { createIslandScene } from '@pvp/island-scene';
 import { createInputState, attachTouchControls, attachDesktopControls, isTouchDevice } from '@pvp/touch-controls';
 import { decodeServerMessage, encodeClient, unpackSnapshotPlayer, makeFlags, readFlags } from '@pvp/net-protocol';
 import { slotBar, heldDurabilityView, healthView, pickSlot, brokeMessage, WEAPON_ICONS } from '@pvp/hud-model';
+import { potionView, drinkState, drinkMessage, POTION_ICON_SVG } from '@pvp/hud-model';
 
 const $ = id => document.getElementById(id);
 const JOIN_TIMEOUT_MS = 8000;  // give up joining if 'welcome' does not come
@@ -65,6 +66,9 @@ export class Game {
     this.mobile = isTouchDevice(window);
     this.setupControls(canvas);
     this.buildSlots();
+    $('potionIcon').innerHTML = POTION_ICON_SVG; // the flask from the boss's drawing (@pvp/hud-model)
+    $('drinkIcon').innerHTML = POTION_ICON_SVG;
+    this.drink = null; // the potion drinking in progress: { startedAt, ms } (from the server's 'drink' messages)
     this.mode = 'menu';
     this.time = 0;
 
@@ -115,15 +119,14 @@ export class Game {
         canvas, stick: $('stick'), knob: $('knob'),
         buttons: {
           fire: $('btnFire'), jump: $('btnJump'), crouch: $('btnCrouch'), open: $('btnOpen'),
-          bandage: $('btnBandage'), medkit: $('btnMedkit'),
+          potion: $('btnPotion'),
         },
       });
     } else {
       attachDesktopControls(this.input, { canvas, target: window });
       const tap = name => { this.input.button(name, true); this.input.button(name, false); };
       $('btnOpen').addEventListener('click', () => tap('open'));
-      $('btnBandage').addEventListener('pointerdown', e => { e.preventDefault(); tap('bandage'); });
-      $('btnMedkit').addEventListener('pointerdown', e => { e.preventDefault(); tap('medkit'); });
+      $('btnPotion').addEventListener('pointerdown', e => { e.preventDefault(); tap('potion'); });
     }
   }
 
@@ -256,7 +259,9 @@ export class Game {
       openChests: this.chests.meshes.flatMap((m, id) => (m.userData.open ? [{ id, lid: +m.userData.lid.rotation.x.toFixed(3) }] : [])),
       nearChest: play ? this.nearChest ?? null : null,
       items: [...this.items.values()].map(it => ({ id: it.id, kind: it.kind, weapon: it.weapon, x: it.x, y: it.y, z: it.z })),
-      inv: this.inv ? { weapons: [...this.inv.weapons], bandages: this.inv.bandages, medkits: this.inv.medkits, coins: this.inv.coins } : null,
+      inv: this.inv ? { weapons: [...this.inv.weapons], potions: this.inv.potions, coins: this.inv.coins } : null,
+      // potion drinking: null, or how far it is (0..1) as the HUD shows it
+      drinking: this.drink ? potionView(this.inv, { drink: this.drink, now: performance.now() }).progress : null,
     };
   }
 
@@ -283,6 +288,7 @@ export class Game {
       case 'mine-': { const x = this.mines.get(m.id); if (x) { this.scene.remove(x); this.mines.delete(m.id); } return; }
       case 'hitmark': return this.hitmark(m.dead);
       case 'hurt': return this.onHurt(m);
+      case 'drink': return this.onDrink(m);
       case 'broke': this.flashSlot(m.slot); return this.toast(brokeMessage(m.weapon)); // an 'inv' follows
       case 'ko': return this.onKO(m);
       case 'dead': this.endPlay(); return this.ui.onDead(m.by, m.weapon);
@@ -299,6 +305,7 @@ export class Game {
     this.clearArena();
     this.myId = m.id;
     this.inv = null; // the server sends 'inv' right after 'welcome'
+    this.drink = null;
     this.renderSlots();
     this.setHp(C.MAX_HP);
     for (const p of m.players) this.infos.set(p.id, { name: p.name, skin: p.skin });
@@ -325,6 +332,8 @@ export class Game {
   endPlay() {
     if (this.mode !== 'play') return;
     this.mode = 'menu';
+    this.drink = null;
+    this.renderPotion();
     this.input.enabled = false;
     this.input.reset();
     if (this.me) { this.scene.remove(this.me.sm.root); this.me.sm.dispose(); this.me = null; }
@@ -384,13 +393,12 @@ export class Game {
   }
 
   onInventory(m) {
-    this.inv = m; // weapons, dur (uses left per slot, null = never breaks), slot, bandages, medkits, coins, hp
+    this.inv = m; // weapons, dur (uses left per slot, null = never breaks), slot, potions, coins, hp
     this.coins = m.coins;
     $('hudCoins').textContent = m.coins;
-    $('bandageCount').textContent = m.bandages;
-    $('medkitCount').textContent = m.medkits;
     this.setHp(m.hp);
-    if (this.me) this.me.sm.setWeapon(m.weapons[m.slot]);
+    if (this.me) { this.me.sm.setWeapon(m.weapons[m.slot]); holdPotion(this.me.sm, !!this.drink); }
+    this.renderPotion();
     this.renderSlots();
     if (m.picked) this.toast(`Picked up ${m.picked}`);
   }
@@ -433,6 +441,33 @@ export class Game {
       b.setAttribute('aria-label', label);
     }
     this.renderDurability();
+  }
+
+  // ------------------------------------------------------------ Healing Potion (#28)
+  onDrink(m) {
+    this.drink = drinkState(this.drink, m, performance.now());
+    this.setHp(m.hp);
+    if (this.me) holdPotion(this.me.sm, !!this.drink);
+    const text = drinkMessage(m);
+    if (text) this.toast(text);
+    this.renderPotion();
+  }
+
+  // The potion button (count + ring) and the big ring around the crosshair while drinking. Every frame while drinking.
+  renderPotion() {
+    const v = potionView(this.inv, { drink: this.drink, now: performance.now(), hp: this.me?.hp, key: this.mobile ? 'tap' : 'Q' });
+    const b = $('btnPotion');
+    b.style.setProperty('--p', v.progress.toFixed(3));
+    b.classList.toggle('empty', v.empty);
+    b.classList.toggle('drinking', v.drinking);
+    b.title = v.title;
+    b.setAttribute('aria-label', `Healing Potion: ${v.count}`);
+    $('potionCount').textContent = v.label;
+    const ring = $('drinkRing');
+    ring.classList.toggle('hidden', !v.drinking || this.mode !== 'play');
+    ring.style.setProperty('--p', v.progress.toFixed(3));
+    ring.setAttribute('aria-valuenow', v.percent);
+    $('drinkText').textContent = v.text;
   }
 
   // The big Durability bar: the weapon in your hand (full with ∞ if it never breaks, '–' if the hand is empty).
@@ -509,15 +544,12 @@ export class Game {
       w.scale.setScalar(1.3);
       g.add(w);
       color = C.RARITY_COLORS[def.rarity]?.color ?? '#d6dde8'; // ring in the rarity's color
-    } else {
-      const med = it.kind === 'medkit';
-      const box = new THREE.Mesh(new THREE.BoxGeometry(med ? 0.5 : 0.4, med ? 0.35 : 0.15, med ? 0.35 : 0.25), new THREE.MeshStandardMaterial({ color: med ? '#e23b3b' : '#f4efe6' }));
-      g.add(box);
-      const crossMat = new THREE.MeshBasicMaterial({ color: med ? '#fff' : '#ff7aa0' });
-      const c1 = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.02, 0.05), crossMat); c1.position.y = (med ? 0.175 : 0.075) + 0.01;
-      const c2 = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.02, 0.16), crossMat); c2.position.y = c1.position.y;
-      g.add(c1, c2);
-      color = '#66f08c';
+    } else if (it.kind === 'potion') {
+      const p = buildPotion(); // the Healing Potion flask (@pvp/stickman-3d)
+      p.position.y = -0.2;
+      p.scale.setScalar(1.3);
+      g.add(p);
+      color = C.RARITY_COLORS[C.POTION.rarity]?.color ?? '#3cc24a'; // Common: green ring
     }
     const holder = new THREE.Group();
     holder.add(g);
@@ -680,7 +712,7 @@ export class Game {
         } else me.crouch = !me.crouch;
       }
       if (e === 'open' && this.nearChest != null) this.send('open', { id: this.nearChest });
-      if (e === 'bandage' || e === 'medkit') this.send('heal', { kind: e });
+      if (e === 'potion') this.send('drink');
       if (e.startsWith('slot:')) {
         const i = pickSlot(this.inv, e.slice(5));
         if (i != null) this.send('slot', { i });
@@ -753,6 +785,8 @@ export class Game {
       this.send('fire', { d: [ax / len, ay / len, az / len] });
       if (def.type === 'melee') me.sm.swing = 1;
     }
+
+    if (this.drink) this.renderPotion(); // the drinking ring fills up
 
     // nearby chest?
     let near = null, best = 2.8;

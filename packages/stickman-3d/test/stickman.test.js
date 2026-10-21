@@ -4,7 +4,7 @@ import * as THREE from 'three';
 import { COLORS, OUTFITS, WEAPONS, WEAPON_TYPES, DEFAULT_SKIN } from '@pvp/game-rules';
 import {
   Stickman, buildWeapon, weaponModelKind, computePose, restPose, rainbowHue,
-  MODEL_TYPES, OUTFIT_MODELS, eyeColor,
+  MODEL_TYPES, OUTFIT_MODELS, eyeColor, buildPotion, holdPotion,
 } from '../src/index.js';
 
 const meshCount = obj => { let n = 0; obj.traverse(o => { if (o.isMesh) n++; }); return n; };
@@ -209,4 +209,26 @@ test('custom colors and options', () => {
   assert.equal(eyeColor(COLORS.white), '#111');
   assert.equal(eyeColor(COLORS.zebra), '#111');
   for (const id of ['black', 'red', 'gold', 'orange', 'rainbow']) assert.equal(eyeColor(COLORS[id]), '#fff', id);
+});
+
+test('the Healing Potion model: red liquid in a cone flask with a neck and a cork; a stickman can hold it', () => {
+  const p = buildPotion();
+  assert.equal(p.userData.model, 'potion');
+  assert.ok(meshCount(p) >= 5);
+  const box = new THREE.Box3().setFromObject(p);
+  const size = box.getSize(new THREE.Vector3());
+  assert.ok(size.y > 0.3 && size.y < 0.45, `height ${size.y}`);
+  assert.ok(size.x > 0.25, 'wide cone bottom');
+  const reds = [];
+  p.traverse(o => { if (o.isMesh && o.material.color && o.material.color.r > 0.6 && o.material.color.g < 0.2) reds.push(o); });
+  assert.ok(reds.length >= 1, 'red liquid');
+  const sm = new Stickman(DEFAULT_SKIN);
+  sm.setWeapon('gun');
+  holdPotion(sm, true);
+  assert.ok(sm.potion && sm.potion.parent === sm.armR.hand);
+  assert.equal(sm.weapon.visible, false);
+  holdPotion(sm, false);
+  assert.equal(sm.potion, null);
+  assert.equal(sm.weapon.visible, true);
+  sm.dispose();
 });

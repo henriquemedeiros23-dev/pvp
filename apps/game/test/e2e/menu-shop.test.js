@@ -141,6 +141,19 @@ async function checkHud(p) {
   }));
   assert.ok(bars.r <= slots.l, 'the bars should be left of the slots');
   assert.ok(bars.t < slots.b && slots.t < bars.b, 'the bars and the slots should be on one row');
+  // the Healing Potion button (#28) sits right next to the H.P bar, with its count (no free potions)
+  assert.equal(await p.locator('#btnPotion').isVisible(), true);
+  assert.equal(await p.textContent('#potionCount'), '0');
+  assert.match(await p.getAttribute('#btnPotion', 'class'), /\bempty\b/);
+  const [hpBar, pot] = await p.evaluate(() => ['.hpbar', '#btnPotion'].map(sel => {
+    const r = document.querySelector(sel).getBoundingClientRect();
+    return { l: r.left, r: r.right, t: r.top, b: r.bottom };
+  }));
+  // right of the bar, or (short phone screens) just above its right end
+  const near = Math.hypot((pot.l + pot.r) / 2 - hpBar.r, (pot.t + pot.b) / 2 - (hpBar.t + hpBar.b) / 2);
+  assert.ok(near < 90 && pot.r > hpBar.r - 20, `the potion button should be next to the H.P bar ${JSON.stringify({ hpBar, pot })}`);
+  assert.ok(pot.r <= slots.l, 'the potion button should not cover the slots');
+  assert.equal(await p.locator('#btnBandage, #btnMedkit').count(), 0, 'no bandage or medkit buttons any more');
 }
 
 // Nothing in the bottom HUD may cover another control, and all of it must be on screen.
@@ -182,7 +195,19 @@ test('sign up, shop, join the arena, leave: no errors', { skip: !RUN && 'set E2E
   await page.locator('#shop').waitFor({ state: 'visible' });
   assert.ok(await page.locator('#shopGrid .card').count() >= 5);
   assert.equal(await page.textContent('#shopGrid .card.equipped .name'), 'Classic Black');
-  for (const tab of ['hat', 'face', 'back', 'shirt', 'weapon']) {
+  for (const tab of ['hat', 'face', 'back', 'shirt', 'potion', 'weapon']) {
+    if (tab === 'potion') {
+      // the Healing Potion card: the flask icon, 10 coins, Common (green)
+      await page.click('#shop .tabs button[data-tab="potion"]');
+      assert.equal(await page.locator('#shopGrid .card').count(), 1);
+      assert.equal(await page.textContent('#shopGrid .card .name'), 'Healing Potion');
+      assert.equal(await page.textContent('#shopGrid .card .tag .rar'), 'Common');
+      assert.equal(await page.locator('#shopGrid .card .potion-icon svg .liquid').count(), 1, 'the red flask icon');
+      assert.equal(await page.textContent('#shopGrid .card button.buy'), '10');
+      assert.equal(await page.locator('#shopGrid .card button.buy[disabled]').count(), 1, '0 coins: cannot buy');
+      await shot('shop-potion.png');
+      continue;
+    }
     await page.click(`#shop .tabs button[data-tab="${tab}"]`);
     assert.ok(await page.locator(`#shop .tabs button[data-tab="${tab}"].active`).count() === 1, tab);
     assert.ok(await page.locator('#shopGrid .card').count() >= 3, tab);
@@ -327,7 +352,7 @@ test('weapon bar: Durability bar follows the held weapon, tap to switch, a broke
     await checkHud(p);
 
     // the Durability bar shows the weapon in your hand: switch slots and it follows
-    const inv = { weapons: ['gun', 'pistol', 'shotgun', 'sniper'], dur: [3, 60, 10, 1], slot: 1, bandages: 2, medkits: 1, coins: 0, hp: 100 };
+    const inv = { weapons: ['gun', 'pistol', 'shotgun', 'sniper'], dur: [3, 60, 10, 1], slot: 1, potions: 2, coins: 0, hp: 100 };
     const durBar = async () => p.evaluate(() => ({
       text: document.getElementById('durText').textContent,
       level: document.getElementById('durMeter').dataset.level,
@@ -346,7 +371,7 @@ test('weapon bar: Durability bar follows the held weapon, tap to switch, a broke
     await holding(0, 90, { text: '20%', level: 'low', width: '20%' });         // the Gun, 3 shots of 15 left
     await holding(2, 72, { text: '40%', level: 'low', width: '40%' });         // shotgun, 10 of 25 left
     assert.equal(await p.locator('#slots .slot.empty').count(), 1);
-    assert.equal(await p.textContent('#bandageCount'), '2');
+    assert.equal(await p.textContent('#potionCount'), '2');
     // rarity accents come from RARITY_COLORS: the Gun's slot is green (Common), the sniper's yellow (Legendary)
     const bg = await p.$$eval('#slots .slot', els => els.map(b => b.style.background));
     assert.ok(bg[0].includes('rgba(60, 194, 74'), bg[0]);
@@ -371,6 +396,93 @@ test('weapon bar: Durability bar follows the held weapon, tap to switch, a broke
     await p.waitForFunction(() => document.querySelectorAll('#slots .slot.empty').length === 5);
     assert.equal(await p.textContent('#durText'), '–'); // nothing in hand
 
+    await p.click('#btnLeave');
+    await p.locator('#menu').waitFor({ state: 'visible' });
+    assert.deepEqual(errs, []);
+  } finally {
+    await context.close();
+  }
+});
+
+test('Healing Potion: Q drinks, the ring fills up, the stickman holds the flask, full H.P at the end', { skip: !RUN && 'set E2E=1 to run (npm run test:e2e)', timeout: 90000 }, async () => {
+  const { context, page: p, errors: errs } = await newPage({ viewport: { width: 1100, height: 700 } });
+  try {
+    // talk to the real server, but let the test send extra messages to the page and see what it sends
+    let toPage = null;
+    const sent = [];
+    await p.routeWebSocket(/\/\?token=/, ws => {
+      const server = ws.connectToServer();
+      toPage = msg => ws.send(msg);
+      ws.onMessage(m => { try { sent.push(JSON.parse(m).t); } catch { /* not JSON */ } server.send(m); });
+    });
+    await signedIn(p, 'po_');
+    await p.click('#btnJoin');
+    await p.locator('#hud').waitFor({ state: 'visible', timeout: 20000 });
+    await checkHud(p);
+
+    // Q asks the real server to drink (it has no potion, so nothing happens there)
+    await p.keyboard.press('q');
+    for (let i = 0; i < 40 && !sent.includes('drink'); i++) await p.waitForTimeout(50);
+    assert.ok(sent.includes('drink'), `Q should send "drink", sent ${JSON.stringify([...new Set(sent)])}`);
+    assert.equal(await p.locator('#drinkRing').isVisible(), false);
+
+    // pretend: 2 potions, hurt, and a potion lying next to us; then the server says drinking started
+    const me = (await p.evaluate(() => window.pvpDebug())).me;
+    toPage(encode('inv', { weapons: ['gun'], dur: [15], slot: 0, potions: 2, coins: 0, hp: 40 }));
+    toPage(encode('item+', { id: 900001, kind: 'potion', weapon: null, x: me.x + Math.sin(me.yaw) * 2.5 + Math.cos(me.yaw) * 0.6, y: 0, z: me.z + Math.cos(me.yaw) * 2.5 - Math.sin(me.yaw) * 0.6 }));
+    await p.waitForFunction(() => document.getElementById('potionCount').textContent === '2');
+    assert.doesNotMatch(await p.getAttribute('#btnPotion', 'class'), /\bempty\b/);
+    toPage(encode('drink', { state: 'start', ms: 5000, hp: 40 }));
+    await p.locator('#drinkRing').waitFor({ state: 'visible' });
+    const progress = () => p.evaluate(() => Number(getComputedStyle(document.getElementById('drinkRing')).getPropertyValue('--p')));
+    const a = await progress();
+    // software WebGL draws only a few frames a second, so wait for the ring instead of a fixed time
+    await p.waitForFunction(() => Number(getComputedStyle(document.getElementById('drinkRing')).getPropertyValue('--p')) > 0.2, null, { timeout: 15000 });
+    const b = await progress();
+    assert.ok(b > a && b <= 1, `the ring should fill up: ${a} -> ${b}`);
+    assert.match(await p.textContent('#drinkText'), /^Drinking… \d\.\d s$/);
+    assert.match(await p.getAttribute('#btnPotion', 'class'), /\bdrinking\b/);
+    const s = await p.evaluate(() => window.pvpDebug());
+    assert.ok(s.drinking > 0 && s.drinking < 1, 'debug view shows the drinking');
+    assert.ok(s.items.some(it => it.kind === 'potion'), 'the potion on the ground is drawn');
+    await shot('drinking.png', p);
+
+    // done: full H.P, the ring goes away
+    toPage(encode('drink', { state: 'done', ms: 0, hp: 100 }));
+    await p.locator('#drinkRing').waitFor({ state: 'hidden' });
+    await p.waitForFunction(() => document.getElementById('toast').textContent === 'Full H.P!');
+    assert.equal(await p.textContent('#hpText'), '100%');
+
+    // a cancelled drink: the potion is wasted
+    toPage(encode('drink', { state: 'start', ms: 5000, hp: 50 }));
+    await p.locator('#drinkRing').waitFor({ state: 'visible' });
+    toPage(encode('drink', { state: 'cancel', ms: 0, hp: 50 }));
+    await p.locator('#drinkRing').waitFor({ state: 'hidden' });
+    await p.waitForFunction(() => document.getElementById('toast').textContent === 'Potion wasted!');
+
+    await p.click('#btnLeave');
+    await p.locator('#menu').waitFor({ state: 'visible' });
+    assert.deepEqual(errs, []);
+  } finally {
+    await context.close();
+  }
+});
+
+test('Healing Potion on a phone: tapping the potion button sends "drink"', { skip: !RUN && 'set E2E=1 to run (npm run test:e2e)', timeout: 90000 }, async () => {
+  const { context, page: p, errors: errs } = await newPage({ viewport: { width: 844, height: 390 }, isMobile: true, hasTouch: true });
+  try {
+    const sent = [];
+    await p.routeWebSocket(/\/\?token=/, ws => {
+      const server = ws.connectToServer();
+      ws.onMessage(m => { try { sent.push(JSON.parse(m).t); } catch { /* not JSON */ } server.send(m); });
+    });
+    await signedIn(p, 'pt_');
+    await p.click('#btnJoin');
+    await p.locator('#hud').waitFor({ state: 'visible', timeout: 20000 });
+    await checkHud(p);
+    await p.locator('#btnPotion').tap();
+    for (let i = 0; i < 40 && !sent.includes('drink'); i++) await p.waitForTimeout(50);
+    assert.ok(sent.includes('drink'), 'tapping the potion button should send "drink"');
     await p.click('#btnLeave');
     await p.locator('#menu').waitFor({ state: 'visible' });
     assert.deepEqual(errs, []);

@@ -125,16 +125,16 @@ test('play: sign up, join, open a chest, pick up the loot, leave', { skip: SKIP,
     assert.equal(drop.kind, 'weapon', 'a chest gives exactly one weapon');
     assert.ok(!s.inv.weapons.includes(drop.weapon), `this seed should give a weapon we don't have yet, got ${drop.weapon}`);
 
-    // walk onto it: it is picked up (a new weapon slot, or one more bandage / medkit)
+    // walk onto it: it is picked up (a new weapon slot, or one more Healing Potion)
     const inv0 = s.inv;
-    const counts = async () => [await page.locator('#slots .slot:not(.empty)').count(), await hudNumber(page, '#bandageCount'), await hudNumber(page, '#medkitCount')];
+    const counts = async () => [await page.locator('#slots .slot:not(.empty)').count(), await hudNumber(page, '#potionCount')];
     const hud0 = await counts();
     const itemSpot = startSpot(drop, s.me.yaw, { dists: [3, 2.5, 3.5, 4, 2], stopShort: 1 });
     assert.ok(itemSpot, 'no clear path to the item');
     await teleportTo(h, itemSpot);
     s = await holdKey(page, 'w', x => !x.items.some(it => it.id === drop.id), 20000);
     assert.ok(s, 'walking onto the item should pick it up');
-    s = await waitDebug(page, x => x.inv.weapons.length + x.inv.bandages + x.inv.medkits > inv0.weapons.length + inv0.bandages + inv0.medkits, { what: 'the inventory to change' });
+    s = await waitDebug(page, x => x.inv.weapons.length + x.inv.potions > inv0.weapons.length + inv0.potions, { what: 'the inventory to change' });
     if (drop.kind === 'weapon') assert.ok(s.inv.weapons.includes(drop.weapon));
     else assert.equal(s.inv[drop.kind + 's'], inv0[drop.kind + 's'] + 1);
     await page.waitForFunction(() => document.getElementById('toast').textContent.startsWith('Picked up'), null, { timeout: 5000 });

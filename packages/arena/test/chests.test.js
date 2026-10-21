@@ -72,7 +72,7 @@ test('golden chest appears at 60 s, gives exactly 10 coins + one weapon, schedul
   assert.equal(RULES.GOLDEN_CHEST_COINS, 10);
   assert.equal(serverEvents(out, 'coins')[0].amount, 10);
   const drops = msgs(out, 'item+');
-  assert.equal(drops.length, 1, 'one weapon, no medkit');
+  assert.equal(drops.length, 1, 'one weapon (this seed gives no extra potion)');
   assert.equal(drops[0].kind, 'weapon');
   assert.equal(drops[0].dur, RULES.WEAPONS[drops[0].weapon].durability);
   assert.deepEqual(msgs(out, 'golden'), [{ t: 'golden', golden: null, by: 'a' }]);

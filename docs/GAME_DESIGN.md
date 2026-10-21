@@ -32,7 +32,12 @@ Decided by the boss through 22 questions.
 - **Durability:** every weapon wears out a little each time you use it (each swing, shot, throw, rocket or mine).
   When it reaches 0 it **breaks and disappears** from your inventory. There is no repair.
   The Gun breaks too: then you may have **no weapon at all** until you find or pick one up.
-- **Health:** heal only with bandages and medkits (for now chests give no heals; the boss decides later where they come from).
+- **Health:** the **Healing Potion** is the only heal (no bandages, no medkits).
+  - Drinking takes **5 seconds** (a ring fills up) and gives **full H.P**.
+  - Moving or getting hit does **not** stop it. Switching to a weapon before the 5 s are done **cancels** it and the potion is **wasted**.
+  - Carry **max 3** potions (a counter next to the H.P bar, not a weapon slot). Phone: tap the potion button; computer: **Q**.
+  - Shop: **10 coins**, Common (green). Bought potions wait in the backpack and come into the arena with you (up to 3);
+    leave alive and the unused ones go back. Knocked out: your potions drop on the ground.
 
 ## When you get knocked out
 - You drop every weapon you carry, **including bought ones and the Gun**. Anyone can pick them up.
@@ -44,7 +49,8 @@ Decided by the boss through 22 questions.
 ## Chests and coins
 - Coins only come from **chests**.
 - Chests are always in the **same spots**. Each one comes back **15 seconds** after it's opened.
-- Every normal chest gives **3 coins** and **exactly one weapon** (no heals from chests for now).
+- Every normal chest gives **3 coins** and **exactly one weapon**, and **15%** of the time an **extra Healing Potion** next to it
+  (picked up like other items, only if you have fewer than 3).
 - **Which weapon?** Every weapon has its own **chest chance** (in percent). All of them together make 100,
   so the chance is exactly the number: the Gun has 15, so 15 out of 100 chests give a Gun.
   Today: Gun 15, Sword 18, Bat 18, Pistol 17, Spear 5, Axe 5, Shotgun 6, Rifle 5, Grenades 6, Sniper 2, Rocket Launcher 1, Mines 2.
@@ -52,6 +58,7 @@ Decided by the boss through 22 questions.
 - ⭐ **Golden chest:** every few minutes a golden chest appears and everyone races to it.
   It gives **10 coins** and **one weapon**, picked like a normal chest but the numbers of
   **Epic, Legendary and Megalegend weapons count double** (Common stays the same), so rare weapons come out more often.
+  It also gives an extra Healing Potion 15% of the time, like a normal chest.
 
 ## Moving and controls
 - Walk, run, jump, slide and crouch. No climbing, no vehicles.

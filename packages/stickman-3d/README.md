@@ -8,7 +8,7 @@ A three.js stickman character: body in a skin color or pattern (gold, zebra stri
 
 ```js
 import * as THREE from 'three';
-import { Stickman, buildWeapon, computePose } from '@pvp/stickman-3d';
+import { Stickman, buildWeapon, buildPotion, holdPotion, computePose } from '@pvp/stickman-3d';
 
 const sm = new Stickman({ color: 'rainbow', hat: 'crown', face: 'none', back: 'redcape', shirt: 'none' });
 scene.add(sm.root);
@@ -22,6 +22,9 @@ sm.swing = 1;               // when a melee weapon swings
 sm.dispose();               // frees the geometries and materials it made (and its weapon)
 
 const loot = buildWeapon('rocket');   // a loose weapon model (THREE.Group); you dispose it
+
+const flask = buildPotion();          // the Healing Potion (#28): cork, narrow neck, glass cone with red liquid
+holdPotion(sm, true);                 // drinking: the potion in the right hand (weapon hidden); false = back to the weapon
 ```
 
 Options for another game: `new Stickman(skin, { colors, weapons, limbRadius = 0.075, castShadow = true })`.
