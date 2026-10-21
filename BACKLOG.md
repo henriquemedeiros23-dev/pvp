@@ -68,7 +68,7 @@ The live list is on GitHub Issues: https://github.com/henriquemedeiros23-dev/pvp
 | 31 | 🔲 | **Rename the game to PvP Island** | The game is called PvP Island everywhere players see it. |
 | 32 | 🔲 | **More weapons from the boss's cards (batch 2)** | Bomb and the next cards become real items. |
 | 33 | 🔲 | **Damage numbers above the head** | '-15' floats above a hurt player's head for 2 s, visible to everyone. |
-| 34 | 🔲 | **Sword misses keep durability + drop weapon button** | Missing with a melee weapon costs nothing; a button drops the weapon in your hand. |
+| 34 | 🔨 | **Sword misses keep durability + drop weapon button** | Missing with a melee weapon costs nothing; a button drops the weapon in your hand. |
 
 ## Later ideas
 - Sounds and music
