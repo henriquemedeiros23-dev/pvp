@@ -19,22 +19,9 @@ export const ARENA_DEFAULTS = Object.freeze({
   meleeCloseRange: 0.6,        // closer than this counts as in front anyway
   meleeKnock: 3,               // knockback when the weapon has no `knock`
   hitRadiusExtra: 0.1,         // ray vs player radius = PLAYER_RADIUS + this
-  throwLift: 4,                // thrown things get this extra upward speed
-  launchOffset: 0.8,           // projectiles start this far in front (m)
-  projectileMaxAgeS: 6,
-  projectileStepS: 0.05 / 3,   // longest simulation step for projectiles (s)
-  bounceKeep: 0.4,             // thrown things keep this much side speed on a bounce
-  bounceUp: 0.35,              // ... and this much up speed
-  rocketHitRadius: 0.7,
-  explosionKnock: 8,
-  explosionFalloff: 0.7,       // damage at the edge = dmg * (1 - falloff)
-  mineArmMs: 1000,
-  mineLifeMs: 180000,
-  mineTriggerRadius: 1.6,
-  mineTriggerHeight: 1.5,
-  mineBlastLift: 0.3,
+  shieldFrontDot: 0,           // a raised shield blocks hits from the front half (cos of the angle to the attacker)
+  frozenSlack: 0.05,           // a frozen player may not move more than this (m); more gets a 'pos' back
   snapshotRadius: 160,
-  maxStepS: 0.25,              // a late tick never simulates more than this (s)
   teleportSlack: 1.6,          // max move = SLIDE_SPEED * dt * slack + extra
   teleportExtra: 2,
   maxFallSpeed: 25,            // max height change = speed * dt + extra

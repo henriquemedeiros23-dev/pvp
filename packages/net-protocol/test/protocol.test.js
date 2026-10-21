@@ -4,7 +4,8 @@ import {
   PROTOCOL_VERSION, MAX_MESSAGE_SIZE, CLIENT_MESSAGES, SERVER_MESSAGES, SNAP, SNAP_LENGTH,
   FLAG_CROUCH, FLAG_SLIDE, FLAG_MOVING, FLAG_AIR, MAX_NUMBER,
   parseClientMessage, decodeServerMessage, encode, encodeClient, serverMessage, clientMessage,
-  packSnapshotPlayer, unpackSnapshotPlayer, makeFlags, readFlags, isValid, setEncodeChecks,
+  packSnapshotPlayer, unpackSnapshotPlayer, makeFlags, readFlags, makeStatus, readStatus, isValid, setEncodeChecks,
+  STATUS_SHIELD_UP, STATUS_SHOCKED, STATUS_FROZEN,
 } from '../src/index.js';
 
 const J = JSON.stringify;
@@ -18,6 +19,7 @@ const CLIENT_EXAMPLES = {
   slot: { t: 'slot', i: 2 },
   open: { t: 'open', id: 7 },
   heal: { t: 'heal', kind: 'bandage' },
+  shield: { t: 'shield', up: true },
 };
 
 // One valid example per server message, shaped exactly like apps/game/server.js sends them.
@@ -27,33 +29,29 @@ const SERVER_EXAMPLES = {
     id: 3, x: 10, z: -20,
     players: [{ id: 3, name: 'Bob', skin: SKIN }],
     chests: [1, 4], golden: null,
-    items: [{ id: 9, kind: 'weapon', weapon: 'pistol', x: 1, y: 0, z: 2 }, { id: 10, kind: 'medkit', weapon: null, x: 1, y: 0.5, z: 2 }],
-    mines: [{ id: 11, x: 5, z: 5, owner: 2 }],
+    items: [{ id: 9, kind: 'weapon', weapon: 'shootbm', x: 1, y: 0, z: 2 }, { id: 10, kind: 'medkit', weapon: null, x: 1, y: 0.5, z: 2 }],
   },
   full: {},
   left: {},
-  snap: { p: [[3, 1.5, 0, -2.25, 0.5, -0.1, 5, 'pistol', 100, 1]], n: 4 },
-  inv: { weapons: ['fists', 'pistol'], dur: [null, 42], slot: 0, bandages: 1, medkits: 0, coins: 120, hp: 100 },
-  broke: { slot: 1, weapon: 'pistol' },
+  snap: { p: [[3, 1.5, 0, -2.25, 0.5, -0.1, 5, 'shootbm', 100, 1, 'shield', 5]], n: 4 },
+  inv: { weapons: ['fists', 'shootbm'], dur: [null, 12], slot: 0, bandages: 1, medkits: 0, coins: 120, hp: 100, shield: { id: 'megashield', dur: 64 } },
+  broke: { slot: 1, weapon: 'shootbm' },
   pjoin: { id: 3, name: 'Bob', skin: SKIN },
   pleave: { id: 3 },
   pos: { x: 1, y: 0, z: 2 },
   coins: { amount: 10, total: 130 },
   chest: { id: 4, open: true },
   golden: { golden: { x: 50, z: -30 } },
-  'item+': { id: 9, kind: 'weapon', weapon: 'shotgun', x: 1, y: 0, z: 2, dur: 17 },
+  'item+': { id: 9, kind: 'weapon', weapon: 'icesword', x: 1, y: 0, z: 2, dur: 17 },
   'item-': { id: 9, by: 3 },
-  shot: { id: 3, w: 'shotgun', from: [1, 1.4, 2], to: [[5, 1, 9], [6, 1, 9]] },
+  shot: { id: 3, w: 'shootbm', from: [1, 1.4, 2], to: [[5, 1, 9]] },
   swing: { id: 3 },
-  proj: { id: 20, kind: 'grenade', x: 1, y: 1, z: 2, vx: 0, vy: 4, vz: 14 },
-  'proj-': { id: 20 },
-  boom: { x: 1, y: 0.3, z: 2, r: 4 },
-  'mine+': { id: 21, x: 1, y: 0, z: 2, owner: 3 },
-  'mine-': { id: 21 },
-  hitmark: { dead: false },
+  block: { id: 3, by: 4 },
+  shieldbroke: { weapon: 'shield' },
+  hitmark: { dead: false, blocked: true },
   hurt: { hp: 75, kx: 0, kz: 0, from: [3, 4] },
-  ko: { id: 3, x: 1, y: 0, z: 2, victim: 'Bob', by: 'Ann', weapon: 'sniper' },
-  dead: { by: null, weapon: 'mine' },
+  ko: { id: 3, x: 1, y: 0, z: 2, victim: 'Bob', by: 'Ann', weapon: 'supersword' },
+  dead: { by: null, weapon: 'electricsword' },
 };
 
 const rejected = (raw) => {
@@ -65,10 +63,12 @@ const rejected = (raw) => {
 };
 
 test('constants', () => {
-  assert.equal(PROTOCOL_VERSION, 1);
+  assert.equal(PROTOCOL_VERSION, 2);
   assert.equal(MAX_MESSAGE_SIZE, 4096);
   assert.deepEqual([FLAG_CROUCH, FLAG_SLIDE, FLAG_MOVING, FLAG_AIR], [1, 2, 4, 8]);
-  assert.equal(SNAP_LENGTH, 10);
+  assert.equal(SNAP_LENGTH, 12);
+  assert.deepEqual([STATUS_SHIELD_UP, STATUS_SHOCKED, STATUS_FROZEN], [1, 2, 4]);
+  for (const gone of ['proj', 'proj-', 'boom', 'mine+', 'mine-']) assert.ok(!(gone in SERVER_MESSAGES), `${gone} is gone (no explosives)`);
   assert.deepEqual(Object.keys(CLIENT_MESSAGES).sort(), Object.keys(CLIENT_EXAMPLES).sort());
   assert.deepEqual(Object.keys(SERVER_MESSAGES).sort(), Object.keys(SERVER_EXAMPLES).sort());
 });
@@ -186,7 +186,7 @@ test('every valid server example encodes and decodes back', () => {
 test('golden "opened" form and expired item decode', () => {
   assert.ok(decodeServerMessage(encode('golden', { golden: null, by: 'Ann' })).ok);
   assert.deepEqual(decodeServerMessage(encode('item-', { id: 4 })).msg, { t: 'item-', id: 4 });
-  assert.ok(decodeServerMessage(encode('inv', { ...SERVER_EXAMPLES.inv, picked: 'Sniper' })).ok);
+  assert.ok(decodeServerMessage(encode('inv', { ...SERVER_EXAMPLES.inv, picked: 'Supersword' })).ok);
   assert.ok(decodeServerMessage(encode('hurt', { hp: 0, kx: 3, kz: -3, from: null })).ok);
 });
 
@@ -201,7 +201,7 @@ test('decodeServerMessage rejects bad server messages without throwing', () => {
 test('encode throws on mistakes in our own code', () => {
   assert.throws(() => encode('coins', { amount: 5 }), /coins\.total: missing/);
   assert.throws(() => encode('coins', { amount: 5, total: '10' }), /expected a number/);
-  assert.throws(() => encode('boom', { x: NaN, y: 0, z: 0, r: 4 }), /NaN/);
+  assert.throws(() => encode('pos', { x: NaN, y: 0, z: 0 }), /NaN/);
   assert.throws(() => encode('nope', {}), /unknown server message type/);
   assert.throws(() => encode('pleave', { id: 1, idd: 2 }), /unknown field "idd"/);
   assert.throws(() => encode('join', {}), /unknown server message type/); // client-only
@@ -222,18 +222,39 @@ test('encode checks can be switched off', () => {
 });
 
 test('snapshot pack / unpack round-trip', () => {
-  const p = { id: 7, x: 12.5, y: 0.25, z: -3.75, ry: 1.57, pitch: -0.2, flags: FLAG_CROUCH | FLAG_MOVING, weapon: 'rocket', hp: 64, protected: true };
+  const p = {
+    id: 7, x: 12.5, y: 0.25, z: -3.75, ry: 1.57, pitch: -0.2, flags: FLAG_CROUCH | FLAG_MOVING, weapon: 'supersword', hp: 64, protected: true,
+    shield: 'megashield', shieldUp: true, shocked: false, frozen: true,
+  };
   const a = packSnapshotPlayer(p);
   assert.equal(a.length, SNAP_LENGTH);
   assert.equal(a[SNAP.ID], 7);
-  assert.equal(a[SNAP.WEAPON], 'rocket');
+  assert.equal(a[SNAP.WEAPON], 'supersword');
   assert.equal(a[SNAP.PROTECTED], 1);
+  assert.equal(a[SNAP.SHIELD], 'megashield');
+  assert.equal(a[SNAP.STATUS], STATUS_SHIELD_UP | STATUS_FROZEN);
   assert.deepEqual(unpackSnapshotPlayer(a), p);
   assert.deepEqual(unpackSnapshotPlayer(packSnapshotPlayer({ ...p, protected: false })).protected, false);
   // rounding to 2 decimals, like the server does today
   assert.equal(packSnapshotPlayer({ ...p, x: 1.23456 })[SNAP.X], 1.23);
   // packed players fit the snap schema
   assert.ok(decodeServerMessage(encode('snap', { p: [a], n: 1 })).ok);
+});
+
+test('status helpers and the shield fields', () => {
+  assert.equal(makeStatus({ shieldUp: true, shocked: true }), 3);
+  assert.equal(makeStatus(), 0);
+  for (let f = 0; f < 8; f++) assert.equal(makeStatus(readStatus(f)), f);
+  const none = unpackSnapshotPlayer(packSnapshotPlayer({ id: 1, x: 0, y: 0, z: 0, ry: 0, pitch: 0, flags: 0, weapon: '', hp: 5 }));
+  assert.deepEqual([none.shield, none.shieldUp, none.shocked, none.frozen], ['', false, false, false]);
+  // inv: no shield (null) or missing are both fine; a bad shield is rejected
+  const { shield, ...noShield } = SERVER_EXAMPLES.inv;
+  assert.ok(decodeServerMessage(encode('inv', noShield)).ok);
+  assert.ok(decodeServerMessage(encode('inv', { ...noShield, shield: null })).ok);
+  assert.equal(decodeServerMessage(J({ t: 'inv', ...noShield, shield: { id: 'shield', dur: -1 } })).ok, false);
+  assert.equal(parseClientMessage(J({ t: 'shield', up: 'yes' })).ok, false);
+  assert.equal(parseClientMessage(J({ t: 'shield' })).ok, false);
+  assert.deepEqual(decodeServerMessage(encode('hitmark', { dead: true })).msg, { t: 'hitmark', dead: true });
 });
 
 test('flags helpers', () => {
@@ -248,13 +269,13 @@ test('durability fields: optional (old messages still work), null = never breaks
   assert.deepEqual(decodeServerMessage(encode('inv', oldInv)).msg, { t: 'inv', ...oldInv });
   assert.ok(decodeServerMessage(encode('item+', { id: 1, kind: 'weapon', weapon: 'gun', x: 0, y: 0, z: 0, dur: null })).ok);
   assert.ok(decodeServerMessage(encode('item+', { id: 1, kind: 'bandage', weapon: null, x: 0, y: 0, z: 0 })).ok);
-  const welcome = { ...SERVER_EXAMPLES.welcome, items: [{ id: 9, kind: 'weapon', weapon: 'pistol', x: 1, y: 0, z: 2, dur: 3 }] };
+  const welcome = { ...SERVER_EXAMPLES.welcome, items: [{ id: 9, kind: 'weapon', weapon: 'shootbm', x: 1, y: 0, z: 2, dur: 3 }] };
   assert.deepEqual(decodeServerMessage(encode('welcome', welcome)).msg.items[0].dur, 3);
   for (const bad of [[-1], [1.5], ['5']]) {
     assert.equal(decodeServerMessage(J({ t: 'inv', ...oldInv, dur: bad })).ok, false, J(bad));
   }
   assert.equal(decodeServerMessage(J({ t: 'broke', slot: 1 })).ok, false);
-  assert.deepEqual(decodeServerMessage(encode('broke', { slot: 2, weapon: 'sniper' })).msg, { t: 'broke', slot: 2, weapon: 'sniper' });
+  assert.deepEqual(decodeServerMessage(encode('broke', { slot: 2, weapon: 'shootbm' })).msg, { t: 'broke', slot: 2, weapon: 'shootbm' });
 });
 
 test('isValid helper', () => {

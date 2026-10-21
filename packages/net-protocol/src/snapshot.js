@@ -1,13 +1,15 @@
 // Snapshot players are sent as short arrays to save bandwidth.
-// Slot order (see SNAP): [id, x, y, z, ry, pitch, flags, weapon, hp, protected]
+// Slot order (see SNAP): [id, x, y, z, ry, pitch, flags, weapon, hp, protected, shield, status]
 
-import { SNAP, SNAP_LENGTH, FLAG_CROUCH, FLAG_SLIDE, FLAG_MOVING, FLAG_AIR } from './messages.js';
+import {
+  SNAP, SNAP_LENGTH, FLAG_CROUCH, FLAG_SLIDE, FLAG_MOVING, FLAG_AIR, STATUS_SHIELD_UP, STATUS_SHOCKED, STATUS_FROZEN,
+} from './messages.js';
 
 const r2 = v => Math.round(v * 100) / 100;
 
 /**
  * Pack a player into a snapshot array. Positions and angles are rounded to 2 decimals.
- * p: { id, x, y, z, ry, pitch, flags, weapon, hp, protected (boolean) }
+ * p: { id, x, y, z, ry, pitch, flags, weapon, hp, protected, shield ('' or id), shieldUp, shocked, frozen }
  */
 export function packSnapshotPlayer(p) {
   const a = new Array(SNAP_LENGTH);
@@ -21,10 +23,12 @@ export function packSnapshotPlayer(p) {
   a[SNAP.WEAPON] = p.weapon;
   a[SNAP.HP] = p.hp;
   a[SNAP.PROTECTED] = p.protected ? 1 : 0;
+  a[SNAP.SHIELD] = p.shield || '';
+  a[SNAP.STATUS] = makeStatus(p);
   return a;
 }
 
-/** Turn a snapshot array back into { id, x, y, z, ry, pitch, flags, weapon, hp, protected }. */
+/** Turn a snapshot array back into { id, x, y, z, ry, pitch, flags, weapon, hp, protected, shield, shieldUp, shocked, frozen }. */
 export function unpackSnapshotPlayer(a) {
   return {
     id: a[SNAP.ID],
@@ -37,7 +41,19 @@ export function unpackSnapshotPlayer(a) {
     weapon: a[SNAP.WEAPON],
     hp: a[SNAP.HP],
     protected: a[SNAP.PROTECTED] === 1,
+    shield: a[SNAP.SHIELD] || '',
+    ...readStatus(a[SNAP.STATUS]),
   };
+}
+
+/** Build snapshot status bits from { shieldUp, shocked, frozen } booleans. */
+export function makeStatus({ shieldUp = false, shocked = false, frozen = false } = {}) {
+  return (shieldUp ? STATUS_SHIELD_UP : 0) | (shocked ? STATUS_SHOCKED : 0) | (frozen ? STATUS_FROZEN : 0);
+}
+
+/** Read snapshot status bits into { shieldUp, shocked, frozen } booleans. */
+export function readStatus(s) {
+  return { shieldUp: !!(s & STATUS_SHIELD_UP), shocked: !!(s & STATUS_SHOCKED), frozen: !!(s & STATUS_FROZEN) };
 }
 
 /** Build movement flags from { crouch, slide, moving, air } booleans. */

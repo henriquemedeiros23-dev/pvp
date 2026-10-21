@@ -28,14 +28,14 @@ test('tick queues a snap for every player when snapshots are on', () => {
   assert.ok(snaps.some(e => e.to === a));
 });
 
-// A scripted fight on the real island: chests, guns, grenades, rockets, mines, knockouts.
+// A scripted fight on the real island: chests, guns, swords, shields, shock, freeze, knockouts.
 function replay(seed) {
   const island = generateIsland();
   const arena = createArena({ island, random: createRandom(seed), now: 1000 });
   const log = [];
   const keep = () => log.push(...drain(arena));
   const ids = ['ann', 'bob', 'cat', 'dan'].map((k, i) =>
-    arena.join(k, { name: k, loadout: [['shotgun', 'grenade'], ['rocket', 'rifle'], ['mine', 'sniper'], ['pistol']][i] }, 1000 + i).id);
+    arena.join(k, { name: k, loadout: [['electricsword', 'shield'], ['icesword', 'megashield'], ['icesword', 'electricsword'], ['electricsword', 'supersword']][i] }, 1000 + i).id);
   keep();
   const c = island.chests[0];
   ids.forEach((id, i) => arena.teleport(id, { x: c.x + 1 + i * 2, z: c.z, ry: i }));
@@ -43,6 +43,7 @@ function replay(seed) {
     const id = ids[step % ids.length];
     if (step % 7 === 0) arena.openChest(id, step % 3, t);
     if (step % 5 === 0) { arena.selectSlot(id, step % 3); arena.fire(id, [Math.sin(step), -0.1, Math.cos(step)], t); }
+    if (step % 13 === 0) arena.setShield(id, step % 2 === 0, t);
     if (step % 11 === 0) arena.heal(id, 'bandage', t);
     if (step % 3 === 0) {
       const p = arena.getPlayer(id);
@@ -59,7 +60,9 @@ test('replay: same seed and inputs give an identical outbox', () => {
   const one = replay(7), two = replay(7);
   assert.ok(msgs(one, 'ko').length > 0, 'knockouts happened');
   assert.ok(one.length > 1000);
-  assert.ok(msgs(one, 'boom').length > 0, 'explosions happened');
+  assert.ok(msgs(one, 'block').length > 0, 'shields blocked');
+  assert.ok(one.some(e => e.msg?.t === 'snap' && e.msg.p.some(q => q[11] & 2)), 'someone was shocked');
+  assert.ok(one.some(e => e.msg?.t === 'snap' && e.msg.p.some(q => q[11] & 4)), 'someone was frozen');
   assert.ok(msgs(one, 'chest').length > 0, 'chests opened');
   assert.ok(msgs(one, 'broke').length > 0, 'weapons broke');
   assert.deepEqual(two, one);
