@@ -6,7 +6,7 @@
 // chest gives +3 coins, bots are on the island, and there are no console errors.
 // The only outside request allowed is three.js from the CDN; the test answers it with the same
 // file from node_modules (this machine may not reach the CDN).
-// Also saves docs/screenshots/practice.png (phone landscape 844x390, in the arena).
+// With SCREENSHOTS=1 it also saves docs/screenshots/practice.png (phone landscape 844x390, in the arena).
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -180,7 +180,7 @@ test('practice file: the island draws (screenshot on a phone in landscape)', { s
       await page.evaluate(({ x, z }) => { const { server } = window.pvpPractice; server.arena.teleport(server.bots.ids()[0], { x, y: 0, z }); }, botSpot);
       await page.waitForTimeout(100);
     }
-    const png = await page.screenshot({ path: SHOT });
+    const png = await page.screenshot(process.env.SCREENSHOTS === '1' ? { path: SHOT } : {});
     assert.ok(png.length > 60000, `the screenshot looks empty (${png.length} bytes)`);
     assert.deepEqual(h.errors, []);
     assert.deepEqual(h.outside, []);
