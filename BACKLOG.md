@@ -37,7 +37,7 @@ The live list is on GitHub Issues: https://github.com/henriquemedeiros23-dev/pvp
 |---|---|---|---|
 | 11 | ✅ | **Menu and shop screens** | Login, main menu (Join Arena, Shop, coins, players online), shop with tabs, death screen. This part is missing right now. |
 | 12 | ✅ | **Connect the game to the packages** | Server and phone code use the packages instead of their own copies. The game runs from start to finish. |
-| 13 | 🔲 | **Automatic play test** | A browser test signs up, joins the arena, moves, opens a chest and leaves, with no errors. |
+| 13 | ✅ | **Automatic play test** | A browser test signs up, joins the arena, moves, opens a chest and leaves, with no errors. |
 | 15 | ✅ | **Server crashes on a bad web address** | A request like `/%E0` makes the server crash. It must answer 400 instead, with a test. |
 | 14 | ✅ | **Package catalog** | `CATALOG.md` lists every package: what it does, how to use it, how deterministic it is. |
 
@@ -53,6 +53,13 @@ The live list is on GitHub Issues: https://github.com/henriquemedeiros23-dev/pvp
 | 22 | ✅ | **Arena HUD: 5 slots with durability bars** | 5 slots always shown, health bar above, durability bar per weapon. |
 | 23 | ✅ | **In-game coin count can be out of date** | Coins shown in the arena always match the account. |
 | 20 | ✅ | **Chest lid turned the wrong way** | The lid sits along the chest, opens like a real lid, and the lock is on the front. |
+
+## Phase 6: The boss's designs
+
+| # | Status | Issue | What "done" means |
+|---|---|---|---|
+| 24 | 🔨 | **HUD like the boss's drawing** | Durability bar + H.P bar with % on the left, 5 slots on the right, polished (docs/design/hud-sketch.jpg). |
+| 25 | 🔲 | **Starting weapon: the Gun** | Gun from the boss's card (docs/design/weapon-card-gun.jpg) replaces the wooden sword. |
 
 ## Later ideas
 - Sounds and music
