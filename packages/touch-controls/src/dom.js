@@ -17,7 +17,8 @@ const capture = (el, e) => { try { el.setPointerCapture?.(e.pointerId); } catch 
 /**
  * Touch screen: joystick on the left, drag on the canvas / fire button to aim,
  * tap buttons for actions. `buttons` maps a button name to its element;
- * the name equal to state.config.fireButton ('fire') is held, every other one is tapped.
+ * the fire button (state.config.fireButton, 'fire') and the hold buttons (state.config.holdButtons,
+ * e.g. 'shield') are held (and you can drag on them to aim), every other one is tapped.
  */
 export function attachTouchControls(state, { canvas, stick, knob, buttons = {} } = {}) {
   const off = [];
@@ -62,8 +63,8 @@ export function attachTouchControls(state, { canvas, stick, knob, buttons = {} }
   for (const [name, el] of Object.entries(buttons)) {
     if (!el) continue;
     pressedEls.push(el);
-    if (name === state.config.fireButton) {
-      // hold to shoot, and drag on it to aim at the same time
+    if (name === state.config.fireButton || state.config.holdButtons.includes(name)) {
+      // hold to shoot (or to keep the shield up), and drag on it to aim at the same time
       listen(off, el, 'pointerdown', e => {
         e.preventDefault();
         state.button(name, true);

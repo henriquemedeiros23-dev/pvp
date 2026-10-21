@@ -4,7 +4,7 @@
 
 Game controls for phones and computers: a joystick on the left, drag on the
 screen (or on the fire button) to aim, tap buttons for actions, plus keyboard
-(WASD / arrows, shift = walk, space / C / E / Q / F / 1-5), mouse look with
+(WASD / arrows, hold Shift = raise the shield, space / C / E / Q / F / 1-5), mouse look with
 pointer lock and the mouse wheel. A pure core keeps the input state; thin
 DOM adapters feed it real browser events. No dependencies.
 
@@ -22,13 +22,15 @@ const detach = isTouchDevice(window)
   ? attachTouchControls(input, {
       canvas, stick: $('stick'), knob: $('knob'),
       buttons: { fire: $('btnFire'), jump: $('btnJump'), crouch: $('btnCrouch'),
+                 shield: $('btnShield'),                // held like fire (raise the shield)
                  open: $('btnOpen'), bandage: $('btnBandage') }, // any number of buttons
     })
   : attachDesktopControls(input, { canvas, target: window });
 
 input.enabled = true;            // e.g. when the match starts
 // every frame:
-const { ev, look, move, fire } = input.take(); // ev: ['jump', 'slot:2', ...], look is cleared
+const { ev, look, move, fire, shield } = input.take(); // ev: ['jump', 'slot:2', ...], look is cleared
+// fire / shield: held right now (shield: Shift on a computer, the shield button on a phone)
 input.reset();                   // let go of everything (also resets the knob / pointer lock)
 detach();                        // remove all listeners
 ```
@@ -41,6 +43,8 @@ stick centre), `lookStart(id, x, y)`, `lookMove(id, x, y)`, `lookEnd(id)`,
 
 Options (`DEFAULT_CONFIG`): `stickRadius` 55, `touchLookSensitivity` 0.0055,
 `mouseSensitivity` 0.0024, `walkSpeed` 0.6, `fireButton` `'fire'`,
+`holdKeys` `{ shield: ['shift'] }` and `holdButtons` `['shield']` (held actions: `input.held('shield')`,
+`input.shield`, and `shield` / `holds` in `take()`), `moveKeys.walk` empty by default (Shift is the shield),
 `wheelUp` `'slot:-'`, `wheelDown` `'slot:+'`, `moveKeys` (forward/back/left/right/walk,
 merged per direction), `actionKeys` (key → action, replaces the defaults when given),
 `buttonActions` (button name → action, default: the button's own name), `enabled` true.

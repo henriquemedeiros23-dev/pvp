@@ -23,7 +23,7 @@ shopItems('weapon', account);
 //    stashCount: 0, owned: false, equipped: false, canAfford: true, action: 'buy' }, …]
 // rarity colors come from RARITY_COLORS in @pvp/game-rules (Megalegend's background is blue + black)
 
-backpackSummary(account);   // 'Backpack: 2× Pistol, 1× Sniper' or 'Backpack is empty. Buy weapons in the shop!'
+backpackSummary(account);   // 'Backpack: 2× Shootbm, 1× Supersword' or 'Backpack is empty. Buy weapons in the shop!'
 swatchBackground(card);     // CSS background for a color card (gradients for patterns)
 ```
 

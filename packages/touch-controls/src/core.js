@@ -8,6 +8,10 @@ export const DEFAULT_CONFIG = Object.freeze({
   mouseSensitivity: 0.0024,   // radians per pixel of mouse movement
   walkSpeed: 0.6,             // move length while a walk key is held
   fireButton: 'fire',         // button name that is held to shoot
+  // Held actions besides fire: true while any of their keys or buttons is held down.
+  // Shift (computer) or the shield button (phone) raises the shield.
+  holdKeys: Object.freeze({ shield: Object.freeze(['shift']) }),
+  holdButtons: Object.freeze(['shield']),
   wheelUp: 'slot:-',          // action for wheel dy < 0
   wheelDown: 'slot:+',        // action for wheel dy > 0
   moveKeys: Object.freeze({
@@ -15,7 +19,7 @@ export const DEFAULT_CONFIG = Object.freeze({
     back: Object.freeze(['s', 'arrowdown']),
     left: Object.freeze(['a', 'arrowleft']),
     right: Object.freeze(['d', 'arrowright']),
-    walk: Object.freeze(['shift']),
+    walk: Object.freeze([]),  // no walk key by default (Shift raises the shield)
   }),
   actionKeys: Object.freeze({
     ' ': 'jump',
@@ -42,10 +46,22 @@ export function createInputState(config = {}) {
     moveKeys: { ...DEFAULT_CONFIG.moveKeys, ...(config.moveKeys || {}) },
     actionKeys: { ...(config.actionKeys || DEFAULT_CONFIG.actionKeys) },
     buttonActions: { ...DEFAULT_CONFIG.buttonActions, ...(config.buttonActions || {}) },
+    holdKeys: { ...(config.holdKeys || DEFAULT_CONFIG.holdKeys) },
+    holdButtons: [...(config.holdButtons || DEFAULT_CONFIG.holdButtons)],
   };
   const actionKeys = new Map(Object.entries(cfg.actionKeys).map(([k, a]) => [lower(k), a]));
   const moveKeys = {};
   for (const [dir, list] of Object.entries(cfg.moveKeys)) moveKeys[dir] = list.map(lower);
+  const holdKeys = new Map(); // key -> held action name
+  for (const [name, list] of Object.entries(cfg.holdKeys)) for (const k of list) holdKeys.set(lower(k), name);
+  const holdButtons = new Set(cfg.holdButtons);
+  const holding = new Map(); // held action name -> Set of sources ('key:shift', 'button')
+  const hold = (name, source, down) => {
+    if (!holding.has(name)) holding.set(name, new Set());
+    if (down) holding.get(name).add(source); else holding.get(name).delete(source);
+  };
+  const isHeld = name => (holding.get(name)?.size ?? 0) > 0;
+  const holds = () => Object.fromEntries([...new Set([...holdKeys.values(), ...holdButtons])].map(n => [n, isHeld(n)]));
 
   let enabled = !!cfg.enabled;
   const keys = new Set();
@@ -89,6 +105,9 @@ export function createInputState(config = {}) {
     config: cfg,
     move, look, knob,
     get fire() { return held.size > 0; },
+    /** Is a held action (e.g. 'shield') held down right now? */
+    held: isHeld,
+    get shield() { return isHeld('shield'); },
     get enabled() { return enabled; },
     set enabled(v) { enabled = !!v; },
 
@@ -124,11 +143,15 @@ export function createInputState(config = {}) {
     },
     lookEnd(id) { lookers.delete(id); },
 
-    // --- on-screen buttons: the fire button is held, the rest are tapped ---
+    // --- on-screen buttons: the fire button and holdButtons are held, the rest are tapped ---
     button(name, down) {
       if (name === cfg.fireButton) {
         if (!down) held.delete('button');
         else if (enabled) held.add('button');
+        return;
+      }
+      if (holdButtons.has(name)) {
+        if (!down || enabled) hold(name, 'button', down);
         return;
       }
       if (down && enabled) actions.push(cfg.buttonActions[name] ?? name);
@@ -153,8 +176,9 @@ export function createInputState(config = {}) {
     // --- keyboard (KeyboardEvent.key values, any case) ---
     key(key, down, repeat = false) {
       const k = lower(key);
-      if (!down) { keys.delete(k); updateKeys(); return; }
+      if (!down) { keys.delete(k); if (holdKeys.has(k)) hold(holdKeys.get(k), 'key:' + k, false); updateKeys(); return; }
       if (!enabled) return;
+      if (holdKeys.has(k)) hold(holdKeys.get(k), 'key:' + k, true);
       if (!repeat && actionKeys.has(k)) actions.push(actionKeys.get(k));
       keys.add(k);
       updateKeys();
@@ -162,7 +186,7 @@ export function createInputState(config = {}) {
 
     // window lost focus: let go of everything that is held
     blur() {
-      keys.clear(); held.clear();
+      keys.clear(); held.clear(); holding.clear();
       updateKeys();
     },
 
@@ -170,12 +194,12 @@ export function createInputState(config = {}) {
     take() {
       const ev = actions; actions = [];
       const l = { x: look.x, y: look.y }; look.x = look.y = 0;
-      return { ev, actions: ev, look: l, move: { x: move.x, y: move.y }, fire: held.size > 0 };
+      return { ev, actions: ev, look: l, move: { x: move.x, y: move.y }, fire: held.size > 0, shield: isHeld('shield'), holds: holds() };
     },
 
     // drop all input (e.g. when a match ends)
     reset() {
-      keys.clear(); held.clear(); lookers.clear(); actions = [];
+      keys.clear(); held.clear(); holding.clear(); lookers.clear(); actions = [];
       look.x = look.y = 0;
       stick.active = false; stick.x = stick.y = 0; knob.x = knob.y = 0;
       keyMove.x = keyMove.y = 0;

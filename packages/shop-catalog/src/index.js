@@ -10,7 +10,7 @@ const TABS = Object.freeze([
   Object.freeze({ id: 'shirt', label: 'Clothes', hint: 'Dress up your stickman.' }),
   Object.freeze({
     id: 'weapon', label: 'Weapons',
-    hint: 'Weapons go into your backpack and come with you into the arena. Get knocked out and you drop them!',
+    hint: 'Weapons go into your backpack and come with you into the arena. Shields go on your other arm. Get knocked out and you drop them!',
   }),
 ]);
 
@@ -100,7 +100,7 @@ export function swatchBackground(card) {
 
 /**
  * One line of text about the weapons in the backpack, e.g.
- * "Backpack: 2× Pistol, 1× Sniper" or "Backpack is empty. Buy weapons in the shop!"
+ * "Backpack: 2× Shootbm, 1× Supersword" or "Backpack is empty. Buy weapons in the shop!"
  * Weapons are listed in shop order.
  */
 export function backpackSummary(account, rules = RULES) {
