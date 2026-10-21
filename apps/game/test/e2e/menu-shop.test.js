@@ -10,6 +10,7 @@ import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { encode } from '@pvp/net-protocol';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const SERVER = path.join(HERE, '..', '..', 'server.js');
@@ -82,13 +83,67 @@ after(async () => {
   await stopServer();
 });
 
-const shot = async name => {
+const shot = async (name, p = page) => {
   if (process.env.SCREENSHOTS !== '1') return;
-  fs.mkdirSync(SHOTS, { recursive: true });
-  await page.waitForTimeout(800); // let the 3D view draw a few frames
-  await page.screenshot({ path: path.join(SHOTS, name) });
+  const dir = process.env.SCREENSHOTS_DIR || SHOTS;
+  fs.mkdirSync(dir, { recursive: true });
+  await p.waitForTimeout(800); // let the 3D view draw a few frames
+  await p.screenshot({ path: path.join(dir, name) });
 };
 const isVisible = sel => page.locator(sel).isVisible();
+
+// A new page that records console errors, page crashes and bad answers like the main one.
+async function newPage(contextOptions) {
+  const context = await browser.newContext(contextOptions);
+  const p = await context.newPage();
+  const errs = [];
+  p.on('console', m => { if (m.type() === 'error' && !m.text().startsWith('Failed to load resource')) errs.push(m.text()); });
+  p.on('pageerror', e => errs.push(String(e)));
+  p.on('response', r => { if (r.status() >= 400) errs.push(`${r.status()} ${new URL(r.url()).pathname}`); });
+  return { context, page: p, errors: errs };
+}
+
+// Sign up through the API and log the page in with the saved token.
+async function signedIn(p, prefix) {
+  const name = prefix + Date.now().toString(36).slice(-7);
+  const res = await fetch(`http://127.0.0.1:${port}/api/signup`, {
+    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name, password: 'secret1' }),
+  });
+  assert.equal(res.status, 200);
+  const { token } = await res.json();
+  await p.addInitScript(t => localStorage.setItem('pvp.token', t), token);
+  await p.goto(`http://127.0.0.1:${port}/?debug=1`);
+  await p.locator('#menu').waitFor({ state: 'visible' });
+  return name;
+}
+
+// The weapon bar after joining: always 5 slots, the starting weapon in the first one, health 100.
+async function checkHud(p) {
+  await p.waitForFunction(() => document.querySelector('#slots .slot.active'));
+  assert.equal(await p.locator('#slots .slot').count(), 5);
+  assert.equal(await p.locator('#slots .slot.empty').count(), 4);
+  const first = p.locator('#slots .slot').first();
+  assert.equal(await first.getAttribute('aria-label'), '1: Wooden Sword');
+  assert.match(await first.getAttribute('class'), /\bactive\b/);
+  assert.equal(await first.locator('.dur').isVisible(), false); // the basic weapon never breaks: no bar
+  assert.equal(await p.textContent('#hpText'), '100');
+  assert.equal(await p.getAttribute('.hpbar', 'aria-valuenow'), '100');
+}
+
+// Nothing in the bottom HUD may cover another control, and all of it must be on screen.
+async function checkPhoneLayout(p, { width, height }) {
+  const boxes = await p.evaluate(() => Object.fromEntries(['hotbar', 'stick', 'btnFire', 'btnJump', 'btnCrouch', 'btnLeave'].map(id => {
+    const r = document.getElementById(id).getBoundingClientRect();
+    return [id, { l: r.left, t: r.top, r: r.right, b: r.bottom }];
+  })));
+  const overlap = (a, b) => a.l < b.r && b.l < a.r && a.t < b.b && b.t < a.b;
+  for (const [id, b] of Object.entries(boxes)) {
+    assert.ok(b.l >= 0 && b.t >= 0 && b.r <= width && b.b <= height, `${id} is off screen at ${width}x${height}`);
+  }
+  for (const other of ['stick', 'btnFire', 'btnJump', 'btnCrouch', 'btnLeave']) {
+    assert.ok(!overlap(boxes.hotbar, boxes[other]), `the weapon bar covers ${other} at ${width}x${height}`);
+  }
+}
 
 test('sign up, shop, join the arena, leave: no errors', { skip: !RUN && 'set E2E=1 to run (npm run test:e2e)', timeout: 120000 }, async () => {
   await page.goto(`http://127.0.0.1:${port}/?debug=1`); // ?debug: window.pvpDebug() shows the game state
@@ -128,6 +183,7 @@ test('sign up, shop, join the arena, leave: no errors', { skip: !RUN && 'set E2E
   await page.locator('#hud').waitFor({ state: 'visible', timeout: 20000 });
   assert.equal(await isVisible('#menu'), false);
   assert.equal(await isVisible('#loading'), false);
+  await checkHud(page);
   await shot('in-game.png');
 
   // walk forward with the keyboard: the stickman must move more than 1 m.
@@ -152,11 +208,14 @@ test('sign up, shop, join the arena, leave: no errors', { skip: !RUN && 'set E2E
   assert.ok(moved > 1, `player should move forward, moved ${moved.toFixed(2)} m in ${secs.toFixed(1)} s at ${fps.toFixed(1)} fps`);
   assert.equal((await page.evaluate(() => window.pvpDebug())).mode, 'play');
 
-  // leave
+  // leave: the menu asks for the account after the server says 'left'
+  const meAfterLeave = page.waitForResponse(r => new URL(r.url()).pathname === '/api/me');
   await page.click('#btnLeave');
   await page.locator('#menu').waitFor({ state: 'visible' });
   assert.equal(await isVisible('#hud'), false);
   assert.equal((await page.evaluate(() => window.pvpDebug())).mode, 'menu');
+  assert.equal((await (await meAfterLeave).json()).online, 0); // already out of the arena
+  assert.match(await page.textContent('#menuBackpack'), /Backpack is empty/);
 
   // log out and back in with the saved account
   await page.click('#btnLogout');
@@ -177,4 +236,101 @@ test('sign up, shop, join the arena, leave: no errors', { skip: !RUN && 'set E2E
 
   assert.deepEqual(errors, []);
   assert.deepEqual(badResponses, ['400 /api/login']);
+});
+
+test('phone in landscape: menu and weapon bar fit (844x390 and 667x375)', { skip: !RUN && 'set E2E=1 to run (npm run test:e2e)', timeout: 120000 }, async () => {
+  for (const viewport of [{ width: 844, height: 390 }, { width: 667, height: 375 }]) {
+    const { context, page: p, errors: errs } = await newPage({ viewport, isMobile: true, hasTouch: true });
+    try {
+      await signedIn(p, 'ph_');
+      const tag = `${viewport.width}x${viewport.height}`;
+      if (viewport.width === 844) await shot('menu-phone.png', p);
+      await p.click('#btnJoin');
+      await p.locator('#hud').waitFor({ state: 'visible', timeout: 20000 });
+      assert.equal(await p.locator('#stick').isVisible(), true, `touch controls at ${tag}`);
+      await checkHud(p);
+      await checkPhoneLayout(p, viewport);
+      if (viewport.width === 844) await shot('hud-phone.png', p);
+      // tapping an empty slot does nothing; tapping the first one keeps it
+      await p.locator('#slots .slot').nth(3).tap();
+      await p.locator('#slots .slot').first().tap();
+      assert.match(await p.locator('#slots .slot').first().getAttribute('class'), /\bactive\b/);
+      await p.click('#btnLeave');
+      await p.locator('#menu').waitFor({ state: 'visible' });
+      assert.deepEqual(errs, [], tag);
+    } finally {
+      await context.close();
+    }
+  }
+});
+
+test('join gives up after a few seconds when the arena does not answer', { skip: !RUN && 'set E2E=1 to run (npm run test:e2e)', timeout: 60000 }, async () => {
+  const { context, page: p, errors: errs } = await newPage({ viewport: { width: 1100, height: 700 } });
+  try {
+    // 1) the socket opens but the server never says 'welcome'
+    let closeRightAway = false;
+    await p.routeWebSocket(/\/\?token=/, ws => { if (closeRightAway) ws.close(); /* else: a silent server */ });
+    await signedIn(p, 'to_');
+    await p.click('#btnJoin');
+    await p.locator('#loading').waitFor({ state: 'visible' });
+    await p.locator('#menu').waitFor({ state: 'visible', timeout: 15000 });
+    assert.equal(await p.locator('#loading').isVisible(), false);
+    assert.match(await p.textContent('#menuMessage'), /didn't answer/);
+    assert.equal((await p.evaluate(() => window.pvpDebug())).mode, 'menu');
+
+    // 2) the socket is closed right away
+    closeRightAway = true;
+    await p.click('#btnJoin');
+    await p.waitForFunction(() => /connect/i.test(document.getElementById('menuMessage').textContent));
+    assert.equal(await p.locator('#menu').isVisible(), true);
+    assert.equal(await p.locator('#loading').isVisible(), false);
+    assert.deepEqual(errs, []);
+  } finally {
+    await context.close();
+  }
+});
+
+test('weapon bar: durability colors, tap to switch, a broken weapon flashes', { skip: !RUN && 'set E2E=1 to run (npm run test:e2e)', timeout: 90000 }, async () => {
+  const { context, page: p, errors: errs } = await newPage({ viewport: { width: 844, height: 390 }, isMobile: true, hasTouch: true });
+  try {
+    // talk to the real server, but let the test send extra messages to the page
+    let toPage = null;
+    const sentSlots = [];
+    await p.routeWebSocket(/\/\?token=/, ws => {
+      const server = ws.connectToServer();
+      toPage = msg => ws.send(msg);
+      ws.onMessage(m => { if (String(m).includes('"slot"')) sentSlots.push(JSON.parse(m).i); server.send(m); });
+    });
+    await signedIn(p, 'du_');
+    await p.click('#btnJoin');
+    await p.locator('#hud').waitFor({ state: 'visible', timeout: 20000 });
+    await checkHud(p);
+
+    const inv = { weapons: ['woodsword', 'pistol', 'shotgun', 'sniper'], dur: [null, 60, 10, 1], slot: 1, bandages: 2, medkits: 1, coins: 0, hp: 100 };
+    toPage(encode('inv', inv));
+    await p.waitForFunction(() => document.querySelectorAll('#slots .slot.empty').length === 1);
+    const levels = await p.$$eval('#slots .slot', els => els.map(b => (b.querySelector('.dur').hidden ? null : b.querySelector('.dur').dataset.level)));
+    assert.deepEqual(levels, [null, 'good', 'low', 'critical', null]);
+    assert.match(await p.locator('#slots .slot').nth(1).getAttribute('class'), /\bactive\b/);
+    await shot('hud-phone-weapons.png', p);
+
+    // tap a slot: the game asks the server for it
+    await p.locator('#slots .slot').nth(2).tap();
+    for (let i = 0; i < 40 && !sentSlots.includes(2); i++) await p.waitForTimeout(50);
+    assert.ok(sentSlots.includes(2), `tapping slot 3 should send it, sent ${JSON.stringify(sentSlots)}`);
+
+    // the sniper breaks: toast and a flash on its slot
+    toPage(encode('broke', { slot: 3, weapon: 'sniper' }));
+    toPage(encode('inv', { ...inv, weapons: inv.weapons.slice(0, 3), dur: inv.dur.slice(0, 3) }));
+    await p.waitForFunction(() => document.querySelector('#slots .slot:nth-child(4)').classList.contains('broke'));
+    assert.equal(await p.textContent('#toast'), 'Your Sniper broke!');
+    assert.equal(await p.locator('#slots .slot.empty').count(), 2);
+    await p.waitForFunction(() => !document.querySelector('#slots .slot.broke'), null, { timeout: 3000 });
+
+    await p.click('#btnLeave');
+    await p.locator('#menu').waitFor({ state: 'visible' });
+    assert.deepEqual(errs, []);
+  } finally {
+    await context.close();
+  }
 });
