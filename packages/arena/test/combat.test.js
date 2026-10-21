@@ -5,10 +5,10 @@ import { makeArena, drain, msgs, serverEvents, aimAt, RULES, WALL } from './help
 const READY = RULES.SPAWN_PROTECT_MS + 100; // spawn protection is over
 
 // Two players: shooter with `loadout` in slot 1, victim with `victimLoadout`.
-function duel({ loadout = ['sniper'], victimLoadout = [], rules, at = [[0, 0], [20, 0]] } = {}) {
+function duel({ loadout = ['sniper'], victimLoadout = [], victimPotions = 0, rules, at = [[0, 0], [20, 0]] } = {}) {
   const arena = makeArena({ rules });
   const s = arena.join('shooter', { loadout }).id;
-  const v = arena.join('victim', { loadout: victimLoadout }).id;
+  const v = arena.join('victim', { loadout: victimLoadout, potions: victimPotions }).id;
   arena.selectSlot(s, 1);
   arena.teleport(s, { x: at[0][0], z: at[0][1] });
   arena.teleport(v, { x: at[1][0], z: at[1][1] });
@@ -116,15 +116,15 @@ test('mines over maxActive replace the oldest', () => {
   assert.equal(arena.mines().length, RULES.WEAPONS.mine.maxActive);
 });
 
-test('knockout drops weapons and heals, emits ko + dead + knockedOut', () => {
-  const { arena, s, v } = duel({ victimLoadout: ['rocket', 'pistol'] });
+test('knockout drops weapons and potions, emits ko + dead + knockedOut', () => {
+  const { arena, s, v } = duel({ victimLoadout: ['rocket', 'pistol'], victimPotions: 2 });
   arena.fire(s, aimAt(arena, s, v), READY);
   arena.fire(s, aimAt(arena, s, v), READY + 2000);
   const out = drain(arena);
   assert.equal(arena.getPlayer(v), undefined);
   assert.equal(arena.playerCount(), 1);
   const drops = msgs(out, 'item+');
-  assert.deepEqual(drops.map(d => d.weapon ?? d.kind), ['gun', 'rocket', 'pistol', 'bandage'], 'the Gun is dropped too');
+  assert.deepEqual(drops.map(d => d.weapon ?? d.kind), ['gun', 'rocket', 'pistol', 'potion', 'potion'], 'the Gun and every potion are dropped too');
   const ko = msgs(out, 'ko')[0];
   assert.equal(ko.id, v);
   assert.equal(ko.victim, 'victim');

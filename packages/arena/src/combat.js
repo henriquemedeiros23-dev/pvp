@@ -23,7 +23,8 @@ export function damage(A, victim, amount, attacker, weapon, kx = 0, kz = 0) {
 }
 
 /**
- * Knocked out: drop every weapon (the starting weapon too) and the heals, leave the arena.
+ * Knocked out: drop every weapon (the starting weapon too) and every Healing Potion, leave the arena.
+ * A potion being drunk is gone (it was used up when the drinking started).
  * A dropped weapon with more than half its durability keeps it; half or less is set to half
  * (rounded up), see droppedDurability in @pvp/game-rules.
  */
@@ -33,8 +34,8 @@ function knockOut(A, victim, attacker, weapon) {
   victim.weapons.forEach((w, i) => {
     dropItem(A, 'weapon', w, victim.x, victim.z, spread, droppedDurability(w, victim.dur[i], A.rules.WEAPONS));
   });
-  if (victim.medkits) dropItem(A, 'medkit', null, victim.x, victim.z, spread);
-  if (victim.bandages) dropItem(A, 'bandage', null, victim.x, victim.z, spread);
+  for (let i = 0; i < victim.potions; i++) dropItem(A, 'potion', null, victim.x, victim.z, spread);
+  victim.drink = null;
   removePlayer(A, victim);
   const by = attacker ? attacker.name : null;
   send(A, 'all', { t: 'ko', id: victim.id, x: victim.x, y: victim.y, z: victim.z, victim: victim.name, by, weapon });
@@ -103,6 +104,7 @@ export function fire(A, id, dir, now) {
   now = at(A, now);
   const w = p.weapons[p.slot];
   const def = weaponDef(A, w);
+  if (p.drink) return false; // busy drinking a potion (switch slots to stop, the potion is wasted)
   if (!def || now - p.lastFire < def.rate * 1000 * A.tune.fireRateSlack) return false;
   let [dx, dy, dz] = Array.isArray(dir) ? dir.map(Number) : dir ? [dir.x, dir.y, dir.z].map(Number) : [0, 0, 1];
   const len = Math.hypot(dx, dy, dz);

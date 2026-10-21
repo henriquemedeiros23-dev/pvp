@@ -82,6 +82,22 @@ export function validateRules(rules) {
     }
   }
 
+  // The Healing Potion (optional in a rules object; the real rules have it)
+  if (rules.POTION !== undefined) {
+    const P = rules.POTION;
+    if (!isObject(P)) problems.push('POTION must be an object');
+    else {
+      if (typeof P.id !== 'string' || !P.id) problems.push('POTION: missing id');
+      if (P.name === undefined) problems.push('POTION: missing name');
+      if (!isPercent(P.healPercent) || P.healPercent <= 0) problems.push('POTION: healPercent must be a number from 1 to 100');
+      if (!isPosInt(P.drinkMs)) problems.push('POTION: drinkMs must be a whole number > 0');
+      if (!isPercent(P.chestChance)) problems.push('POTION: chestChance must be a number from 0 to 100');
+      if (!isPrice(P.price)) problems.push('POTION: price must be a number >= 0');
+      if (!rarities.includes(P.rarity)) problems.push(`POTION: unknown rarity "${P.rarity}"`);
+    }
+    if (!Number.isInteger(rules.MAX_POTIONS) || rules.MAX_POTIONS < 0) problems.push('MAX_POTIONS must be a whole number >= 0');
+  }
+
   // Colors
   if (!isObject(COLORS)) {
     problems.push('COLORS must be an object');

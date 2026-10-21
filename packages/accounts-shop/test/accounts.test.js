@@ -28,7 +28,7 @@ test('signup gives a token and a fresh account with free items and the default s
   assert.deepEqual(view, {
     name: 'Stick_Kid', coins: 0,
     owned: ['color:black', 'hat:none', 'face:none', 'back:none', 'shirt:none'],
-    skin: { ...DEFAULT_SKIN }, stash: {},
+    skin: { ...DEFAULT_SKIN }, stash: {}, potions: 0,
   });
   for (const secret of ['hash', 'salt', 'tokens']) assert.ok(!(secret in view));
   assert.notEqual(account.hash, 'pass');
@@ -263,4 +263,40 @@ test('old accounts with a wooden sword (no longer in the game) still load; it is
   const acc = again.login('Old_Kid', 'secret').account;
   assert.deepEqual(again.publicView(acc).stash, { pistol: 1 });
   assert.deepEqual(again.takeLoadout(acc), ['pistol']);
+});
+
+test('Healing Potions: buy for 10 coins (many times) into the backpack; take up to 3 into the arena, return the rest', () => {
+  const { accounts } = setup();
+  const { account } = accounts.signup('Potty', 'secret');
+  rejects(() => accounts.buy(account, 'potion', 'potion'), 'NOT_ENOUGH_COINS');
+  accounts.addCoins(account, 45);
+  for (let i = 0; i < 4; i++) accounts.buy(account, 'potion', 'potion');
+  const view = accounts.publicView(account);
+  assert.equal(view.potions, 4);
+  assert.equal(view.coins, 5, '4 potions cost 40 coins');
+  rejects(() => accounts.buy(account, 'potion', 'medkit'), 'UNKNOWN_ITEM');
+  rejects(() => accounts.buy(account, 'potion', 'bandage'), 'UNKNOWN_ITEM');
+  assert.equal(accounts.takePotions(account), 3, 'at most 3 go into the arena');
+  assert.equal(accounts.publicView(account).potions, 1);
+  assert.equal(accounts.returnPotions(account, 2).potions, 3, 'left alive with 2 unused');
+  accounts.returnPotions(account, -5);
+  accounts.returnPotions(account, 'x');
+  assert.equal(accounts.publicView(account).potions, 3, 'bad counts are ignored');
+  assert.equal(accounts.takePotions(account), 3);
+  assert.equal(accounts.takePotions(account), 0, 'empty backpack: none');
+});
+
+test('old saved accounts without potions still load (0 potions); bad potion counts become 0', () => {
+  const store = createMemoryStore();
+  const { accounts } = setup({ store });
+  accounts.signup('Old_Kid', 'secret');
+  accounts.signup('Odd_Kid', 'secret');
+  const data = store.load();
+  delete data.old_kid.potions;
+  data.odd_kid.potions = -3;
+  const again = createAccounts({ store: createMemoryStore(data), now: fakeClock(), randomBytes: fakeRandom() });
+  assert.equal(again.publicView(again.login('Old_Kid', 'secret').account).potions, 0);
+  const odd = again.login('Odd_Kid', 'secret').account;
+  assert.equal(again.publicView(odd).potions, 0);
+  assert.equal(again.takePotions(odd), 0);
 });

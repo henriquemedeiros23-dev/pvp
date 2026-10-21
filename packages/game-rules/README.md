@@ -2,7 +2,7 @@
 
 ## What it does
 
-All the game's rules (limits, movement, weapons, heals, loot, skin colors and outfits, prices) as deep-frozen plain data, plus small pure helpers and `validateRules()` which lists any problems in a set of rules.
+All the game's rules (limits, movement, weapons, the Healing Potion, loot, skin colors and outfits, prices) as deep-frozen plain data, plus small pure helpers and `validateRules()` which lists any problems in a set of rules.
 
 It is a plain ES module with no dependencies and no build step, so it works in Node and directly in the browser.
 
@@ -12,7 +12,7 @@ It is a plain ES module with no dependencies and no build step, so it works in N
 import {
   WEAPONS, STARTING_WEAPON, RARITIES, RARITY_COLORS, MAX_HP, DEFAULT_SKIN, RULES, CHEST_COINS, GOLDEN_CHEST_COINS,
   weaponPrice, skinPrice, isBuyable, weaponsByRarity, weaponDurability, weaponWear,
-  chestChance, droppedDurability, rarityStyle, validateRules,
+  chestChance, droppedDurability, rarityStyle, validateRules, POTION, MAX_POTIONS, potionHeal, itemPrice,
 } from '@pvp/game-rules';
 // In the browser without a bundler: import from '/path/to/packages/game-rules/src/index.js'
 
@@ -27,6 +27,11 @@ chestChance('gun');             // 15 (percent of normal chests that give a Gun)
 droppedDurability('gun', 3);    // 8: a knocked-out player's weapon with half or less left comes back at half
 rarityStyle('megalegend');      // { id, name: 'Megalegend', color: '#2f6fff', color2: '#0b0b12', background: 'linear-gradient(…)' }
 CHEST_COINS;                    // 3 coins from every normal chest; GOLDEN_CHEST_COINS = 10
+POTION;                         // { id: 'potion', name: 'Healing Potion', healPercent: 100, drinkMs: 5000,
+                                //   chestChance: 15, price: 10, rarity: 'common' }
+MAX_POTIONS;                    // 3 potions carried at most (a counter, not weapon slots)
+potionHeal(20, 100);            // 100: a potion gives full H.P
+itemPrice('potion', 'potion');  // 10 (the shop kind and id are both 'potion')
 
 validateRules(RULES);           // [] — empty means valid
 validateRules({ ...RULES, STARTING_WEAPON: 'laser' });
@@ -49,10 +54,15 @@ says how much one use costs. Today: Gun 15, melee 40-60, pistol 60, shotgun 25, 
 grenades 5, rocket launcher 6, mines 5. **Dropped weapons:** `droppedDurability(id, usesLeft)` = what a
 knocked-out player's weapon has when picked up: more than half keeps it, half or less becomes half (rounded up).
 
-`validateRules` reports a missing or bad `durability` / `wearPerUse` / `chestChance`, chest chances that do not
-add up to 100, an unknown rarity, bad rarity colors, and a `STARTING_WEAPON` that is not a weapon.
+**Healing Potion** (`src/potion.js`, the boss's card in #28): the **only heal** (bandages and medkits are gone).
+Drinking takes `drinkMs` (5 s) and gives `healPercent` (100 % = full H.P). Moving or getting hit does not stop it;
+switching to a weapon before it is done cancels it and the potion is wasted (the arena does this). Every chest,
+the golden chest too, gives an extra potion `chestChance` (15 %) of the time. Shop price 10 coins, rarity Common.
 
-Files: `src/player.js` (limits, timers, movement), `src/weapons.js` (weapons, heals, loot), `src/skins.js` (colors, outfits, default skin), `src/validate.js`, all re-exported from `src/index.js`.
+`validateRules` reports a missing or bad `durability` / `wearPerUse` / `chestChance`, chest chances that do not
+add up to 100, an unknown rarity, bad rarity colors, a `STARTING_WEAPON` that is not a weapon, and a bad `POTION` / `MAX_POTIONS`.
+
+Files: `src/player.js` (limits, timers, movement), `src/weapons.js` (weapons, loot), `src/potion.js` (the Healing Potion), `src/skins.js` (colors, outfits, default skin), `src/validate.js`, all re-exported from `src/index.js`.
 
 ## Determinism
 

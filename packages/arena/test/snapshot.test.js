@@ -35,7 +35,7 @@ function replay(seed) {
   const log = [];
   const keep = () => log.push(...drain(arena));
   const ids = ['ann', 'bob', 'cat', 'dan'].map((k, i) =>
-    arena.join(k, { name: k, loadout: [['shotgun', 'grenade'], ['rocket', 'rifle'], ['mine', 'sniper'], ['pistol']][i] }, 1000 + i).id);
+    arena.join(k, { name: k, potions: 3, loadout: [['shotgun', 'grenade'], ['rocket', 'rifle'], ['mine', 'sniper'], ['pistol']][i] }, 1000 + i).id);
   keep();
   const c = island.chests[0];
   ids.forEach((id, i) => arena.teleport(id, { x: c.x + 1 + i * 2, z: c.z, ry: i }));
@@ -43,7 +43,7 @@ function replay(seed) {
     const id = ids[step % ids.length];
     if (step % 7 === 0) arena.openChest(id, step % 3, t);
     if (step % 5 === 0) { arena.selectSlot(id, step % 3); arena.fire(id, [Math.sin(step), -0.1, Math.cos(step)], t); }
-    if (step % 11 === 0) arena.heal(id, 'bandage', t);
+    if (step % 11 === 0) arena.drink(id, t);
     if (step % 3 === 0) {
       const p = arena.getPlayer(id);
       if (p) arena.setState(id, { x: p.x + 0.2, y: 0, z: p.z, ry: step / 10, pitch: 0, f: 4 }, t);
@@ -62,6 +62,8 @@ test('replay: same seed and inputs give an identical outbox', () => {
   assert.ok(msgs(one, 'boom').length > 0, 'explosions happened');
   assert.ok(msgs(one, 'chest').length > 0, 'chests opened');
   assert.ok(msgs(one, 'broke').length > 0, 'weapons broke');
+  const drinks = msgs(one, 'drink').map(m => m.state);
+  assert.ok(drinks.includes('start') && drinks.includes('cancel'), 'potions were drunk (and wasted by slot changes)');
   assert.deepEqual(two, one);
   assert.notDeepEqual(replay(8), one, 'another seed gives another fight');
 });

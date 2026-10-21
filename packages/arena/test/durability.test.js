@@ -151,7 +151,7 @@ test('an empty inventory is safe: nothing to fire, snapshot still valid, picking
 test('knockout drops weapons with their wear; picking one up keeps it', () => {
   const arena = makeArena();
   const s = arena.join('shooter', { loadout: ['sniper'] }).id;
-  const v = arena.join('victim', { loadout: ['pistol'] }).id;
+  const v = arena.join('victim', { loadout: ['pistol'], potions: 1 }).id;
   const w = arena.join('walker', {}).id;
   arena.teleport(s, { x: 0, z: 0 });
   arena.teleport(v, { x: 20, z: 0 });
@@ -167,7 +167,7 @@ test('knockout drops weapons with their wear; picking one up keeps it', () => {
   assert.equal(arena.getPlayer(v), undefined, 'knocked out');
   const drop = msgs(out, 'item+').find(m => m.weapon === 'pistol');
   assert.equal(drop.dur, left);
-  assert.equal(msgs(out, 'item+').find(m => m.kind === 'bandage').dur, undefined, 'heals have no dur');
+  assert.equal(msgs(out, 'item+').find(m => m.kind === 'potion').dur, undefined, 'potions have no dur');
   assert.equal(arena.items().find(i => i.id === drop.id).dur, left);
   assert.equal(arena.welcomeFor(s).items.find(i => i.id === drop.id).dur, left);
 
@@ -182,7 +182,7 @@ test('dropped weapons with half or less durability come back at half (rounded up
   const rules = rulesWith({ pistol: { durability: 11 } });
   const arena = makeArena({ rules });
   const s = arena.join('shooter', { loadout: ['sniper'] }).id;
-  const v = arena.join('victim', { loadout: ['pistol'] }).id;
+  const v = arena.join('victim', { loadout: ['pistol'], potions: 1 }).id;
   const w = arena.join('walker', {}).id;
   arena.teleport(s, { x: 0, z: 0 });
   arena.teleport(v, { x: 20, z: 0 });

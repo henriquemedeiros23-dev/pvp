@@ -5,13 +5,11 @@ export const ARENA_DEFAULTS = Object.freeze({
   firstGoldenMs: 60000,        // first golden chest after 1 minute
   openDistance: 3.2,           // how close you must be to open a chest (m)
   // A normal chest gives CHEST_COINS coins and one weapon picked by the weapons' chestChance (game-rules).
-  chestHealChance: 0,          // normal chest: chance of a heal as well (0 = off; the boss decides later)
-  bandageChance: 0.75,         // heal from a chest: bandage (else medkit)
+  // Every chest (golden too) also gives an extra Healing Potion POTION.chestChance % of the time (game-rules).
   dropSpread: 1.2,             // how far loot scatters (m)
   koDropSpread: 2,             // how far a knocked-out player's items scatter (m)
   pickupRadius: 1.5,           // auto pick up within this distance (m)
   pickupHeight: 2,             // ... and this height difference (m)
-  healCooldownMs: 800,
   fireRateSlack: 0.9,          // next shot allowed after rate * 1000 * slack ms
   muzzleDrop: 0.3,             // shots start this far below the head (m)
   meleeMaxHeightDiff: 2,

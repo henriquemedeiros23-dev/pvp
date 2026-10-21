@@ -1,7 +1,7 @@
 // Chests in fixed spots (back after CHEST_RESPAWN_MS) and the golden chest.
 
 import { at, send, tellServer, randPick } from './state.js';
-import { dropItem, rollLoot, rollChestWeapon } from './loot.js';
+import { rollLoot } from './loot.js';
 
 function giveCoins(A, p, amount) {
   p.coins += amount;
@@ -21,10 +21,10 @@ export function openChest(A, id, which, now) {
     if (!g || Math.hypot(g.x - p.x, g.z - p.z) > T.openDistance) return false;
     A.golden = null;
     A.nextGolden = now + A.rules.GOLDEN_CHEST_EVERY_MS;
-    // GOLDEN_CHEST_COINS coins and one weapon, with Epic and better weapons more likely.
+    // GOLDEN_CHEST_COINS coins and one weapon, with Epic and better weapons more likely
+    // (and, like every chest, sometimes an extra Healing Potion).
     giveCoins(A, p, A.rules.GOLDEN_CHEST_COINS ?? 0);
-    const w = rollChestWeapon(A, { golden: true });
-    if (w) dropItem(A, 'weapon', w, g.x, g.z);
+    rollLoot(A, g.x, g.z, { golden: true });
     send(A, 'all', { t: 'golden', golden: null, by: p.name });
     return true;
   }

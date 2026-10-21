@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { RULES, COLORS, OUTFITS, RARITY_COLORS } from '@pvp/game-rules';
-import { shopTabs, shopItems, shopWeaponIds, backpackSummary, swatchBackground, OUTFIT_ICONS } from '../src/index.js';
+import { shopTabs, shopItems, shopWeaponIds, backpackSummary, swatchBackground, OUTFIT_ICONS, potionCard } from '../src/index.js';
 
 const fresh = () => ({
   name: 'Bob', coins: 0,
@@ -10,10 +10,10 @@ const fresh = () => ({
   stash: {},
 });
 
-test('shopTabs lists the six tabs in order, and returns copies', () => {
+test('shopTabs lists the seven tabs in order, and returns copies', () => {
   const tabs = shopTabs();
-  assert.deepEqual(tabs.map(t => t.id), ['color', 'hat', 'face', 'back', 'shirt', 'weapon']);
-  assert.deepEqual(tabs.map(t => t.label), ['Colors', 'Hats', 'Masks', 'Back', 'Clothes', 'Weapons']);
+  assert.deepEqual(tabs.map(t => t.id), ['color', 'hat', 'face', 'back', 'shirt', 'weapon', 'potion']);
+  assert.deepEqual(tabs.map(t => t.label), ['Colors', 'Hats', 'Masks', 'Back', 'Clothes', 'Weapons', 'Potions']);
   assert.ok(tabs.every(t => typeof t.hint === 'string' && t.hint));
   tabs[0].label = 'changed';
   assert.equal(shopTabs()[0].label, 'Colors');
@@ -88,6 +88,8 @@ test('backpackSummary text', () => {
   assert.equal(backpackSummary(fresh()), 'Backpack is empty. Buy weapons in the shop!');
   assert.equal(backpackSummary({ stash: { sniper: 1, pistol: 2, bat: 0 } }), 'Backpack: 2× Pistol, 1× Sniper');
   assert.equal(backpackSummary(undefined), 'Backpack is empty. Buy weapons in the shop!');
+  assert.equal(backpackSummary({ stash: { pistol: 1 }, potions: 2 }), 'Backpack: 1× Pistol, 2× Healing Potion');
+  assert.equal(backpackSummary({ stash: {}, potions: 1 }), 'Backpack: 1× Healing Potion');
 });
 
 test('swatchBackground gives a CSS value for every color', () => {
@@ -100,4 +102,20 @@ test('same input gives the same output (deterministic)', () => {
   const acc = { ...fresh(), coins: 123, stash: { rifle: 1 } };
   for (const t of shopTabs()) assert.deepEqual(shopItems(t.id, acc), shopItems(t.id, acc));
   assert.equal(backpackSummary(acc), backpackSummary(acc));
+});
+
+test('the Healing Potion card (the boss\'s card): 10 coins, Common (green), full H.P in 5 s', () => {
+  const cards = shopItems('potion', { ...fresh(), coins: 12, potions: 2 });
+  assert.equal(cards.length, 1);
+  assert.deepEqual(cards[0], {
+    kind: 'potion', id: 'potion', name: 'Healing Potion', price: 10,
+    owned: true, equipped: false, canAfford: true, action: 'buy',
+    rarity: 'common', stashCount: 2,
+    rarityName: 'Common', rarityColor: RARITY_COLORS.common.color, rarityBackground: RARITY_COLORS.common.color,
+    healPercent: 100, drinkSeconds: 5, chestChance: 15, maxCarry: 3,
+  });
+  assert.equal(shopItems('potion', { coins: 9 })[0].canAfford, false);
+  assert.equal(shopItems('potion', fresh())[0].stashCount, 0, 'old accounts without potions: 0');
+  assert.deepEqual(potionCard({ coins: 10 }), shopItems('potion', { coins: 10 })[0]);
+  assert.deepEqual(shopItems('potion', fresh(), { ...RULES, POTION: undefined }), []);
 });

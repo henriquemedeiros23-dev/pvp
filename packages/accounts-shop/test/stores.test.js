@@ -61,6 +61,7 @@ test('accounts survive a reload from disk', async t => {
   accounts.addCoins(account, 300);
   accounts.buy(account, 'hat', 'cap');
   accounts.buy(account, 'weapon', 'axe');
+  accounts.buy(account, 'potion', 'potion');
   accounts.equip(account, 'hat', 'cap');
   await accounts.flush();
 
@@ -68,10 +69,11 @@ test('accounts survive a reload from disk', async t => {
   const back = again.byToken(token);
   assert.ok(back);
   assert.deepEqual(again.publicView(back), {
-    name: 'Bob', coins: 300 - 100 - 50,
+    name: 'Bob', coins: 300 - 100 - 50 - 10,
     owned: ['color:black', 'hat:none', 'face:none', 'back:none', 'shirt:none', 'hat:cap'],
     skin: { color: 'black', hat: 'cap', face: 'none', back: 'none', shirt: 'none' },
     stash: { axe: 1 },
+    potions: 1,
   });
   assert.equal(again.login('BOB', 'pass').account, back);
 });

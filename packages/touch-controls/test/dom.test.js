@@ -27,8 +27,8 @@ function fakeEl(rect = { left: 0, top: 0, width: 100, height: 100 }) {
 test('touch adapter: stick, look, fire, tap buttons, detach', () => {
   const s = createInputState();
   const canvas = fakeEl(), stick = fakeEl(), knob = fakeEl();
-  const fire = fakeEl(), jump = fakeEl(), medkit = fakeEl();
-  const detach = attachTouchControls(s, { canvas, stick, knob, buttons: { fire, jump, medkit } });
+  const fire = fakeEl(), jump = fakeEl(), potion = fakeEl();
+  const detach = attachTouchControls(s, { canvas, stick, knob, buttons: { fire, jump, potion } });
 
   stick.fire('pointerdown', { pointerId: 1, clientX: 50 + 110, clientY: 50 });
   assert.deepEqual(s.move, { x: 1, y: 0 });
@@ -49,13 +49,13 @@ test('touch adapter: stick, look, fire, tap buttons, detach', () => {
   assert.equal(s.fire, false);
 
   jump.fire('pointerdown', { pointerId: 4 });
-  medkit.fire('pointerdown', { pointerId: 5 });
+  potion.fire('pointerdown', { pointerId: 5 });
   const t = s.take();
-  assert.deepEqual(t.ev, ['jump', 'medkit']);
+  assert.deepEqual(t.ev, ['jump', 'potion']);
   assert.ok(Math.abs(t.look.x - 20 * 0.0055) < 1e-9);
 
   detach();
-  for (const el of [canvas, stick, fire, jump, medkit]) assert.equal(el.count('pointerdown'), 0);
+  for (const el of [canvas, stick, fire, jump, potion]) assert.equal(el.count('pointerdown'), 0);
 });
 
 test('desktop adapter: pointer lock, mouse, keys, wheel, blur, detach', () => {

@@ -16,7 +16,8 @@ export { ARENA_DEFAULTS } from './tuning.js';
 const copyPlayer = p => p && {
   id: p.id, key: p.key, name: p.name, skin: { ...p.skin }, coins: p.coins,
   x: p.x, y: p.y, z: p.z, ry: p.ry, pitch: p.pitch, flags: p.flags,
-  hp: p.hp, weapons: [...p.weapons], dur: [...p.dur], free: [...p.free], slot: p.slot, bandages: p.bandages, medkits: p.medkits,
+  hp: p.hp, weapons: [...p.weapons], dur: [...p.dur], free: [...p.free], slot: p.slot, potions: p.potions,
+  drink: p.drink ? { ...p.drink } : null,
   protectUntil: p.protectUntil,
 };
 
@@ -42,7 +43,8 @@ export function createArena(o = {}) {
     fire: (id, dir, now) => fire(A, id, dir, now),
     selectSlot: (id, i) => players.selectSlot(A, id, i),
     openChest: (id, chest, now) => openChest(A, id, chest, now),
-    heal: (id, kind, now) => players.heal(A, id, kind, now),
+    /** Start drinking a Healing Potion (full H.P after POTION.drinkMs). False if refused. */
+    drink: (id, now) => players.startDrink(A, id, now),
     teleport: (id, pos) => players.teleport(A, id, pos),
     /** Set a player's coins from the account (the real total). Queues an 'inv'. False if unknown id. */
     setCoins: (id, total) => players.setCoins(A, id, total),
@@ -53,6 +55,7 @@ export function createArena(o = {}) {
       const now = at(A, nowMs);
       const dt = Math.min(A.tune.maxStepS, Math.max(0, (now - prev) / 1000));
       A.lastTick = now;
+      players.tickDrinks(A, now);
       tickChests(A, now);
       tickItems(A, now);
       tickProjectiles(A, now, dt);

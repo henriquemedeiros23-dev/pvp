@@ -22,8 +22,7 @@ export const DEFAULT_CONFIG = Object.freeze({
     c: 'crouch',
     control: 'crouch',
     e: 'open',
-    q: 'bandage',
-    f: 'medkit',
+    q: 'potion',               // drink a Healing Potion
     1: 'slot:0',
     2: 'slot:1',
     3: 'slot:2',

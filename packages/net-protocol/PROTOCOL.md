@@ -17,7 +17,7 @@ The exact rules live in `src/messages.js`.
 | `fire` | `d` vec3 | Use the weapon in my hand, aiming in direction `d`. |
 | `slot` | `i` int 0–31 | Switch to weapon slot `i` (0 = the first slot; it may hold nothing if your weapons broke). |
 | `open` | `id` int or `"golden"` | Open the chest next to me (chest index, or the golden chest). |
-| `heal` | `kind` `"bandage"` or `"medkit"` | Use a heal item. |
+| `drink` | – | Start drinking a Healing Potion (the only heal). Takes `POTION.drinkMs` (5 s). Moving or getting hit does not stop it; switching weapon slots (`slot`) before it is done cancels it and the potion is wasted. |
 
 ## Server → phone
 
@@ -27,7 +27,8 @@ The exact rules live in `src/messages.js`.
 | `full` | – | Arena is full. |
 | `left` | – | You left (answer to `leave`). |
 | `snap` | `p` [snapshot player], `n` uint | 20 times a second: players near you, and how many are in the arena. |
-| `inv` | `weapons` [weapon id], `dur?` [uint or null], `slot`, `bandages`, `medkits`, `coins`, `hp`, `picked?` string | Your inventory and health (`picked` = name of what you just picked up). `dur` = uses left per slot, same order as `weapons`; `null` = never breaks. The max is the weapon's `durability` in `@pvp/game-rules`. |
+| `inv` | `weapons` [weapon id], `dur?` [uint or null], `slot`, `potions`, `coins`, `hp`, `picked?` string | Your inventory and health (`potions` = Healing Potions carried, max `MAX_POTIONS` (3); `picked` = name of what you just picked up). `dur` = uses left per slot, same order as `weapons`; `null` = never breaks. The max is the weapon's `durability` in `@pvp/game-rules`. |
+| `drink` | `state` `"start"`/`"done"`/`"cancel"`, `ms` uint, `hp` | Potion drinking: `start` (the potion is used up now, `ms` = drinking time, show a progress ring), `done` (`hp` is full now), `cancel` (switched weapon or ended: the potion is wasted). An `inv` follows `start` and `done`. |
 | `broke` | `slot` uint, `weapon` id | Your weapon in `slot` broke (durability 0) and is gone, e.g. show "Your Pistol broke!". An updated `inv` follows. |
 | `pjoin` | `id`, `name`, `skin` {color, hat, face, back, shirt} | A player joined. |
 | `pleave` | `id` | A player left. |
@@ -35,7 +36,7 @@ The exact rules live in `src/messages.js`.
 | `coins` | `amount`, `total` | You got coins. |
 | `chest` | `id`, `open` bool | A chest opened (true) or came back full (false). |
 | `golden` | `golden` {x, z} or null, `by?` string | Golden chest appeared, or `by` opened it. |
-| `item+` | `id`, `kind` weapon/bandage/medkit, `weapon` id or null, `x, y, z`, `dur?` uint or null | Item dropped on the ground. `dur` (weapons only) = uses left, it keeps them when picked up. Items in `welcome` have the same `dur?`. |
+| `item+` | `id`, `kind` weapon/potion, `weapon` id or null, `x, y, z`, `dur?` uint or null | Item dropped on the ground. `dur` (weapons only) = uses left, it keeps them when picked up. Items in `welcome` have the same `dur?`. |
 | `item-` | `id`, `by?` player id | Item gone (`by` picked it up; missing = it expired). |
 | `shot` | `id` shooter, `w` weapon id, `from` vec3, `to` [vec3] | Gun fired; one `to` per bullet. |
 | `swing` | `id` | Melee swing. |

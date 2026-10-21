@@ -3,6 +3,9 @@
 // Plain ES module: works in Node and directly in the browser (import map for @pvp/game-rules).
 import { RULES } from '@pvp/game-rules';
 
+// The Healing Potion button and its drinking progress ring (#28).
+export { POTION_ICON_SVG, drinkState, drinkMessage, potionView } from './potion.js';
+
 /** One emoji per weapon id, for slots, the kill feed and the shop. */
 export const WEAPON_ICONS = Object.freeze({
   gun: '🔫', sword: '⚔️', bat: '🏏', spear: '🔱', axe: '🪓', pistol: '🔫', shotgun: '💥',

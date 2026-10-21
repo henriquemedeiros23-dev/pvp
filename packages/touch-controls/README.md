@@ -4,7 +4,7 @@
 
 Game controls for phones and computers: a joystick on the left, drag on the
 screen (or on the fire button) to aim, tap buttons for actions, plus keyboard
-(WASD / arrows, shift = walk, space / C / E / Q / F / 1-5), mouse look with
+(WASD / arrows, shift = walk, space / C / E / Q / 1-5), mouse look with
 pointer lock and the mouse wheel. A pure core keeps the input state; thin
 DOM adapters feed it real browser events. No dependencies.
 
@@ -22,7 +22,7 @@ const detach = isTouchDevice(window)
   ? attachTouchControls(input, {
       canvas, stick: $('stick'), knob: $('knob'),
       buttons: { fire: $('btnFire'), jump: $('btnJump'), crouch: $('btnCrouch'),
-                 open: $('btnOpen'), bandage: $('btnBandage') }, // any number of buttons
+                 open: $('btnOpen'), potion: $('btnPotion') }, // any number of buttons
     })
   : attachDesktopControls(input, { canvas, target: window });
 

@@ -2,7 +2,7 @@
 
 ## What it does
 
-Pure functions that turn the player's inventory (the server's `inv` message) and health into what the in-game HUD shows (the boss's drawing, #24): a big **Durability** bar for the weapon you are holding, the **H.P** bar with its percent, always all weapon slots (empty ones too), which slot a key picks, and the "Your Pistol broke!" text. The game only draws the result. Plain ES module, works in Node and directly in the browser (with an import map for `@pvp/game-rules`).
+Pure functions that turn the player's inventory (the server's `inv` message) and health into what the in-game HUD shows (the boss's drawing, #24): a big **Durability** bar for the weapon you are holding, the **H.P** bar with its percent, always all weapon slots (empty ones too), which slot a key picks, the "Your Pistol broke!" text, and the **Healing Potion button** with its count and drinking progress ring (#28). The game only draws the result. Plain ES module, works in Node and directly in the browser (with an import map for `@pvp/game-rules`).
 
 ## How to use
 
@@ -30,6 +30,23 @@ heldDurabilityView({ ...inv, slot: 0 });
 healthView(30);          // { hp: 30, max: 100, ratio: 0.3, percent: 30, low: true, text: '30', label: '30%' }
 pickSlot(inv, '0');      // 0  (key 1); '+' / '-' = next / previous; null for an empty or the current slot
 brokeMessage('pistol');  // 'Your Pistol broke!'
+```
+
+**Healing Potion button** (`src/potion.js`): time is passed in (your own clock, e.g. `performance.now()`).
+
+```js
+import { potionView, drinkState, drinkMessage, POTION_ICON_SVG } from '@pvp/hud-model';
+
+let drink = null;                                   // the drinking in progress, from the server's 'drink' messages
+drink = drinkState(drink, msg, performance.now());  // 'start' -> { startedAt, ms }, 'done' / 'cancel' -> null
+drinkMessage(msg);                                  // '' | 'Full H.P!' | 'Potion wasted!'
+
+potionView({ potions: 2, hp: 40 });
+// { count: 2, max: 3, label: '2', empty: false, full: false, canDrink: true, drinking: false,
+//   progress: 0, percent: 0, secondsLeft: 0, text: '', title: 'Healing Potion (Q): full H.P in 5 s · 2/3', key: 'Q' }
+potionView(inv, { drink, now: performance.now(), hp: myHp, key: 'tap' });
+// while drinking: drinking: true, progress 0..1 (fill the ring), secondsLeft 2.5, text 'Drinking… 2.5 s'
+button.innerHTML = POTION_ICON_SVG;                 // the flask from the boss's drawing (cork, neck, cone, red liquid)
 ```
 
 - Durability `ratio` = uses left / the weapon's `durability` in `@pvp/game-rules`. `level` is `'good'` above 50 %, `'low'` from 20 % to 50 %, `'critical'` below 20 % (`DURABILITY_LEVELS`). Weapons with `durability: null` get `durability: null`. A missing `dur` value counts as full.
