@@ -5,7 +5,7 @@ import { RULES } from '@pvp/game-rules';
 
 /** One emoji per weapon id, for slots, the kill feed and the shop. */
 export const WEAPON_ICONS = Object.freeze({
-  gun: '🔫', shootbm: '🎯', electricsword: '⚡', icesword: '❄️', shield: '🛡️', megashield: '🔰', supersword: '🗡️',
+  gun: '🔫', shootbm: '🎯', electricsword: '⚡', icesword: '❄️', shield: '🛡️', megashield: '🛡️', supersword: '🗡️',
 });
 
 /** Durability bar colors: above `good` is 'good' (green), from `low` up to `good` is 'low' (yellow), below `low` is 'critical' (red). */

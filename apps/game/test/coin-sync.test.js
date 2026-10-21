@@ -91,9 +91,9 @@ test('buying in the shop from another device sends the new coin total to the are
   ws.send(JSON.stringify({ t: 'join' }));
   assert.equal((await firstInv).coins, START_COINS);
 
-  const price = RULES.WEAPONS.sword.price;
+  const price = RULES.WEAPONS.icesword.price;
   const update = waitFor(ws, m => m.t === 'inv' && m.coins !== START_COINS);
-  const buy = await post('/api/buy', { kind: 'weapon', id: 'sword' }, laptop.body.token);
+  const buy = await post('/api/buy', { kind: 'weapon', id: 'icesword' }, laptop.body.token);
   assert.equal(buy.status, 200);
   assert.equal(buy.body.account.coins, START_COINS - price);
   assert.equal((await update).coins, START_COINS - price);

@@ -8,7 +8,7 @@ import { Stickman, buildWeapon } from '@pvp/stickman-3d';
 import { createIslandScene } from '@pvp/island-scene';
 import { createInputState, attachTouchControls, attachDesktopControls, isTouchDevice } from '@pvp/touch-controls';
 import { decodeServerMessage, encodeClient, unpackSnapshotPlayer, makeFlags, readFlags } from '@pvp/net-protocol';
-import { slotBar, heldDurabilityView, healthView, pickSlot, brokeMessage, WEAPON_ICONS } from '@pvp/hud-model';
+import { slotBar, heldDurabilityView, healthView, pickSlot, brokeMessage, shieldView, WEAPON_ICONS } from '@pvp/hud-model';
 
 const $ = id => document.getElementById(id);
 const JOIN_TIMEOUT_MS = 8000;  // give up joining if 'welcome' does not come
@@ -86,9 +86,9 @@ export class Game {
     this.remotes = new Map();   // id -> remote player
     this.infos = new Map();     // id -> { name, skin }
     this.items = new Map();
-    this.projectiles = new Map();
-    this.mines = new Map();
     this.effects = [];
+    this.shieldUp = false; // my shield is raised (Shift / the shield button)
+    this.frozen = false;   // I am frozen (Ice Sword): no moving, turning, shooting or switching
     this.me = null;
     this.ws = null;
     this.yaw = 0; this.pitch = 0;
@@ -115,7 +115,7 @@ export class Game {
         canvas, stick: $('stick'), knob: $('knob'),
         buttons: {
           fire: $('btnFire'), jump: $('btnJump'), crouch: $('btnCrouch'), open: $('btnOpen'),
-          bandage: $('btnBandage'), medkit: $('btnMedkit'),
+          bandage: $('btnBandage'), medkit: $('btnMedkit'), shield: $('btnShield'),
         },
       });
     } else {
@@ -150,7 +150,7 @@ export class Game {
   showPreview(skin) {
     if (this.preview) { this.scene.remove(this.preview.root); this.preview.dispose(); }
     this.preview = new Stickman(skin);
-    this.preview.setWeapon('sword');
+    this.preview.setWeapon(C.STARTING_WEAPON);
     this.preview.root.position.copy(this.previewSpot);
     this.scene.add(this.preview.root);
   }
@@ -256,7 +256,9 @@ export class Game {
       openChests: this.chests.meshes.flatMap((m, id) => (m.userData.open ? [{ id, lid: +m.userData.lid.rotation.x.toFixed(3) }] : [])),
       nearChest: play ? this.nearChest ?? null : null,
       items: [...this.items.values()].map(it => ({ id: it.id, kind: it.kind, weapon: it.weapon, x: it.x, y: it.y, z: it.z })),
-      inv: this.inv ? { weapons: [...this.inv.weapons], bandages: this.inv.bandages, medkits: this.inv.medkits, coins: this.inv.coins } : null,
+      inv: this.inv ? { weapons: [...this.inv.weapons], bandages: this.inv.bandages, medkits: this.inv.medkits, coins: this.inv.coins, shield: this.inv.shield ?? null } : null,
+      shieldUp: this.shieldUp,
+      frozen: this.frozen,
     };
   }
 
@@ -276,12 +278,9 @@ export class Game {
       case 'item-': return this.removeItem(m.id);
       case 'shot': return this.onShot(m);
       case 'swing': { const r = this.remotes.get(m.id); if (r) r.sm.swing = 1; return; }
-      case 'proj': return this.addProjectile(m);
-      case 'proj-': { const p = this.projectiles.get(m.id); if (p) { this.scene.remove(p.mesh); this.projectiles.delete(m.id); } return; }
-      case 'boom': return this.explosion(m.x, m.y, m.z, m.r);
-      case 'mine+': return this.addMine(m);
-      case 'mine-': { const x = this.mines.get(m.id); if (x) { this.scene.remove(x); this.mines.delete(m.id); } return; }
-      case 'hitmark': return this.hitmark(m.dead);
+      case 'block': return this.onBlock(m);
+      case 'shieldbroke': this.shieldUp = false; return this.toast(brokeMessage(m.weapon)); // an 'inv' follows
+      case 'hitmark': return this.hitmark(m.dead, m.blocked);
       case 'hurt': return this.onHurt(m);
       case 'broke': this.flashSlot(m.slot); return this.toast(brokeMessage(m.weapon)); // an 'inv' follows
       case 'ko': return this.onKO(m);
@@ -311,7 +310,8 @@ export class Game {
     for (const id of m.chests) this.chests.setOpen(id, true);
     this.onGolden({ golden: m.golden, quiet: true });
     for (const it of m.items) this.addItem(it);
-    for (const mi of m.mines) this.addMine(mi);
+    this.shieldUp = false;
+    this.frozen = false;
     if (this.preview) this.preview.root.visible = false;
     this.mode = 'play';
     this.frameMenu();
@@ -338,9 +338,7 @@ export class Game {
   clearArena() {
     for (const id of [...this.remotes.keys()]) this.removeRemote(id);
     for (const it of this.items.values()) this.scene.remove(it.mesh);
-    for (const p of this.projectiles.values()) this.scene.remove(p.mesh);
-    for (const x of this.mines.values()) this.scene.remove(x);
-    this.items.clear(); this.projectiles.clear(); this.mines.clear();
+    this.items.clear();
     this.island.golden.hide(); this.golden = null;
     $('compass').classList.add('hidden');
   }
@@ -349,8 +347,15 @@ export class Game {
     $('hudPlayers').textContent = m.n;
     const seen = new Set();
     for (const packed of m.p) {
-      const { id, x, y, z, ry, pitch, flags, weapon, hp, protected: prot } = unpackSnapshotPlayer(packed);
-      if (id === this.myId) { if (this.me) this.setHp(hp); continue; }
+      const { id, x, y, z, ry, pitch, flags, weapon, hp, protected: prot, shield, shieldUp, shocked, frozen } = unpackSnapshotPlayer(packed);
+      if (id === this.myId) {
+        if (this.me) {
+          this.setHp(hp);
+          this.frozen = frozen;
+          this.me.sm.setStatus({ frozen, shocked });
+        }
+        continue;
+      }
       seen.add(id);
       let r = this.remotes.get(id);
       if (!r) {
@@ -370,6 +375,9 @@ export class Game {
       r.tx = x; r.ty = y; r.tz = z; r.try = ry; r.pitch = pitch; r.flags = flags;
       r.bubble.visible = !!prot;
       r.sm.setWeapon(weapon);
+      r.sm.setShield(shield || null);
+      r.sm.shieldUp = shieldUp;
+      r.sm.setStatus({ frozen, shocked });
       if (hp !== r.hp) { r.hp = hp; r.tag.userData.draw(hp); }
     }
     for (const id of [...this.remotes.keys()]) if (!seen.has(id)) this.removeRemote(id);
@@ -391,7 +399,10 @@ export class Game {
     $('medkitCount').textContent = m.medkits;
     this.setHp(m.hp);
     if (this.me) this.me.sm.setWeapon(m.weapons[m.slot]);
+    if (this.me) this.me.sm.setShield(m.shield ? m.shield.id : null);
+    if (!m.shield) this.shieldUp = false;
     this.renderSlots();
+    this.renderShield();
     if (m.picked) this.toast(`Picked up ${m.picked}`);
   }
 
@@ -450,6 +461,23 @@ export class Game {
     bar.title = d.empty ? '' : d.infinite ? `${d.name} never breaks` : `${d.name}: ${d.label}`;
   }
 
+  // The small shield pill next to the bars, and the phone's shield button (only while you wear a shield).
+  renderShield() {
+    const v = shieldView(this.inv, this.shieldUp);
+    const pill = $('shieldPill');
+    pill.classList.toggle('hidden', !v);
+    $('btnShield').classList.toggle('hidden', !v);
+    if (!v) return;
+    pill.classList.toggle('up', v.up);
+    pill.classList.toggle('legendary', C.WEAPONS[v.weapon]?.rarity === 'legendary');
+    pill.dataset.level = v.level;
+    $('shieldIcon').textContent = v.icon;
+    $('shieldFill').style.width = v.percent + '%';
+    $('shieldText').textContent = v.label;
+    pill.setAttribute('aria-valuenow', v.percent);
+    pill.title = `${v.name}: ${v.label}${v.max ? ` of ${v.max}` : ''} blocks left`;
+  }
+
   flashSlot(i) {
     const b = this.slotEls[i];
     if (!b) return;
@@ -505,9 +533,10 @@ export class Game {
     if (it.kind === 'weapon') {
       const w = buildWeapon(it.weapon);
       const def = C.WEAPONS[it.weapon];
-      if (def.type !== 'melee') w.rotation.x = Math.PI / 2; // lay guns flat-ish
-      w.scale.setScalar(1.3);
+      if (def.type === 'gun') w.rotation.x = Math.PI / 2; // lay guns flat-ish
+      w.scale.setScalar(def.type === 'shield' ? 1 : 1.3);  // shields stand up and spin
       g.add(w);
+      it = { ...it, model: w };
       color = C.RARITY_COLORS[def.rarity]?.color ?? '#d6dde8'; // ring in the rarity's color
     } else {
       const med = it.kind === 'medkit';
@@ -537,42 +566,12 @@ export class Game {
     this.items.delete(id);
   }
 
-  addProjectile(m) {
-    let mesh;
-    if (m.kind === 'rocket') {
-      mesh = new THREE.Group();
-      const body = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.6, 8), new THREE.MeshStandardMaterial({ color: '#ddd' }));
-      body.rotation.x = Math.PI / 2;
-      const flame = new THREE.Mesh(new THREE.ConeGeometry(0.1, 0.5, 8), new THREE.MeshBasicMaterial({ color: '#ffa830' }));
-      flame.rotation.x = -Math.PI / 2; flame.position.z = -0.5;
-      mesh.add(body, flame);
-    } else {
-      mesh = new THREE.Mesh(new THREE.SphereGeometry(0.13, 10, 8), new THREE.MeshStandardMaterial({ color: '#4b6b2f' }));
-    }
-    mesh.position.set(m.x, m.y, m.z);
-    this.scene.add(mesh);
-    this.projectiles.set(m.id, { ...m, mesh });
-  }
-
-  addMine(m) {
-    const g = new THREE.Group();
-    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.32, 0.1, 16), new THREE.MeshStandardMaterial({ color: '#4a4f45', metalness: 0.5 }));
-    body.position.y = 0.05;
-    const light = new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 8), new THREE.MeshBasicMaterial({ color: '#ff3030' }));
-    light.position.y = 0.12;
-    g.add(body, light);
-    g.userData.light = light;
-    g.position.set(m.x, m.y, m.z);
-    this.scene.add(g);
-    this.mines.set(m.id, g);
-  }
-
   // ------------------------------------------------------------ effects
   onShot(m) {
     const from = new THREE.Vector3(...m.from);
     if (m.id === this.myId && this.me) this.me.sm.recoil = 1;
     else { const r = this.remotes.get(m.id); if (r) { r.sm.recoil = 1; from.set(r.sm.root.position.x, from.y, r.sm.root.position.z); } }
-    const color = m.w === 'sniper' ? '#9ff' : '#ffe9a0';
+    const color = '#ffe9a0';
     for (const to of m.to) {
       const end = new THREE.Vector3(...to);
       const geo = new THREE.BufferGeometry().setFromPoints([from, end]);
@@ -586,25 +585,16 @@ export class Game {
     }
   }
 
-  explosion(x, y, z, radius) {
-    const ball = new THREE.Mesh(new THREE.SphereGeometry(1, 20, 14), new THREE.MeshBasicMaterial({ color: '#ffb340', transparent: true, opacity: 0.9 }));
-    ball.position.set(x, y, z);
-    this.scene.add(ball);
-    this.effects.push({ obj: ball, life: 0.45, max: 0.45, fade: true, grow: radius * 2.2 });
-    const light = new THREE.PointLight('#ffaa44', 60, radius * 4);
-    light.position.set(x, y + 1, z);
-    this.scene.add(light);
-    this.effects.push({ obj: light, life: 0.3, max: 0.3, light: 60 });
-    for (let i = 0; i < 8; i++) {
-      const s = new THREE.Mesh(new THREE.SphereGeometry(0.5 + Math.random() * 0.6, 8, 6), new THREE.MeshStandardMaterial({ color: '#6d6763', transparent: true, opacity: 0.7 }));
-      s.position.set(x + (Math.random() - 0.5) * radius, y + Math.random() * 1.5, z + (Math.random() - 0.5) * radius);
-      this.scene.add(s);
-      this.effects.push({ obj: s, life: 1.2, max: 1.2, fade: true, grow: 2.5, rise: 1.5 });
-    }
-    if (this.me) {
-      const d = Math.hypot(this.me.x - x, this.me.z - z);
-      if (d < 30) this.shake = Math.max(this.shake, 0.6 * (1 - d / 30));
-    }
+  // A shield blocked a hit: a bright flash in front of the defender.
+  onBlock(m) {
+    const sm = m.id === this.myId ? this.me?.sm : this.remotes.get(m.id)?.sm;
+    if (!sm) return;
+    const p = sm.root.position, a = sm.root.rotation.y;
+    const flash = new THREE.Mesh(new THREE.SphereGeometry(0.25, 12, 8), new THREE.MeshBasicMaterial({ color: '#cfe3ff', transparent: true, opacity: 0.9 }));
+    flash.position.set(p.x + Math.sin(a) * 0.7, p.y + 1.2, p.z + Math.cos(a) * 0.7);
+    this.scene.add(flash);
+    this.effects.push({ obj: flash, life: 0.25, max: 0.25, fade: true, grow: 2.5 });
+    if (m.id === this.myId) this.shake = Math.max(this.shake, 0.15);
   }
 
   puff(x, y, z) {
@@ -616,9 +606,10 @@ export class Game {
     }
   }
 
-  hitmark(ko) {
+  hitmark(ko, blocked) {
     const h = $('hitmark');
     h.classList.toggle('ko', !!ko);
+    h.classList.toggle('blocked', !!blocked);
     h.classList.add('show');
     clearTimeout(this.hmTimer);
     this.hmTimer = setTimeout(() => h.classList.remove('show'), 90);
@@ -664,7 +655,19 @@ export class Game {
 
   updatePlay(dt) {
     const me = this.me;
-    const { ev, look, move, fire } = this.input.take();
+    const input = this.input.take();
+    const frozen = this.frozen; // Ice Sword: completely stuck, every input is ignored
+    const { ev, look, fire } = frozen ? { ev: [], look: { x: 0, y: 0 }, fire: false } : input;
+    const move = frozen ? { x: 0, y: 0 } : input.move;
+
+    // shield: raised while Shift / the shield button is held (if you wear one); the server is told when it changes
+    const wantShield = !frozen && input.shield && !!this.inv?.shield;
+    if (!frozen && wantShield !== this.shieldUp) {
+      this.shieldUp = wantShield;
+      this.send('shield', { up: wantShield });
+      this.renderShield();
+    }
+    me.sm.shieldUp = this.shieldUp;
 
     // look (yaw kept in -PI..PI so it always fits in a message)
     this.yaw -= look.x;
@@ -704,7 +707,8 @@ export class Game {
       dx = (wx / len) * speed * dt; dz = (wz / len) * speed * dt;
       me.moveYaw = Math.atan2(wx, wz);
     }
-    // knockback
+    // knockback (not while frozen in the ice)
+    if (frozen) { me.kx = me.kz = 0; me.slide = 0; }
     dx += me.kx * dt; dz += me.kz * dt;
     me.kx *= Math.max(0, 1 - dt * 6); me.kz *= Math.max(0, 1 - dt * 6);
     me.speed = speed;
@@ -734,7 +738,7 @@ export class Game {
     const w = this.inv && this.inv.weapons[this.inv.slot];
     const def = C.WEAPONS[w];
     const now = performance.now();
-    if (fire && def && now - this.lastFire >= def.rate * 1000) {
+    if (fire && def && !this.shieldUp && now - this.lastFire >= def.rate * 1000) {
       this.lastFire = now;
       const cam = this.camera.position;
       const range = def.type === 'gun' ? def.range : 60;
@@ -748,7 +752,7 @@ export class Game {
       const tx = cam.x + dirX * t, ty = cam.y + dirY * t, tz = cam.z + dirZ * t;
       const oy = me.y + height - 0.3;
       let ax = tx - me.x, ay = ty - oy, az = tz - me.z;
-      if (def.type === 'melee' || def.type === 'mine') { ax = dirX; ay = dirY; az = dirZ; }
+      if (def.type === 'melee') { ax = dirX; ay = dirY; az = dirZ; }
       const len = Math.hypot(ax, ay, az) || 1;
       this.send('fire', { d: [ax / len, ay / len, az / len] });
       if (def.type === 'melee') me.sm.swing = 1;
@@ -810,15 +814,8 @@ export class Game {
       it.spin.rotation.y = t * 1.8;
       it.spin.position.y = 0.7 + Math.sin(t * 3 + it.id) * 0.1;
     }
-    // projectiles (visual copy of the server simulation)
-    for (const p of this.projectiles.values()) {
-      if (p.kind === 'grenade') p.vy -= C.GRAVITY * dt;
-      const nx = p.mesh.position.x + p.vx * dt, ny = p.mesh.position.y + p.vy * dt, nz = p.mesh.position.z + p.vz * dt;
-      if (p.kind === 'grenade' && ny < 0.13) { p.vy = Math.abs(p.vy) * 0.35; p.vx *= 0.6; p.vz *= 0.6; p.mesh.position.set(nx, 0.13, nz); }
-      else p.mesh.position.set(nx, ny, nz);
-      if (p.kind === 'rocket') p.mesh.lookAt(nx + p.vx, ny + p.vy, nz + p.vz);
-    }
-    for (const m of this.mines.values()) m.userData.light.visible = Math.sin(t * 6) > 0;
+    // glowing / moving parts of weapons lying on the ground (lightning, snowflakes, Mega Shield dots)
+    for (const it of this.items.values()) it.model?.userData.update?.(t);
     // effects
     for (let i = this.effects.length - 1; i >= 0; i--) {
       const e = this.effects[i];
