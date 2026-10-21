@@ -30,6 +30,13 @@ graph LR
   scene --> three
   scene -.-> worldgen
   api["@pvp/api-client"]
+  local["@pvp/local-server"] --> arena
+  local --> accounts
+  local --> api
+  local --> protocol
+  local --> worldgen
+  local --> random
+  local --> collision
   controls["@pvp/touch-controls"]
 ```
 
@@ -45,13 +52,14 @@ graph LR
 | `@pvp/collision` | Walls, jumping, landing and ray hits in a world made of boxes. | both | fully: pure math, no random, no time | 18 |
 | `@pvp/world-gen` | Builds the island of ruins (houses, towers, chests) from a seed. | both | fully: all random comes from the seed | 12 |
 | `@pvp/net-protocol` | Every message between phone and server, with builders and checks. | both | fully: pure functions and frozen data | 16 |
-| `@pvp/accounts-shop` | Accounts, log in, coins, buying skins and weapons, the backpack. | Node | partly: logic is pure, tokens/clock are passed in, file saving is real I/O | 26 |
+| `@pvp/accounts-shop` | Accounts, log in, coins, buying skins and weapons, the backpack. | Node (browser via `/browser`) | partly: logic is pure, tokens/clock are passed in, file saving is real I/O | 31 |
 | `@pvp/arena` | The fight itself: players, chests, loot, weapons, damage, knockouts. | both | fully: time and seeded random are passed in (replay test) | 51 |
 | `@pvp/shop-catalog` | Turns the rules and an account into the cards the shop screen shows. | both | fully: pure functions of their inputs | 9 |
 | `@pvp/hud-model` | Turns your inventory and health into the in-game HUD: Durability bar of the held weapon, H.P bar, 5 slots. | both | fully: pure functions of their inputs | 11 |
 | `@pvp/api-client` | Talks to the server's account and shop API and keeps the login token. | both | fully: fetch and storage are passed in | 10 |
 | `@pvp/stickman-3d` | A three.js stickman with skins, outfits, weapons (a detailed pistol for the Gun) and animation. | browser (pose math also in Node) | partly: pose math is pure, how it looks depends on the renderer | 17 |
 | `@pvp/island-scene` | The 3D island: sky, sun, ground, water, palms, ruins and chests. | browser (also builds in Node) | partly: all placement and colors from a seed, how it looks depends on the renderer | 8 |
+| `@pvp/local-server` | The game server inside the page (practice mode): arena, accounts in localStorage, tick, fake WebSocket, bots. | browser (also Node) | partly: seeded arena and bots, time and timer passed in; tokens and localStorage are real | 14 |
 | `@pvp/touch-controls` | Joystick, aim by dragging, buttons, keyboard and mouse. | browser (core also in Node) | partly: the core is pure, the DOM part depends on real fingers and mice | 18 |
 
 "Both" means Node and the browser (in the browser, `@pvp/*` imports need an import map or a bundler).
@@ -143,7 +151,7 @@ graph LR
 
 ## `@pvp/accounts-shop`
 
-**Purpose:** player accounts (sign up, log in, log out), coins, the shop (buy and equip skins, buy weapons into the backpack) and the loadout taken into the arena. Storage is pluggable. Node only.
+**Purpose:** player accounts (sign up, log in, log out, rename), coins, the shop (buy and equip skins, buy weapons into the backpack) and the loadout taken into the arena. Storage is pluggable. Node entry, plus `@pvp/accounts-shop/browser` (no Node imports, hashing passed in).
 
 | Export | Example |
 |---|---|
@@ -152,6 +160,8 @@ graph LR
 | `accounts.buy` / `accounts.equip` | `accounts.buy(acc, 'hat', 'crown'); accounts.equip(acc, 'hat', 'crown');` |
 | `accounts.takeLoadout` / `returnLoadout` | `const weapons = accounts.takeLoadout(acc);` |
 | `createJsonFileStore(file, opts)` | `createJsonFileStore('data/accounts.json', { saveDelayMs: 1000 });` |
+| `createWebStorageStore(storage, key)` | `createWebStorageStore(localStorage, 'pvp.accounts'); // memory if blocked` |
+| `accounts.rename` | `accounts.rename(acc, 'New_Name');` |
 | `AccountError` | `catch (e) { if (e.code === 'NAME_TAKEN') ... }` |
 
 **Depends on:** `@pvp/game-rules` (and Node's `crypto` and `fs`).
@@ -254,6 +264,23 @@ graph LR
 
 **Depends on:** `@pvp/seeded-random`, and `three` (peer dependency). Tests also use `@pvp/world-gen`.
 **Determinism:** partly. Every random placement, shade and texture comes from a seeded random (one fork per part), so the same seed gives the same scenery; time is passed in to `update()`. How it looks on screen depends on the renderer.
+
+## `@pvp/local-server`
+
+**Purpose:** the game server's glue running in the page, for practice mode with no network: island, arena (seeded), accounts and shop saved in `localStorage`, the 50 ms tick, a WebSocket-like connection speaking the `@pvp/net-protocol` messages, a `fetch` for `@pvp/api-client`, and simple bots.
+
+| Export | Example |
+|---|---|
+| `createLocalServer(opts)` | `const server = createLocalServer({ seed: 'abc', storage: localStorage, bots: 3 });` |
+| `server.createApi()` / `server.ensurePlayer()` | `const api = server.createApi(); server.ensurePlayer(); // a local player, no login` |
+| `server.connect(token)` | `const ws = server.connect(api.token); ws.onmessage = e => ...; ws.send(text);` |
+| `server.rename` / `server.teleport` | `server.rename(api.token, 'Boss_Kid');` |
+| `server.tick(now)` | `createLocalServer({ autoStart: false, now }); server.tick(); // tests` |
+| `createBots(opts)` | `const bots = createBots({ arena, island, random: createRandom('b'), count: 3 }); bots.tick(now);` |
+| `createFakeSocket(opts)` | the WebSocket-like object (send, close, readyState, onopen/onmessage/onclose) |
+
+**Depends on:** `@pvp/arena`, `@pvp/accounts-shop` (browser entry), `@pvp/api-client`, `@pvp/net-protocol`, `@pvp/world-gen`, `@pvp/seeded-random`, `@pvp/collision`, `@pvp/game-rules`.
+**Determinism:** partly. The arena and bots use seeded randoms and time/timer are passed in, so tests replay exactly; login tokens use `crypto.getRandomValues` unless `randomBytes` is passed, and `localStorage` is real storage.
 
 ## `@pvp/touch-controls`
 
