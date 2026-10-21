@@ -10,6 +10,7 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { generateIsland } from '@pvp/world-gen';
@@ -22,11 +23,11 @@ const THREE_FILE = path.join(ROOT, 'node_modules', 'three', 'build', 'three.modu
 const SHOT = path.join(ROOT, 'docs', 'screenshots', 'practice.png');
 const island = generateIsland();
 
-let browser, file;
+let browser, file, artifact;
 
 before(async () => {
   if (!RUN) return;
-  ({ file } = await build({ check: false }));
+  ({ file, artifact } = await build({ check: false }));
   browser = await launchBrowser();
 });
 after(async () => { await browser?.close(); });
@@ -150,6 +151,43 @@ test('practice file: no server, no login; join, walk, open a chest for +3 coins'
     assert.deepEqual(h.outside, [], 'no outside requests except three.js');
   } finally {
     await h.context.close();
+  }
+});
+
+// The artifact viewer puts the fragment into its own page; this wrapper copies what it adds.
+function artifactWrapper(fragment) {
+  return `<!doctype html><html><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>*, *::before, *::after { box-sizing: border-box; }
+:root { padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); }
+body { margin: 0; }</style></head><body>
+${fragment}
+</body></html>`;
+}
+
+test('artifact version: boots inside a wrapper page, join works, no console errors', { skip: SKIP, timeout: 120000 }, async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pvp-artifact-'));
+  const wrapper = path.join(dir, 'wrapper.html');
+  fs.writeFileSync(wrapper, artifactWrapper(fs.readFileSync(artifact, 'utf8')));
+  const h = await practicePage({ viewport: { width: 844, height: 390 }, isMobile: true, hasTouch: true });
+  const { page } = h;
+  try {
+    await page.goto(`${pathToFileURL(wrapper).href}?debug=1&seed=artifact`);
+    await page.locator('#menu').waitFor({ state: 'visible', timeout: 30000 });
+    assert.equal(await page.title(), 'PvP Island');
+    await page.locator('#practiceBadge').waitFor({ state: 'visible' });
+    // full height inside the wrapper, with our own background
+    const size = await page.evaluate(() => ({ h: document.getElementById('view').clientHeight, bg: getComputedStyle(document.body).backgroundColor }));
+    assert.equal(size.h, 390);
+    assert.equal(size.bg, 'rgb(22, 19, 31)');
+    await page.click('#btnJoin');
+    await page.locator('#hud').waitFor({ state: 'visible', timeout: 20000 });
+    await waitDebug(page, x => x.me && x.inv, { what: 'joining' });
+    assert.deepEqual(h.errors, []);
+    assert.deepEqual(h.outside, []);
+  } finally {
+    await h.context.close();
+    fs.rmSync(dir, { recursive: true, force: true });
   }
 });
 
