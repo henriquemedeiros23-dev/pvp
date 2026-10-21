@@ -1,7 +1,7 @@
 // @pvp/stickman-3d: a three.js stickman with skins, outfits, weapon models and a pure pose.
 // `three` is a peer dependency (bare import: node_modules in Node, an import map in the browser).
 export { Stickman, DEFAULT_LIMB_RADIUS, disposeObject, collectResources } from './stickman.js';
-export { buildWeapon, weaponModelKind, MODEL_TYPES } from './weapons.js';
+export { buildWeapon, weaponModelKind, MODEL_TYPES, bolt, snowflake } from './weapons.js';
 export { buildOutfit, OUTFIT_MODELS } from './outfits.js';
 export { bodyMaterial, colorDef, eyeColor } from './materials.js';
-export { computePose, restPose, rainbowHue, AIM_TYPES, STAND_HIP_Y, CROUCH_HIP_Y, SLIDE_HIP_Y } from './pose.js';
+export { computePose, restPose, rainbowHue, AIM_TYPES, SHIELD_ARM, STAND_HIP_Y, CROUCH_HIP_Y, SLIDE_HIP_Y } from './pose.js';
