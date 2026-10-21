@@ -66,6 +66,7 @@ The live list is on GitHub Issues: https://github.com/henriquemedeiros23-dev/pvp
 | 29 | 🔲 | **Coins look like the boss's drawing** | Square-ish yellow coin with sparkle everywhere coins are shown (docs/design/coin.jpg). |
 | 30 | 🔨 | **Practice mode you can open from a link** | One HTML page runs the whole game alone in the browser; published as a link. |
 | 31 | 🔲 | **Rename the game to PvP Island** | The game is called PvP Island everywhere players see it. |
+| 32 | 🔲 | **More weapons from the boss's cards (batch 2)** | Bomb and the next cards become real items. |
 
 ## Later ideas
 - Sounds and music
