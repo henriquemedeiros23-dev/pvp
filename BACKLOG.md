@@ -51,6 +51,7 @@ The live list is on GitHub Issues: https://github.com/henriquemedeiros23-dev/pvp
 | 19 | ✅ | **Tests use a separate data file** | Tests never create accounts in the real data file. |
 | 21 | ✅ | **Weapon durability** | Weapons wear out with use; at 0 they break and disappear. |
 | 22 | 🔨 | **Arena HUD: 5 slots with durability bars** | 5 slots always shown, health bar above, durability bar per weapon. |
+| 23 | 🔨 | **In-game coin count can be out of date** | Coins shown in the arena always match the account. |
 | 20 | ✅ | **Chest lid turned the wrong way** | The lid sits along the chest, opens like a real lid, and the lock is on the front. |
 
 ## Later ideas
