@@ -29,13 +29,13 @@ export function join(A, key, { name, skin, loadout = [], coins = 0 } = {}, now) 
   let replaced = null;
   if (oldId !== undefined) replaced = { id: oldId, weapons: leave(A, oldId, { alive: true }) };
 
-  // The starting weapon (free, slot 1), then weapons from the loadout (best first is the server's
-  // choice), one of each kind, as many as fit.
+  // The starting weapon (free, slot 1), then weapons from the loadout in its order (best first is the
+  // server's choice), copies of the same weapon too, as many as fit.
   const freeStart = Boolean(weaponDef(A, R.STARTING_WEAPON));
   const weapons = freeStart ? [R.STARTING_WEAPON] : [];
   for (const w of Array.isArray(loadout) ? loadout : []) {
     if (weapons.length >= R.MAX_SLOTS) break;
-    if (weaponDef(A, w) && !weapons.includes(w)) weapons.push(w);
+    if (weaponDef(A, w)) weapons.push(w);
   }
 
   const spot = findSpawn(A.island, [...A.players.values()], A.rnd.spawn);
@@ -46,7 +46,8 @@ export function join(A, key, { name, skin, loadout = [], coins = 0 } = {}, now) 
     // dur: uses left per slot (parallel to weapons), null = never breaks. Loadout weapons start full.
     hp: R.MAX_HP, weapons, dur: weapons.map(w => maxDurability(A, w)), slot: 0, bandages: 1, medkits: 0, lastFire: -Infinity, lastHeal: -Infinity,
     protectUntil: now + R.SPAWN_PROTECT_MS, lastState: now,
-    freeStart, // still holds the free starting weapon (it is not put in the backpack on leave)
+    // free: per slot (parallel to weapons), true for the free starting weapon (not put in the backpack on leave)
+    free: weapons.map((w, i) => freeStart && i === 0),
   };
   A.players.set(p.id, p);
   A.byKey.set(key, p.id);
@@ -87,12 +88,7 @@ export function leave(A, id, { alive = true } = {}) {
   removePlayer(A, p);
   send(A, 'all', { t: 'pleave', id: p.id });
   if (!alive) return [];
-  const back = [...p.weapons];
-  if (p.freeStart) {
-    const i = back.indexOf(A.rules.STARTING_WEAPON);
-    if (i >= 0) back.splice(i, 1);
-  }
-  return back;
+  return p.weapons.filter((w, i) => !p.free[i]);
 }
 
 /** A movement update from the player. Returns false if refused (a `pos` correction is queued). */

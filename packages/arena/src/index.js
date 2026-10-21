@@ -16,7 +16,7 @@ export { ARENA_DEFAULTS } from './tuning.js';
 const copyPlayer = p => p && {
   id: p.id, key: p.key, name: p.name, skin: { ...p.skin }, coins: p.coins,
   x: p.x, y: p.y, z: p.z, ry: p.ry, pitch: p.pitch, flags: p.flags,
-  hp: p.hp, weapons: [...p.weapons], dur: [...p.dur], slot: p.slot, bandages: p.bandages, medkits: p.medkits,
+  hp: p.hp, weapons: [...p.weapons], dur: [...p.dur], free: [...p.free], slot: p.slot, bandages: p.bandages, medkits: p.medkits,
   protectUntil: p.protectUntil,
 };
 

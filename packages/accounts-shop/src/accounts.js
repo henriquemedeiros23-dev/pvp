@@ -180,9 +180,9 @@ export function createAccounts({
   }
 
   /**
-   * Weapons to carry into the arena from the backpack: the most expensive stashed weapons
-   * (one of each kind) until the slots are full. They leave the stash. The arena gives the
-   * free starting weapon itself, so one slot is kept for it (when the rules have one).
+   * Weapons to carry into the arena from the backpack: the most expensive stashed weapons first,
+   * every copy counts (2 Shotguns take 2 slots), until the slots are full. They leave the stash.
+   * The arena gives the free starting weapon itself, so one slot is kept for it (when the rules have one).
    */
   function takeLoadout(account) {
     const a = own(account);
@@ -192,9 +192,10 @@ export function createAccounts({
       .filter(id => a.stash[id] > 0 && Object.hasOwn(WEAPONS, id))
       .sort((x, y) => WEAPONS[y].price - WEAPONS[x].price || (x < y ? -1 : x > y ? 1 : 0));
     for (const id of best) {
-      if (weapons.length >= room) break;
-      weapons.push(id);
-      a.stash[id]--;
+      while (weapons.length < room && a.stash[id] > 0) {
+        weapons.push(id);
+        a.stash[id]--;
+      }
       if (!a.stash[id]) delete a.stash[id];
     }
     save();

@@ -8,7 +8,7 @@ import { Stickman, buildWeapon } from '@pvp/stickman-3d';
 import { createIslandScene } from '@pvp/island-scene';
 import { createInputState, attachTouchControls, attachDesktopControls, isTouchDevice } from '@pvp/touch-controls';
 import { decodeServerMessage, encodeClient, unpackSnapshotPlayer, makeFlags, readFlags } from '@pvp/net-protocol';
-import { slotBar, healthView, pickSlot, brokeMessage, WEAPON_ICONS } from '@pvp/hud-model';
+import { slotBar, heldDurabilityView, healthView, pickSlot, brokeMessage, WEAPON_ICONS } from '@pvp/hud-model';
 
 const $ = id => document.getElementById(id);
 const JOIN_TIMEOUT_MS = 8000;  // give up joining if 'welcome' does not come
@@ -402,9 +402,7 @@ export class Game {
     this.slotEls = slotBar(null).map(s => {
       const b = make('button', 'slot empty');
       b.dataset.slot = s.index;
-      const dur = make('span', 'dur');
-      dur.append(make('i', ''));
-      b.append(make('span', 'key'), make('span', 'icon'), make('small', 'name'), dur);
+      b.append(make('span', 'key'), make('span', 'icon'), make('small', 'name'));
       b.querySelector('.key').textContent = s.key;
       b.addEventListener('pointerdown', e => {
         e.preventDefault(); e.stopPropagation();
@@ -430,16 +428,26 @@ export class Game {
         : `radial-gradient(circle at 50% 40%, ${rc.color}66, rgba(10,8,16,0.6) 70%)`;
       b.querySelector('.icon').textContent = s.icon;
       b.querySelector('.name').textContent = s.name;
-      const dur = b.querySelector('.dur');
-      dur.hidden = !s.durability;
-      if (s.durability) {
-        dur.dataset.level = s.durability.level;
-        dur.firstChild.style.width = s.durability.percent + '%';
-      }
       const label = s.empty ? `Slot ${s.key}: empty` : `${s.key}: ${s.name}${s.durability ? ` (${s.durability.percent}%)` : ''}`;
       b.title = label;
       b.setAttribute('aria-label', label);
     }
+    this.renderDurability();
+  }
+
+  // The big Durability bar: the weapon in your hand (full with ∞ if it never breaks, '–' if the hand is empty).
+  renderDurability() {
+    const d = heldDurabilityView(this.inv);
+    const meter = $('durMeter');
+    meter.dataset.level = d.level || 'none';
+    meter.classList.toggle('infinite', d.infinite);
+    meter.classList.toggle('empty', d.empty);
+    $('durFill').style.width = d.percent + '%';
+    $('durText').textContent = d.label;
+    const bar = $('durBar');
+    bar.setAttribute('aria-valuenow', d.percent);
+    bar.setAttribute('aria-valuetext', d.empty ? 'no weapon' : d.infinite ? `${d.name}: never breaks` : `${d.name}: ${d.label}`);
+    bar.title = d.empty ? '' : d.infinite ? `${d.name} never breaks` : `${d.name}: ${d.label}`;
   }
 
   flashSlot(i) {
@@ -457,7 +465,7 @@ export class Game {
     if (this.me) this.me.hp = h.hp;
     $('hpFill').style.width = h.percent + '%';
     $('hpFill').classList.toggle('low', h.low);
-    $('hpText').textContent = h.text;
+    $('hpText').textContent = h.label;
     $('hpFill').parentElement.setAttribute('aria-valuenow', h.hp);
   }
 

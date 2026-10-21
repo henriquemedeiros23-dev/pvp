@@ -133,7 +133,7 @@ function wear(A, p, slot) {
   if (p.dur[slot] === 0) {
     const [weapon] = p.weapons.splice(slot, 1);
     p.dur.splice(slot, 1);
-    if (weapon === A.rules.STARTING_WEAPON) p.freeStart = false;
+    p.free.splice(slot, 1);
     p.slot = Math.max(0, Math.min(p.slot, p.weapons.length - 1)); // same slot number, or the last one
     send(A, p.id, { t: 'broke', slot, weapon });
   }

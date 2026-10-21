@@ -97,12 +97,24 @@
       </div>
     </div>
     <div id="compass" class="compass hidden">★ <span id="compassDist"></span></div>
+    <!-- bottom bar, like the boss's drawing: Durability + H.P bars on the left, the 5 weapon slots on the right -->
     <div id="hotbar" class="hotbar">
-      <div class="health">
-        <div class="hpbar" role="progressbar" aria-label="Health" aria-valuemin="0" aria-valuemax="100"><div id="hpFill"></div><span id="hpText">100</span></div>
+      <div class="vitals">
         <div class="heals">
           <button id="btnBandage" class="heal" title="Bandage (Q)">🩹 <b id="bandageCount">0</b></button>
           <button id="btnMedkit" class="heal" title="Medkit (F)">💊 <b id="medkitCount">0</b></button>
+        </div>
+        <div class="meters">
+          <div id="durMeter" class="meter dur">
+            <span class="mlabel">Durability</span>
+            <div id="durBar" class="mbar" role="progressbar" aria-label="Durability of the weapon you hold" aria-valuemin="0" aria-valuemax="100"><div id="durFill" class="mfill"></div></div>
+            <span id="durText" class="mval">∞</span>
+          </div>
+          <div class="meter hp">
+            <span class="mlabel">H.P</span>
+            <div class="mbar hpbar" role="progressbar" aria-label="Health" aria-valuemin="0" aria-valuemax="100"><div id="hpFill" class="mfill"></div></div>
+            <span id="hpText" class="mval">100%</span>
+          </div>
         </div>
       </div>
       <div id="slots" class="slots"></div>

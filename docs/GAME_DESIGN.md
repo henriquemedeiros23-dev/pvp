@@ -19,12 +19,16 @@ Decided by the boss through 22 questions.
 - **Weapons:** everyone starts with **the Gun**, find better weapons in chests, or buy them in the shop.
 - **The Gun** (starting weapon): a pistol. Damage 2, one shot every 2 seconds, 15 shots, Common, costs 3 coins,
   15% chance to come out of a chest. You get one free every time you join (slot 1), then your backpack weapons.
-  A bought Gun goes into the backpack like any other weapon (you can only carry one Gun at a time).
+  A bought Gun goes into the backpack like any other weapon and comes with you in slot 2.
 - **Rarities** (weakest to strongest), each with its own color everywhere in the game (shop, HUD slots, rings on the ground):
   - 🟩 **Common** = green (Gun, Sword, Bat, Pistol)
   - 🟪 **Epic** = purple (Spear, Axe, Shotgun, Rifle, Grenades)
   - 🟨 **Legendary** = yellow (Sniper, Rocket Launcher, Mines)
   - 🟦⬛ **Megalegend** = blue + black (none yet, coming with the next weapon cards)
+- **Copies:** you can carry the same weapon more than once (for example 2 Guns, or 2 Shotguns), each copy in its
+  own slot with its own durability. When you join you get the free Gun in slot 1, then your backpack weapons,
+  most expensive first (copies too), up to 5 slots. You can pick up a weapon you already have if a slot is free.
+  When you leave alive, every weapon except the free Gun goes back into your backpack.
 - **Durability:** every weapon wears out a little each time you use it (each swing, shot, throw, rocket or mine).
   When it reaches 0 it **breaks and disappears** from your inventory. There is no repair.
   The Gun breaks too: then you may have **no weapon at all** until you find or pick one up.

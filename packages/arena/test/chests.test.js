@@ -186,3 +186,19 @@ test('chest heals are a separate setting (off by default)', () => {
   const loot = msgs(drain(arena), 'item+').map(m => m.kind);
   assert.deepEqual(loot, ['weapon', 'bandage']);
 });
+
+test('picking up a copy of a weapon you already have is fine (a free slot is enough)', () => {
+  const arena = makeArena({ rules: chestAlways('gun') });
+  const a = arena.join('a', {});
+  arena.teleport(a.id, { x: 10, z: 31 });
+  arena.openChest(a.id, 0, 100);
+  const item = arena.items()[0];
+  assert.equal(item.weapon, 'gun');
+  arena.teleport(a.id, { x: item.x, z: item.z });
+  drain(arena);
+  arena.tick(200);
+  const inv = msgs(drain(arena), 'inv', a.id).at(-1);
+  assert.deepEqual(inv.weapons, ['gun', 'gun']);
+  assert.deepEqual(inv.dur, [15, 15]);
+  assert.deepEqual(arena.leave(a.id, { alive: true }), ['gun'], 'the picked up copy is not the free one');
+});

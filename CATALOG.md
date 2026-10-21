@@ -46,9 +46,9 @@ graph LR
 | `@pvp/world-gen` | Builds the island of ruins (houses, towers, chests) from a seed. | both | fully: all random comes from the seed | 12 |
 | `@pvp/net-protocol` | Every message between phone and server, with builders and checks. | both | fully: pure functions and frozen data | 16 |
 | `@pvp/accounts-shop` | Accounts, log in, coins, buying skins and weapons, the backpack. | Node | partly: logic is pure, tokens/clock are passed in, file saving is real I/O | 26 |
-| `@pvp/arena` | The fight itself: players, chests, loot, weapons, damage, knockouts. | both | fully: time and seeded random are passed in (replay test) | 49 |
+| `@pvp/arena` | The fight itself: players, chests, loot, weapons, damage, knockouts. | both | fully: time and seeded random are passed in (replay test) | 51 |
 | `@pvp/shop-catalog` | Turns the rules and an account into the cards the shop screen shows. | both | fully: pure functions of their inputs | 9 |
-| `@pvp/hud-model` | Turns your inventory and health into the in-game HUD: 5 slots, durability bars, health bar. | both | fully: pure functions of their inputs | 9 |
+| `@pvp/hud-model` | Turns your inventory and health into the in-game HUD: Durability bar of the held weapon, H.P bar, 5 slots. | both | fully: pure functions of their inputs | 11 |
 | `@pvp/api-client` | Talks to the server's account and shop API and keeps the login token. | both | fully: fetch and storage are passed in | 10 |
 | `@pvp/stickman-3d` | A three.js stickman with skins, outfits, weapons (a detailed pistol for the Gun) and animation. | browser (pose math also in Node) | partly: pose math is pure, how it looks depends on the renderer | 17 |
 | `@pvp/island-scene` | The 3D island: sky, sun, ground, water, palms, ruins and chests. | browser (also builds in Node) | partly: all placement and colors from a seed, how it looks depends on the renderer | 8 |
@@ -192,13 +192,14 @@ graph LR
 
 ## `@pvp/hud-model`
 
-**Purpose:** pure functions that turn the `inv` message and your health into what the in-game HUD shows: always all 5 weapon slots (empty ones too), a durability bar per weapon, the health bar, and which slot a key picks.
+**Purpose:** pure functions that turn the `inv` message and your health into what the in-game HUD shows (the boss's drawing): the Durability bar of the weapon you hold, the H.P bar with its percent, always all 5 weapon slots (empty ones too), and which slot a key picks.
 
 | Export | Example |
 |---|---|
 | `slotBar(inv, rules)` | `slotBar(inv); // 5 slots: { index, key, weapon, name, icon, rarity, active, empty, durability }` |
 | `durabilityView(id, usesLeft)` | `durabilityView('pistol', 9); // { ratio: 0.15, level: 'critical', … } or null` |
-| `healthView(hp)` | `healthView(30); // { hp: 30, percent: 30, low: true, text: '30', … }` |
+| `heldDurabilityView(inv, rules)` | `heldDurabilityView(inv); // { ratio, percent, level, label: '75%' or '∞', infinite, empty, … }` |
+| `healthView(hp)` | `healthView(30); // { hp: 30, percent: 30, low: true, text: '30', label: '30%', … }` |
 | `pickSlot(inv, action)` | `pickSlot(inv, '+'); // next filled slot, or null` |
 | `brokeMessage(id)` | `brokeMessage('pistol'); // 'Your Pistol broke!'` |
 | `WEAPON_ICONS` | `WEAPON_ICONS.rocket; // '🚀'` |

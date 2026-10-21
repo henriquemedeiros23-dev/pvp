@@ -169,7 +169,7 @@ test('equip needs the item to be owned', () => {
   assert.equal(accounts.equip(account, 'color', 'black').skin.color, 'black');
 });
 
-test('takeLoadout: most expensive first, one slot kept for the starting Gun, rest stays in the stash', () => {
+test('takeLoadout: most expensive first, copies too, one slot kept for the starting Gun, rest stays in the stash', () => {
   const { accounts } = setup();
   const { account } = accounts.signup('Bob', 'pass');
   accounts.addCoins(account, 10000);
@@ -178,6 +178,14 @@ test('takeLoadout: most expensive first, one slot kept for the starting Gun, res
   assert.equal(weapons.length, MAX_SLOTS - 1);
   assert.deepEqual(weapons, ['rocket', 'sniper', 'rifle', 'pistol']);
   assert.deepEqual(account.stash, { sword: 2, bat: 1 });
+  // two of a kind take two slots, a bought Gun too
+  accounts.buy(account, 'weapon', 'shotgun');
+  accounts.buy(account, 'weapon', 'shotgun');
+  accounts.buy(account, 'weapon', 'gun');
+  assert.deepEqual(accounts.takeLoadout(account), ['shotgun', 'shotgun', 'sword', 'sword']);
+  assert.deepEqual(account.stash, { bat: 1, gun: 1 });
+  assert.deepEqual(accounts.takeLoadout(account), ['bat', 'gun']);
+  assert.deepEqual(account.stash, {});
 });
 
 test('takeLoadout respects a smaller MAX_SLOTS and an empty stash', () => {
@@ -198,13 +206,14 @@ test('returnLoadout puts weapons back (a bought Gun too); unknown ids are ignore
   accounts.buy(account, 'weapon', 'sword');
   accounts.buy(account, 'weapon', 'sword');
   const weapons = accounts.takeLoadout(account);
-  assert.deepEqual(account.stash, { sword: 1 });
-  // picked up a shotgun in the arena, then left alive
+  assert.deepEqual(weapons, ['sword', 'sword']);
+  assert.deepEqual(account.stash, {});
+  // picked up a shotgun and a second Gun in the arena, then left alive (counts add up)
   const view = accounts.returnLoadout(account, [...weapons, 'shotgun', 'gun', 'woodsword', 'not-a-weapon']);
   assert.deepEqual(view.stash, { sword: 2, shotgun: 1, gun: 1 });
   // knocked out: nothing is returned, the weapons are gone
-  assert.deepEqual(accounts.takeLoadout(account), ['shotgun', 'sword', 'gun']);
-  assert.deepEqual(account.stash, { sword: 1 });
+  assert.deepEqual(accounts.takeLoadout(account), ['shotgun', 'sword', 'sword', 'gun']);
+  assert.deepEqual(account.stash, {});
 });
 
 test('accounts survive a reload from the store', async () => {

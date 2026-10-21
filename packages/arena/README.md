@@ -19,9 +19,10 @@ const arena = createArena({ island: generateIsland(), rules: RULES, random: crea
 // optional: tuning: { snapshotRadius: 200, ... } (see src/tuning.js), snapshots: false
 
 const r = arena.join('alice', { name: 'Alice', skin, loadout: ['rocket', 'pistol'], coins: 120 }, Date.now());
-// The player gets the rules' STARTING_WEAPON (the Gun) free in slot 1, then the loadout (one of each kind).
+// The player gets the rules' STARTING_WEAPON (the Gun) free in slot 1, then the loadout in its order
+// (copies of the same weapon too, each with its own durability).
 // { ok: true, id, weapons: ['rocket', 'pistol'] (taken from the loadout: remove them from the backpack;
-//   a loadout weapon not taken, e.g. a second Gun, stays in the backpack),
+//   loadout weapons that do not fit in MAX_SLOTS are not taken),
 //   replaced: null | { id, weapons } (same key was already in: that player left alive) }
 // or { ok: false, reason: 'full' } (send 'full' yourself)
 
@@ -60,6 +61,9 @@ setInterval(() => {
   on the same slot number (or the last slot if that one is gone). Its last use still fires.
   The starting Gun breaks like any weapon; a player may then have no weapons at all (firing does nothing,
   the snapshot shows `''`, picking up works). Loadout weapons and chest loot start full.
+- **Copies:** a player may carry the same weapon more than once (e.g. 2 Guns in 2 slots), each copy with its
+  own durability. Picking up a weapon only needs a free slot. On leave only the free starting Gun stays behind
+  (`getPlayer(id).free` marks it per slot); every other copy goes back.
 - **Knockout:** every weapon is dropped (the Gun too) with the heals. **Dropped weapons rule:** a dropped weapon
   with more than half its durability keeps it; half or less is set to half, rounded up (`droppedDurability` in
   `@pvp/game-rules`). Ground items carry `dur` and whoever picks one up gets exactly that.

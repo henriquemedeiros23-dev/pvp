@@ -25,7 +25,8 @@ accounts.buy(acc, 'hat', 'crown');          // kind: 'weapon' or a skin slot; re
 accounts.buy(acc, 'weapon', 'sniper');      // weapons stack in the stash: { sniper: 1 }
 accounts.equip(acc, 'hat', 'crown');        // must own it
 
-const weapons = accounts.takeLoadout(acc);  // best stashed weapons, one of each kind, up to MAX_SLOTS - 1
+const weapons = accounts.takeLoadout(acc);  // most expensive stashed weapons first, copies too
+                                            // (2 Shotguns = 2 slots), up to MAX_SLOTS - 1
                                             // (the arena gives the free starting Gun in slot 1 itself)
 accounts.returnLoadout(acc, weapons);       // left the arena alive: back into the stash
 // knocked out: just don't call returnLoadout, the weapons are lost

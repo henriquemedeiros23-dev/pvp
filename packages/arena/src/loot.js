@@ -76,9 +76,10 @@ export function rollLoot(A, x, z) {
 /** Try to put an item into a player's inventory. Returns the picked name, or null if no room. */
 function take(A, p, it) {
   if (it.kind === 'weapon') {
-    if (p.weapons.includes(it.weapon) || p.weapons.length >= A.rules.MAX_SLOTS) return null;
+    if (p.weapons.length >= A.rules.MAX_SLOTS) return null; // a copy of a weapon you have is fine
     p.weapons.push(it.weapon);
     p.dur.push(it.dur === undefined ? maxDurability(A, it.weapon) : it.dur); // what the ground item had
+    p.free.push(false);
     return weaponDef(A, it.weapon)?.name ?? it.weapon;
   }
   const slot = HEAL_SLOTS[it.kind];

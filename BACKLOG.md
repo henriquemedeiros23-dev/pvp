@@ -58,8 +58,10 @@ The live list is on GitHub Issues: https://github.com/henriquemedeiros23-dev/pvp
 
 | # | Status | Issue | What "done" means |
 |---|---|---|---|
-| 24 | 🔨 | **HUD like the boss's drawing** | Durability bar + H.P bar with % on the left, 5 slots on the right, polished (docs/design/hud-sketch.jpg). |
+| 24 | ✅ | **HUD like the boss's drawing** | Durability bar + H.P bar with % on the left, 5 slots on the right, polished (docs/design/hud-sketch.jpg). |
 | 25 | 🔨 | **Starting weapon: the Gun** | Gun from the boss's card (docs/design/weapon-card-gun.jpg) replaces the wooden sword. |
+| 26 | 🔲 | **Weapons from the boss's cards** | Every weapon card becomes a real weapon (stats, model, chest chance, price, rarity). |
+| 27 | 🔲 | **One browser test sometimes fails** | The browser tests pass every time. |
 
 ## Later ideas
 - Sounds and music

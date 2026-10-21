@@ -6,10 +6,10 @@ test('join gives the starting Gun plus the loadout, and sends welcome, inv, pjoi
   const arena = makeArena();
   const a = arena.join('ann', { name: 'Ann', loadout: ['rocket', 'pistol', 'nope', 'rocket'], coins: 30 });
   assert.equal(a.ok, true);
-  assert.deepEqual(a.weapons, ['rocket', 'pistol']);
+  assert.deepEqual(a.weapons, ['rocket', 'pistol', 'rocket'], 'copies are fine, unknown ids are skipped');
   const out = drain(arena);
   assert.equal(msgs(out, 'welcome', a.id)[0].id, a.id);
-  assert.deepEqual(msgs(out, 'inv', a.id)[0].weapons, ['gun', 'rocket', 'pistol']);
+  assert.deepEqual(msgs(out, 'inv', a.id)[0].weapons, ['gun', 'rocket', 'pistol', 'rocket']);
   assert.equal(msgs(out, 'inv', a.id)[0].coins, 30);
   const pj = out.find(e => e.msg?.t === 'pjoin');
   assert.equal(pj.to, 'all');
@@ -69,12 +69,25 @@ test('slot switch and heal', () => {
   assert.equal(arena.getPlayer(a.id).slot, 1);
 });
 
-test('the free starting Gun is not put in the backpack on leave; a stashed Gun in the loadout is not taken twice', () => {
+test('a bought Gun goes into slot 2 next to the free one; only the bought copy goes back on leave', () => {
   const arena = makeArena();
   const a = arena.join('a', { loadout: ['gun', 'pistol'] });
-  assert.deepEqual(a.weapons, ['pistol'], 'the gun from the loadout was not taken (already has one)');
-  assert.deepEqual(arena.getPlayer(a.id).weapons, ['gun', 'pistol']);
-  assert.deepEqual(arena.leave(a.id, { alive: true }), ['pistol']);
+  assert.deepEqual(a.weapons, ['gun', 'pistol']);
+  assert.deepEqual(arena.getPlayer(a.id).weapons, ['gun', 'gun', 'pistol']);
+  assert.deepEqual(arena.getPlayer(a.id).free, [true, false, false]);
+  assert.deepEqual(arena.leave(a.id, { alive: true }), ['gun', 'pistol']);
+});
+
+test('copies of a weapon have their own durability; breaking the free Gun keeps the bought one', () => {
+  const arena = makeArena();
+  const id = arena.join('a', { loadout: ['gun'] }).id;
+  arena.teleport(id, { x: 0, z: 0 });
+  let t = RULES.SPAWN_PROTECT_MS + 100;
+  for (let i = 0; i < 15; i++, t += 2000) assert.equal(arena.fire(id, [0, 1, 0], t), true); // slot 1: the free Gun
+  const p = arena.getPlayer(id);
+  assert.deepEqual(p.weapons, ['gun'], 'the free Gun broke, the bought one is left');
+  assert.deepEqual(p.dur, [15], 'the bought Gun was never used');
+  assert.deepEqual(arena.leave(id, { alive: true }), ['gun'], 'the bought Gun goes back to the backpack');
 });
 
 test('join works with rules that have no starting weapon', () => {
