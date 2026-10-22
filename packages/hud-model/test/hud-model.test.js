@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { RULES, MAX_SLOTS, WEAPONS } from '@pvp/game-rules';
-import { slotBar, durabilityView, heldDurabilityView, healthView, pickSlot, brokeMessage, WEAPON_ICONS, DURABILITY_LEVELS } from '../src/index.js';
+import { slotBar, durabilityView, heldDurabilityView, healthView, pickSlot, brokeMessage, shieldView, WEAPON_ICONS, DURABILITY_LEVELS } from '../src/index.js';
 
 test('slotBar always gives MAX_SLOTS slots, empty ones included', () => {
   for (const inv of [undefined, null, {}, { weapons: [] }, { weapons: ['gun'], slot: 0 }]) {
@@ -23,32 +23,33 @@ test('slotBar always gives MAX_SLOTS slots, empty ones included', () => {
 
 test('slotBar marks the active slot and adds durability for weapons that can break', () => {
   const rules = { ...RULES, WEAPONS: { ...RULES.WEAPONS, gun: { ...RULES.WEAPONS.gun, durability: null } } };
-  const bar = slotBar({ weapons: ['gun', 'pistol', 'sniper'], dur: [null, 30, 2], slot: 1 }, rules);
+  const bar = slotBar({ weapons: ['gun', 'electricsword', 'supersword'], dur: [null, 25, 2], slot: 1 }, rules);
   assert.deepEqual(bar.map(s => s.active), [false, true, false, false, false]);
   assert.equal(bar[0].durability, null, 'a weapon that never breaks has no bar');
-  assert.deepEqual(bar[1].durability, { usesLeft: 30, max: 60, ratio: 0.5, percent: 50, level: 'low' });
+  assert.deepEqual(bar[1].durability, { usesLeft: 25, max: 50, ratio: 0.5, percent: 50, level: 'low' });
   assert.equal(bar[2].durability.level, 'critical');
-  assert.equal(bar[2].rarity, 'legendary');
+  assert.equal(bar[2].rarity, 'megalegend');
+  assert.equal(bar[2].icon, '🗡️');
 });
 
 test('slotBar treats missing dur as full and unknown weapons as empty', () => {
-  const bar = slotBar({ weapons: ['rifle', 'laser'], slot: 0 });
+  const bar = slotBar({ weapons: ['icesword', 'laser'], slot: 0 });
   assert.equal(bar[0].durability.ratio, 1);
   assert.equal(bar[0].durability.level, 'good');
   assert.equal(bar[1].empty, true);
 });
 
 test('durability levels: green above 50%, yellow 20-50%, red below 20%', () => {
-  const max = WEAPONS.pistol.durability; // 60
-  const level = left => durabilityView('pistol', left).level;
-  assert.equal(level(60), 'good');
-  assert.equal(level(31), 'good');
-  assert.equal(level(30), 'low');        // exactly 50%
-  assert.equal(level(12), 'low');        // exactly 20%
-  assert.equal(level(11), 'critical');
+  const max = WEAPONS.icesword.durability; // 50
+  const level = left => durabilityView('icesword', left).level;
+  assert.equal(level(50), 'good');
+  assert.equal(level(26), 'good');
+  assert.equal(level(25), 'low');        // exactly 50%
+  assert.equal(level(10), 'low');        // exactly 20%
+  assert.equal(level(9), 'critical');
   assert.equal(level(0), 'critical');
-  assert.equal(durabilityView('pistol', 999).usesLeft, max);
-  assert.equal(durabilityView('pistol', -5).ratio, 0);
+  assert.equal(durabilityView('icesword', 999).usesLeft, max);
+  assert.equal(durabilityView('icesword', -5).ratio, 0);
   assert.equal(durabilityView('x', 5, { ...RULES, WEAPONS: { x: { name: 'X', durability: null } } }), null);
   assert.equal(durabilityView('nope', 5), null);
   assert.deepEqual(DURABILITY_LEVELS, { good: 0.5, low: 0.2 });
@@ -76,12 +77,12 @@ test('healthView clamps, rounds and flags low health', () => {
 });
 
 test('heldDurabilityView follows the weapon in your hand', () => {
-  const inv = { weapons: ['gun', 'pistol', 'sniper'], dur: [15, 45, 1], slot: 1 };
+  const inv = { weapons: ['gun', 'shootbm', 'supersword'], dur: [15, 15, 1], slot: 1 };
   assert.deepEqual(heldDurabilityView(inv), {
-    weapon: 'pistol', name: 'Pistol', ratio: 0.75, percent: 75, level: 'good', label: '75%', infinite: false, empty: false,
+    weapon: 'shootbm', name: 'Shootbm', ratio: 0.75, percent: 75, level: 'good', label: '75%', infinite: false, empty: false,
   });
   assert.equal(heldDurabilityView({ ...inv, slot: 2 }).level, 'critical');
-  assert.equal(heldDurabilityView({ ...inv, slot: 2 }).label, `${Math.round(100 / WEAPONS.sniper.durability)}%`);
+  assert.equal(heldDurabilityView({ ...inv, slot: 2 }).label, `${Math.round(100 / WEAPONS.supersword.durability)}%`);
   assert.deepEqual(heldDurabilityView({ ...inv, slot: 0 }), {
     weapon: 'gun', name: 'Gun', ratio: 1, percent: 100, level: 'good', label: '100%', infinite: false, empty: false,
   }); // a new Gun starts at 100%
@@ -89,11 +90,11 @@ test('heldDurabilityView follows the weapon in your hand', () => {
   assert.deepEqual(heldDurabilityView({ ...inv, slot: 0 }, forever), {
     weapon: 'gun', name: 'Gun', ratio: 1, percent: 100, level: 'good', label: '∞', infinite: true, empty: false,
   }); // a weapon that never breaks: full bar with ∞
-  assert.equal(heldDurabilityView({ weapons: ['rifle'], slot: 0 }).ratio, 1); // missing dur = full
+  assert.equal(heldDurabilityView({ weapons: ['icesword'], slot: 0 }).ratio, 1); // missing dur = full
 });
 
 test('heldDurabilityView with nothing in your hand, and with other rules', () => {
-  for (const inv of [undefined, null, {}, { weapons: [] }, { weapons: ['pistol'], slot: 3 }, { weapons: ['laser'], slot: 0 }]) {
+  for (const inv of [undefined, null, {}, { weapons: [] }, { weapons: ['shootbm'], slot: 3 }, { weapons: ['laser'], slot: 0 }, { weapons: ['shield'], slot: 0 }]) {
     const v = heldDurabilityView(inv);
     assert.equal(v.empty, true);
     assert.equal(v.ratio, 0);
@@ -102,12 +103,12 @@ test('heldDurabilityView with nothing in your hand, and with other rules', () =>
   }
   const rules = { ...RULES, WEAPONS: { stick: { name: 'Stick', rarity: 'common', durability: 4 } } };
   assert.equal(heldDurabilityView({ weapons: ['stick'], dur: [1], slot: 0 }, rules).label, '25%');
-  const a = { weapons: ['gun', 'shotgun'], dur: [15, 7], slot: 1 };
+  const a = { weapons: ['gun', 'icesword'], dur: [15, 7], slot: 1 };
   assert.deepEqual(heldDurabilityView(a), heldDurabilityView(structuredClone(a)));
 });
 
 test('pickSlot: keys, next/previous and only filled slots', () => {
-  const inv = { weapons: ['gun', 'pistol', 'bat'], slot: 0 };
+  const inv = { weapons: ['gun', 'shootbm', 'icesword'], slot: 0 };
   assert.equal(pickSlot(inv, '1'), 1);
   assert.equal(pickSlot(inv, 2), 2);
   assert.equal(pickSlot(inv, '4'), null);   // empty slot
@@ -121,11 +122,23 @@ test('pickSlot: keys, next/previous and only filled slots', () => {
 });
 
 test('brokeMessage names the weapon', () => {
-  assert.equal(brokeMessage('pistol'), 'Your Pistol broke!');
+  assert.equal(brokeMessage('shootbm'), 'Your Shootbm broke!');
+  assert.equal(brokeMessage('megashield'), 'Your Mega Shield broke!');
+});
+
+test('shieldView: the small Shield bar for the shield on your arm', () => {
+  for (const inv of [undefined, null, {}, { shield: null }, { shield: { id: 'laser', dur: 3 } }]) assert.equal(shieldView(inv), null);
+  assert.deepEqual(shieldView({ shield: { id: 'shield', dur: 45 } }, true), {
+    weapon: 'shield', name: 'Shield', icon: '🛡️', up: true, usesLeft: 45, max: 60, ratio: 0.75, percent: 75, level: 'good', label: '45',
+  });
+  const mega = shieldView({ shield: { id: 'megashield', dur: 7 } });
+  assert.deepEqual([mega.name, mega.max, mega.level, mega.label, mega.up], ['Mega Shield', 70, 'critical', '7', false]);
+  assert.equal(shieldView({ shield: { id: 'shield' } }).percent, 100, 'missing dur = full');
   assert.equal(brokeMessage('nope'), 'Your weapon broke!');
 });
 
 test('same input, same output (deterministic)', () => {
-  const inv = { weapons: ['gun', 'shotgun'], dur: [15, 7], slot: 1 };
+  const inv = { weapons: ['gun', 'icesword'], dur: [15, 7], slot: 1, shield: { id: 'shield', dur: 3 } };
+  assert.deepEqual(shieldView(inv), shieldView(structuredClone(inv)));
   assert.deepEqual(slotBar(inv), slotBar(structuredClone(inv)));
 });

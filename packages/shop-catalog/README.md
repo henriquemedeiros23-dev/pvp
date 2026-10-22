@@ -29,7 +29,7 @@ shopItems('potion', account);
 //   rarity: 'common', rarityName: 'Common', rarityColor: '#3cc24a', stashCount: 2 (in the backpack), action: 'buy',
 //   healPercent: 100, drinkSeconds: 5, chestChance: 15, maxCarry: 3, … }]   (also potionCard(account))
 
-backpackSummary(account);   // 'Backpack: 2× Pistol, 1× Sniper, 2× Healing Potion' or 'Backpack is empty. Buy weapons in the shop!'
+backpackSummary(account);   // 'Backpack: 2× Shootbm, 1× Supersword, 2× Healing Potion' or 'Backpack is empty. Buy weapons in the shop!'
 swatchBackground(card);     // CSS background for a color card (gradients for patterns)
 ```
 

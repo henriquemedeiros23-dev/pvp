@@ -5,7 +5,7 @@
 import { deepFreeze } from './freeze.js';
 
 /** Bump when a message changes in a way old phones or servers would not understand. */
-export const PROTOCOL_VERSION = 1;
+export const PROTOCOL_VERSION = 2; // 2: shields and status effects (#26), explosives removed
 
 /** Longest raw message a client may send (bytes). Same as the server's WebSocket maxPayload. */
 export const MAX_CLIENT_MESSAGE_SIZE = 4096;
@@ -17,9 +17,14 @@ export const MAX_SLOT_INDEX = 31;
 
 /** Snapshot array slots: snap.p is a list of these arrays, one per nearby player. */
 export const SNAP = deepFreeze({
-  ID: 0, X: 1, Y: 2, Z: 3, RY: 4, PITCH: 5, FLAGS: 6, WEAPON: 7, HP: 8, PROTECTED: 9,
+  ID: 0, X: 1, Y: 2, Z: 3, RY: 4, PITCH: 5, FLAGS: 6, WEAPON: 7, HP: 8, PROTECTED: 9, SHIELD: 10, STATUS: 11,
 });
-export const SNAP_LENGTH = 10;
+export const SNAP_LENGTH = 12;
+
+/** Status bits in snapshot STATUS: shield raised, shocked (losing HP over time), frozen (stuck). */
+export const STATUS_SHIELD_UP = 1;
+export const STATUS_SHOCKED = 2;
+export const STATUS_FROZEN = 4;
 
 /** Movement flag bits used in state.f and in snapshot FLAGS. */
 export const FLAG_CROUCH = 1;
@@ -43,7 +48,8 @@ const ITEM = { obj: {
   id: 'uint', kind: { enum: ITEM_KINDS }, weapon: { nullable: 'string' }, x: 'number', y: 'number', z: 'number',
   dur: { optional: DUR },
 } };
-const MINE = { obj: { id: 'uint', x: 'number', z: 'number', owner: 'uint' } };
+// The shield you wear: its weapon id and the blocked hits it has left.
+const SHIELD = { obj: { id: 'string', dur: 'uint' } };
 const SNAP_PLAYER = { tuple: [
   'uint',          // ID
   'number',        // X
@@ -55,6 +61,8 @@ const SNAP_PLAYER = { tuple: [
   'string',        // WEAPON
   'int',           // HP
   { enum: [0, 1] }, // PROTECTED
+  'string',        // SHIELD: shield id worn on the left arm, '' = none
+  { type: 'int', min: 0, max: 255 }, // STATUS bits
 ] };
 
 const m = (about, fields = {}) => ({ about, fields });
@@ -80,6 +88,10 @@ export const CLIENT_MESSAGES = deepFreeze({
   open: m('Open the chest I am standing next to.', {
     id: [{ oneOf: [{ type: 'int', min: 0, max: 100000 }, { enum: ['golden'] }] }, 'Chest index, or "golden" for the golden chest'],
   }),
+  drop: m('Drop the weapon in my hand on the ground (it keeps its durability; anyone can pick it up).'),
+  shield: m('Raise (up: true) or lower my shield. Ignored without a shield or while frozen.', {
+    up: ['bool', 'true = raise the shield, false = lower it'],
+  }),
   drink: m('Start drinking a Healing Potion (takes a few seconds; switching weapon slots cancels it).'),
 });
 
@@ -93,7 +105,6 @@ export const SERVER_MESSAGES = deepFreeze({
     chests: [{ list: 'uint', max: 10000 }, 'Indexes of chests that are open right now'],
     golden: [{ nullable: { obj: { x: 'number', z: 'number' } } }, 'Golden chest spot { x, z }, or null'],
     items: [{ list: ITEM, max: 10000 }, 'Items on the ground: { id, kind, weapon, x, y, z }'],
-    mines: [{ list: MINE, max: 10000 }, 'Mines on the ground: { id, x, z, owner }'],
   }),
   full: m('The arena is full, try again later.'),
   left: m('You left the fight (answer to "leave").'),
@@ -108,6 +119,7 @@ export const SERVER_MESSAGES = deepFreeze({
     potions: ['uint', 'Healing Potions carried (max MAX_POTIONS in the rules)'],
     coins: [BIG_INT, 'Your coins'],
     hp: ['int', 'Your health'],
+    shield: [{ optional: { nullable: SHIELD } }, 'The shield on your arm { id, dur } (dur = blocked hits left), or null'],
     picked: ['string?', 'Name of what you just picked up, if anything'],
   }),
   pjoin: m('A player joined.', {
@@ -145,18 +157,16 @@ export const SERVER_MESSAGES = deepFreeze({
     from: ['vec3', 'Muzzle position'], to: [{ list: 'vec3', max: 64 }, 'End point of each bullet'],
   }),
   swing: m('Someone swung a melee weapon.', { id: ['uint', 'Player id'] }),
-  proj: m('A grenade or rocket was launched.', {
-    id: ['uint', 'Projectile id'], kind: ['string', 'Weapon id ("grenade", "rocket")'],
-    x: ['number', 'Start X'], y: ['number', 'Start height'], z: ['number', 'Start Z'],
-    vx: ['number', 'Speed X'], vy: ['number', 'Speed up'], vz: ['number', 'Speed Z'],
+  block: m('A raised shield blocked a hit (to everyone, for the spark).', {
+    id: ['uint', 'Player whose shield blocked'], by: ['uint', 'Attacker id'],
   }),
-  'proj-': m('A projectile is gone (it exploded).', { id: ['uint', 'Projectile id'] }),
-  boom: m('Explosion.', { x: ['number', 'X'], y: ['number', 'Height'], z: ['number', 'Z'], r: ['number', 'Radius'] }),
-  'mine+': m('A mine was placed.', {
-    id: ['uint', 'Mine id'], x: ['number', 'X'], y: ['number', 'Height'], z: ['number', 'Z'], owner: ['uint', 'Owner player id'],
+  shieldbroke: m('Your shield broke (durability 0) and is gone. An "inv" follows.', {
+    weapon: ['string', 'Shield id'],
   }),
-  'mine-': m('A mine is gone (exploded, replaced or expired).', { id: ['uint', 'Mine id'] }),
-  hitmark: m('You hit someone.', { dead: ['bool', 'true if that hit knocked them out'] }),
+  hitmark: m('You hit someone.', {
+    dead: ['bool', 'true if that hit knocked them out'],
+    blocked: ['bool?', 'true if their shield blocked it'],
+  }),
   hurt: m('You got hurt.', {
     hp: ['int', 'Your health now'], kx: ['number', 'Knockback X'], kz: ['number', 'Knockback Z'],
     from: [{ nullable: 'vec2' }, 'Attacker position [x, z], or null'],

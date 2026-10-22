@@ -129,11 +129,11 @@ test('weapons can be bought many times into the stash', () => {
   const { accounts } = setup();
   const { account } = accounts.signup('Bob', 'pass');
   accounts.addCoins(account, 100);
-  accounts.buy(account, 'weapon', 'sword');
-  const view = accounts.buy(account, 'weapon', 'sword');
-  assert.deepEqual(view.stash, { sword: 2 });
-  assert.equal(view.coins, 100 - 2 * weaponPrice('sword'));
-  rejects(() => accounts.buy(account, 'weapon', 'sniper'), 'NOT_ENOUGH_COINS');
+  accounts.buy(account, 'weapon', 'icesword');
+  const view = accounts.buy(account, 'weapon', 'icesword');
+  assert.deepEqual(view.stash, { icesword: 2 });
+  assert.equal(view.coins, 100 - 2 * weaponPrice('icesword'));
+  rejects(() => accounts.buy(account, 'weapon', 'supersword'), 'NOT_ENOUGH_COINS');
 });
 
 test('unknown items cannot be bought; the starting Gun can (into the backpack)', () => {
@@ -144,17 +144,18 @@ test('unknown items cannot be bought; the starting Gun can (into the backpack)',
   assert.equal(account.coins, 1000);
   rejects(() => accounts.buy(account, 'weapon', 'woodsword'), 'UNKNOWN_ITEM');
   rejects(() => accounts.buy(account, 'weapon', 'laser'), 'UNKNOWN_ITEM');
+  for (const old of ['sword', 'pistol', 'rocket', 'sniper']) rejects(() => accounts.buy(account, 'weapon', old), 'UNKNOWN_ITEM');
   rejects(() => accounts.buy(account, 'boots', 'none'), 'UNKNOWN_ITEM');
   rejects(() => accounts.buy(account, 'hat', 'toString'), 'UNKNOWN_ITEM');
   assert.equal(account.coins, 1000);
 });
 
 test('prices come from the rules (itemPrice helper)', () => {
-  const rules = { ...gameRules, itemPrice: (kind, id) => (kind === 'weapon' && id === 'sword' ? 7 : itemPrice(kind, id)) };
+  const rules = { ...gameRules, itemPrice: (kind, id) => (kind === 'weapon' && id === 'icesword' ? 7 : itemPrice(kind, id)) };
   const { accounts } = setup({ rules });
   const { account } = accounts.signup('Bob', 'pass');
   accounts.addCoins(account, 10);
-  assert.equal(accounts.buy(account, 'weapon', 'sword').coins, 3);
+  assert.equal(accounts.buy(account, 'weapon', 'icesword').coins, 3);
 });
 
 test('equip needs the item to be owned', () => {
@@ -162,7 +163,7 @@ test('equip needs the item to be owned', () => {
   const { account } = accounts.signup('Bob', 'pass');
   rejects(() => accounts.equip(account, 'color', 'red'), 'NOT_OWNED');
   assert.throws(() => accounts.equip(account, 'color', 'red'), { message: 'Buy it first' });
-  rejects(() => accounts.equip(account, 'weapon', 'sword'), 'UNKNOWN_ITEM');
+  rejects(() => accounts.equip(account, 'weapon', 'icesword'), 'UNKNOWN_ITEM');
   accounts.addCoins(account, 50);
   accounts.buy(account, 'color', 'red');
   assert.equal(accounts.equip(account, 'color', 'red').skin.color, 'red');
@@ -173,19 +174,29 @@ test('takeLoadout: most expensive first, copies too, one slot kept for the start
   const { accounts } = setup();
   const { account } = accounts.signup('Bob', 'pass');
   accounts.addCoins(account, 10000);
-  for (const id of ['sword', 'sword', 'pistol', 'rocket', 'sniper', 'bat', 'rifle']) accounts.buy(account, 'weapon', id);
+  for (const id of ['shootbm', 'shootbm', 'gun', 'supersword', 'icesword', 'electricsword', 'gun']) accounts.buy(account, 'weapon', id);
   const weapons = accounts.takeLoadout(account);
   assert.equal(weapons.length, MAX_SLOTS - 1);
-  assert.deepEqual(weapons, ['rocket', 'sniper', 'rifle', 'pistol']);
-  assert.deepEqual(account.stash, { sword: 2, bat: 1 });
+  assert.deepEqual(weapons, ['supersword', 'icesword', 'electricsword', 'shootbm']);
+  assert.deepEqual(account.stash, { shootbm: 1, gun: 2 });
   // two of a kind take two slots, a bought Gun too
-  accounts.buy(account, 'weapon', 'shotgun');
-  accounts.buy(account, 'weapon', 'shotgun');
-  accounts.buy(account, 'weapon', 'gun');
-  assert.deepEqual(accounts.takeLoadout(account), ['shotgun', 'shotgun', 'sword', 'sword']);
-  assert.deepEqual(account.stash, { bat: 1, gun: 1 });
-  assert.deepEqual(accounts.takeLoadout(account), ['bat', 'gun']);
+  accounts.buy(account, 'weapon', 'icesword');
+  accounts.buy(account, 'weapon', 'icesword');
+  assert.deepEqual(accounts.takeLoadout(account), ['icesword', 'icesword', 'shootbm', 'gun']);
+  assert.deepEqual(account.stash, { gun: 1 });
+  assert.deepEqual(accounts.takeLoadout(account), ['gun']);
   assert.deepEqual(account.stash, {});
+});
+
+test('takeLoadout: shields take no slot; the best shield comes along, the others stay', () => {
+  const { accounts } = setup();
+  const { account } = accounts.signup('Bob', 'pass');
+  accounts.addCoins(account, 10000);
+  for (const id of ['shield', 'megashield', 'shield', 'icesword', 'icesword', 'icesword', 'icesword', 'shootbm']) accounts.buy(account, 'weapon', id);
+  assert.deepEqual(accounts.takeLoadout(account), ['icesword', 'icesword', 'icesword', 'icesword', 'megashield']);
+  assert.deepEqual(account.stash, { shield: 2, shootbm: 1 });
+  assert.deepEqual(accounts.takeLoadout(account), ['shootbm', 'shield']);
+  assert.deepEqual(account.stash, { shield: 1 });
 });
 
 test('takeLoadout respects a smaller MAX_SLOTS and an empty stash', () => {
@@ -193,26 +204,26 @@ test('takeLoadout respects a smaller MAX_SLOTS and an empty stash', () => {
   const { account } = accounts.signup('Bob', 'pass');
   assert.deepEqual(accounts.takeLoadout(account), []);
   accounts.addCoins(account, 1000);
-  accounts.buy(account, 'weapon', 'axe');
-  accounts.buy(account, 'weapon', 'shotgun');
-  assert.deepEqual(accounts.takeLoadout(account), ['shotgun']);
-  assert.deepEqual(account.stash, { axe: 1 });
+  accounts.buy(account, 'weapon', 'electricsword');
+  accounts.buy(account, 'weapon', 'icesword');
+  assert.deepEqual(accounts.takeLoadout(account), ['icesword']);
+  assert.deepEqual(account.stash, { electricsword: 1 });
 });
 
 test('returnLoadout puts weapons back (a bought Gun too); unknown ids are ignored', () => {
   const { accounts } = setup();
   const { account } = accounts.signup('Bob', 'pass');
   accounts.addCoins(account, 1000);
-  accounts.buy(account, 'weapon', 'sword');
-  accounts.buy(account, 'weapon', 'sword');
+  accounts.buy(account, 'weapon', 'icesword');
+  accounts.buy(account, 'weapon', 'icesword');
   const weapons = accounts.takeLoadout(account);
-  assert.deepEqual(weapons, ['sword', 'sword']);
+  assert.deepEqual(weapons, ['icesword', 'icesword']);
   assert.deepEqual(account.stash, {});
-  // picked up a shotgun and a second Gun in the arena, then left alive (counts add up)
-  const view = accounts.returnLoadout(account, [...weapons, 'shotgun', 'gun', 'woodsword', 'not-a-weapon']);
-  assert.deepEqual(view.stash, { sword: 2, shotgun: 1, gun: 1 });
+  // picked up an Electric Sword and a second Gun in the arena, then left alive (counts add up)
+  const view = accounts.returnLoadout(account, [...weapons, 'electricsword', 'gun', 'woodsword', 'pistol', 'not-a-weapon']);
+  assert.deepEqual(view.stash, { icesword: 2, electricsword: 1, gun: 1 });
   // knocked out: nothing is returned, the weapons are gone
-  assert.deepEqual(accounts.takeLoadout(account), ['shotgun', 'sword', 'sword', 'gun']);
+  assert.deepEqual(accounts.takeLoadout(account), ['icesword', 'icesword', 'electricsword', 'gun']);
   assert.deepEqual(account.stash, {});
 });
 
@@ -221,7 +232,7 @@ test('accounts survive a reload from the store', async () => {
   const { accounts } = setup({ store });
   const { token, account } = accounts.signup('Bob', 'pass');
   accounts.addCoins(account, 70);
-  accounts.buy(account, 'weapon', 'pistol');
+  accounts.buy(account, 'weapon', 'shootbm');
   await accounts.flush();
   const again = createAccounts({ store });
   const back = again.byToken(token);
@@ -247,22 +258,22 @@ test('old data with a single token still works', () => {
 test('accounts from somewhere else are refused', () => {
   const { accounts } = setup();
   const other = setup().accounts.signup('Bob', 'pass').account;
-  assert.throws(() => accounts.buy(other, 'weapon', 'sword'), TypeError);
+  assert.throws(() => accounts.buy(other, 'weapon', 'icesword'), TypeError);
   assert.throws(() => accounts.publicView({ name: 'Bob' }), TypeError);
 });
 
-test('old accounts with a wooden sword (no longer in the game) still load; it is dropped from the backpack', () => {
+test('old accounts with weapons no longer in the game (wooden sword, Pistol, Rocket...) still load; they are dropped', () => {
   const store = createMemoryStore();
   const { accounts } = setup({ store });
   const { account } = accounts.signup('Old_Kid', 'secret');
   accounts.addCoins(account, 100);
-  accounts.buy(account, 'weapon', 'pistol');
+  accounts.buy(account, 'weapon', 'shootbm');
   const data = store.load();
-  data.old_kid.stash = { woodsword: 2, pistol: 1 };
+  data.old_kid.stash = { woodsword: 2, pistol: 1, sword: 3, rocket: 1, mine: 2, shootbm: 1 };
   const again = createAccounts({ store: createMemoryStore(data), now: fakeClock(), randomBytes: fakeRandom() });
   const acc = again.login('Old_Kid', 'secret').account;
-  assert.deepEqual(again.publicView(acc).stash, { pistol: 1 });
-  assert.deepEqual(again.takeLoadout(acc), ['pistol']);
+  assert.deepEqual(again.publicView(acc).stash, { shootbm: 1 });
+  assert.deepEqual(again.takeLoadout(acc), ['shootbm']);
 });
 
 test('Healing Potions: buy for 10 coins (many times) into the backpack; take up to 3 into the arena, return the rest', () => {

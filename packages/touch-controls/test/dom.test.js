@@ -102,3 +102,17 @@ test('isTouchDevice', () => {
   assert.equal(isTouchDevice({ matchMedia: () => ({ matches: false }), navigator: { maxTouchPoints: 0 } }), false);
   assert.equal(isTouchDevice({}), false);
 });
+
+test('touch adapter: the shield button is held (and you can aim by dragging on it)', () => {
+  const s = createInputState();
+  const canvas = fakeEl(), shield = fakeEl();
+  attachTouchControls(s, { canvas, buttons: { shield } });
+  shield.fire('pointerdown', { pointerId: 5, clientX: 0, clientY: 0 });
+  assert.equal(s.shield, true);
+  assert.ok(shield.classList.has('pressed'));
+  shield.fire('pointermove', { pointerId: 5, clientX: 10, clientY: 0 });
+  assert.ok(s.take().look.x > 0, 'drag on it to turn');
+  assert.equal(s.shield, true, 'still held after a take');
+  shield.fire('pointerup', { pointerId: 5 });
+  assert.equal(s.shield, false);
+});

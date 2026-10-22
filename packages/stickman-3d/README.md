@@ -2,7 +2,7 @@
 
 ## What it does
 
-A three.js stickman character: body in a skin color or pattern (gold, zebra stripes, rainbow), outfits (hats, face items, capes, shirts), a weapon in the right hand, and walk / crouch / slide / jump / aim / swing animation. The animation math is a pure function, `computePose()`, that can be tested without three.js.
+A three.js stickman character: body in a skin color or pattern (gold, zebra stripes, rainbow), outfits (hats, face items, capes, shirts), a weapon in the right hand, a shield on the left arm (raised in front or lowered), frozen and shocked looks, and walk / crouch / slide / jump / aim / swing animation. Weapon models follow the boss's cards. The animation math is a pure function, `computePose()`, that can be tested without three.js.
 
 ## How to use
 
@@ -12,7 +12,10 @@ import { Stickman, buildWeapon, buildPotion, holdPotion, computePose } from '@pv
 
 const sm = new Stickman({ color: 'rainbow', hat: 'crown', face: 'none', back: 'redcape', shirt: 'none' });
 scene.add(sm.root);
-sm.setWeapon('rifle');      // or null for empty hands
+sm.setWeapon('icesword');   // or null for empty hands
+sm.setShield('megashield'); // on the left arm, or null
+sm.shieldUp = true;         // raise it (it moves up smoothly in animate)
+sm.setStatus({ frozen: true, shocked: false }); // ice-blue in an ice block (and stuck) / yellow lightning
 
 // every frame (dt and time in seconds, time is passed in)
 sm.animate(dt, { speed, crouch, slide, air, pitch }, time);
@@ -21,7 +24,8 @@ sm.swing = 1;               // when a melee weapon swings
 
 sm.dispose();               // frees the geometries and materials it made (and its weapon)
 
-const loot = buildWeapon('rocket');   // a loose weapon model (THREE.Group); you dispose it
+const loot = buildWeapon('supersword'); // a loose weapon model (THREE.Group); you dispose it
+loot.userData.update?.(time);          // animated parts (lightning, snowflakes, glowing dots), time in seconds
 
 const flask = buildPotion();          // the Healing Potion (#28): cork, narrow neck, glass cone with red liquid
 holdPotion(sm, true);                 // drinking: the potion in the right hand (weapon hidden); false = back to the weapon
@@ -31,9 +35,9 @@ Options for another game: `new Stickman(skin, { colors, weapons, limbRadius = 0.
 `colors` is `{ id: { color, pattern?, eyes? } }` and `weapons` is `{ id: { type } }`; both default to `COLORS` / `WEAPONS` from `@pvp/game-rules`.
 `buildWeapon(id, { weapons, castShadow })` takes the same table.
 
-Weapon models: the current weapon ids keep their own special models. The Gun (starting weapon) is a detailed pistol: slide with grip lines and an ejection port, barrel, sights, hammer, frame with a rail, trigger guard and trigger, and a grip tilted back with wooden side panels, held in the right hand. Any other id (or a known id whose `type` changed) gets a generic model for its `type`: `melee`, `gun`, `throw`, `rocket` or `mine` (an unknown type looks like melee). Generic melee and gun models get longer with `range`, and use the weapon's `color` if it has one. An id missing from the table gives an empty group. `weaponModelKind(id, weapons)` tells which model is used.
+Weapon models (close to the boss's drawings, see `docs/screenshots/weapons.png`): the **Gun** (starting weapon) is a detailed L-shaped pistol. **Shootbm** is a long gun: one long straight body, a stepped wooden stock at the back and a round ring sight on top near the front. The **Electric Sword** has a long thin straight blade, a small guard and handle, and flickering yellow lightning bolts around it. The **Ice Sword** is a thin tapered icy blade with turning blue snowflakes. The **Supersword** (Megalegend) has a very long thin black blade with glowing blue edges, a small blue diamond guard and a long handle. The **Shield** is a square plate with "P.V.P" in block letters (made of boxes, no font), the **Mega Shield** the same in gold with pulsing glowing dots around it and a sparkle. Shields face +z with up +y in their own frame (`buildShieldModel`); `Stickman.setShield` puts them on the left arm. Any other id (or a known id whose `type` changed) gets a generic model for its `type`: `melee`, `gun` or `shield` (an unknown type looks like melee). Generic melee and gun models get longer with `range`, and use the weapon's `color` if it has one. An id missing from the table gives an empty group. `weaponModelKind(id, weapons)` tells which model is used.
 
-Pure pose: `computePose(state, prev, dt)` with `state = { speed, crouch, slide, air, pitch, time, weaponType, swing, recoil }` returns `{ walk, hipY, lean, legL, legR, headX, armL: {x, z}, armR: {x, z}, cape }`. Pass the last pose as `prev` (or `null` to start from `restPose()`). `stickman.applyPose(pose)` puts a body in a pose.
+Pure pose: `computePose(state, prev, dt)` with `state = { speed, crouch, slide, air, pitch, time, weaponType, swing, recoil, shield }` (`shield` 0..1 = how far the shield is raised; the left arm goes to `SHIELD_ARM`) returns `{ walk, hipY, lean, legL, legR, headX, armL: {x, z}, armR: {x, z}, cape }`. Pass the last pose as `prev` (or `null` to start from `restPose()`). `stickman.applyPose(pose)` puts a body in a pose.
 
 **Importing `three`:** `three` is a peer dependency (the game uses `three@0.170.0`). In Node the bare import `three` comes from `node_modules`. In the browser without a bundler, add an import map so `three` and `@pvp/game-rules` resolve, for example:
 
@@ -51,4 +55,4 @@ Nothing touches `document` at import time. The zebra stripes canvas texture is m
 
 ## Determinism
 
-Partly deterministic. `computePose()`, `rainbowHue()` and `weaponModelKind()` are pure: same input, same output, no randomness, time is passed in. The three.js objects built from them are deterministic too, but how they look on screen depends on the renderer (graphics).
+Partly deterministic. `computePose()`, `rainbowHue()` and `weaponModelKind()` are pure: same input, same output, no randomness, time is passed in (also to the weapons' `userData.update(time)`, so the lightning and glow look the same for the same time). The three.js objects built from them are deterministic too, but how they look on screen depends on the renderer (graphics).

@@ -2,14 +2,16 @@
 import { WEAPON_TYPES, RARITIES as KNOWN_RARITIES } from './weapons.js';
 
 const REQUIRED_WEAPON_FIELDS = ['name', 'type', 'dmg', 'rate', 'rarity', 'price'];
+const REQUIRED_SHIELD_FIELDS = ['name', 'type', 'rarity', 'price'];
 const GUN_FIELDS = ['range', 'spread', 'pellets'];
-const EXPLOSIVE_TYPES = ['throw', 'rocket', 'mine'];
 const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
 
 const isObject = v => v !== null && typeof v === 'object';
 const isPrice = v => typeof v === 'number' && Number.isFinite(v) && v >= 0;
-const isPosInt = v => Number.isInteger(v) && v > 0;
 const isPercent = v => typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= 100;
+const isPosInt = v => Number.isInteger(v) && v > 0;
+const isWeight = v => typeof v === 'number' && Number.isFinite(v) && v >= 0;
+const isPosNum = v => typeof v === 'number' && Number.isFinite(v) && v > 0;
 
 /**
  * Validate a rules object shaped like this package's exports
@@ -52,9 +54,20 @@ export function validateRules(rules) {
     let chanceTotal = 0;
     for (const [id, w] of Object.entries(WEAPONS)) {
       if (!isObject(w)) { problems.push(`weapon ${id}: must be an object`); continue; }
-      for (const f of REQUIRED_WEAPON_FIELDS) {
+      const shield = w.type === 'shield';
+      for (const f of shield ? REQUIRED_SHIELD_FIELDS : REQUIRED_WEAPON_FIELDS) {
         if (w[f] === undefined) problems.push(`weapon ${id}: missing ${f}`);
       }
+      if (shield && !isPosInt(w.durability)) problems.push(`weapon ${id}: a shield needs a durability (blocked hits), a whole number > 0`);
+      if (w.reflect !== undefined && (!shield || typeof w.reflect !== 'number' || !(w.reflect >= 0 && w.reflect <= 1))) {
+        problems.push(`weapon ${id}: reflect must be a number from 0 to 1, on a shield`);
+      }
+      if (w.shock !== undefined && !(isObject(w.shock) && isPosInt(w.shock.dmg) && isPosNum(w.shock.everyMs) && isPosNum(w.shock.forMs))) {
+        problems.push(`weapon ${id}: shock must be { dmg, everyMs, forMs } with numbers > 0`);
+      }
+      if (w.freezeMs !== undefined && !isPosNum(w.freezeMs)) problems.push(`weapon ${id}: freezeMs must be a number > 0`);
+      if (w.knockout !== undefined && typeof w.knockout !== 'boolean') problems.push(`weapon ${id}: knockout must be true or false`);
+      if (w.shieldWear !== undefined && !isPosInt(w.shieldWear)) problems.push(`weapon ${id}: shieldWear must be a whole number > 0`);
       if (w.type !== undefined && !WEAPON_TYPES.includes(w.type)) problems.push(`weapon ${id}: unknown type "${w.type}"`);
       if (w.rarity !== undefined && !rarities.includes(w.rarity)) problems.push(`weapon ${id}: unknown rarity "${w.rarity}"`);
       if (w.price !== undefined && !isPrice(w.price)) problems.push(`weapon ${id}: price must be a number >= 0`);
@@ -64,13 +77,14 @@ export function validateRules(rules) {
       if (w.type === 'gun') {
         for (const f of GUN_FIELDS) if (w[f] === undefined) problems.push(`weapon ${id}: gun missing ${f}`);
       }
-      if (EXPLOSIVE_TYPES.includes(w.type) && w.radius === undefined) problems.push(`weapon ${id}: explosive missing radius`);
-      if (w.chestChance === undefined) problems.push(`weapon ${id}: missing chestChance (percent, 0 = never in chests)`);
-      else if (!isPercent(w.chestChance)) problems.push(`weapon ${id}: chestChance must be a number from 0 to 100`);
+      if (w.chestChance === undefined) problems.push(`weapon ${id}: missing chestChance (a weight, 0 = never in chests)`);
+      else if (!isWeight(w.chestChance)) problems.push(`weapon ${id}: chestChance must be a number >= 0`);
       else chanceTotal += w.chestChance;
     }
-    if (Math.abs(chanceTotal - 100) > 1e-9) problems.push(`weapon chestChance values must add up to 100, they add up to ${+chanceTotal.toFixed(4)}`);
+    // The chest numbers are weights: they do not have to add up to 100, but at least one must be > 0.
+    if (!(chanceTotal > 0)) problems.push('at least one weapon needs a chestChance above 0 (chests always give one weapon)');
     if (!Object.hasOwn(WEAPONS, STARTING_WEAPON)) problems.push(`STARTING_WEAPON "${STARTING_WEAPON}" is not a weapon`);
+    else if (WEAPONS[STARTING_WEAPON]?.type === 'shield') problems.push(`STARTING_WEAPON "${STARTING_WEAPON}" must not be a shield`);
 
     if (isObject(LOOT_TABLE)) {
       for (const [rarity, ids] of Object.entries(LOOT_TABLE)) {

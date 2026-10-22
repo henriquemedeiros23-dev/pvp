@@ -208,6 +208,8 @@ export function createLocalServer({
       case 'slot': if (id != null) arena.selectSlot(id, m.i); break;
       case 'open': if (id != null) arena.openChest(id, m.id, t); break;
       case 'drink': if (id != null) arena.drink(id, t); break;
+      case 'shield': if (id != null) arena.setShield(id, m.up, t); break;
+      case 'drop': if (id != null) arena.dropWeapon(id, t); break;
     }
     pump();
   }

@@ -10,6 +10,7 @@ export * from './player.js';
 export {
   STARTING_WEAPON, WEAPON_TYPES, RARITIES, RARITY_COLORS, WEAPONS, LOOT_TABLE, GOLDEN_CHEST_BOOST,
   weaponsByRarity, weaponPrice, weaponDurability, weaponWear, droppedDurability, chestChance, rarityStyle,
+  isShield, rarityRank,
 } from './weapons.js';
 export { MAX_POTIONS, POTION, potionPrice, potionHeal } from './potion.js';
 export { COLORS, OUTFITS, SKIN_SLOTS, DEFAULT_SKIN, skinPrice } from './skins.js';

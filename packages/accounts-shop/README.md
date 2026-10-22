@@ -22,13 +22,14 @@ try {
 const acc = accounts.byToken(token);        // null if not logged in
 accounts.addCoins(acc, 25);                 // from a chest; never below 0, NaN throws
 accounts.buy(acc, 'hat', 'crown');          // kind: 'weapon' or a skin slot; returns publicView
-accounts.buy(acc, 'weapon', 'sniper');      // weapons stack in the stash: { sniper: 1 }
+accounts.buy(acc, 'weapon', 'icesword');    // weapons stack in the stash: { icesword: 1 }
 accounts.buy(acc, 'potion', 'potion');      // Healing Potions (10 coins) stack too: account.potions
 accounts.equip(acc, 'hat', 'crown');        // must own it
 
 const weapons = accounts.takeLoadout(acc);  // most expensive stashed weapons first, copies too
-                                            // (2 Shotguns = 2 slots), up to MAX_SLOTS - 1
+                                            // (2 Ice Swords = 2 slots), up to MAX_SLOTS - 1
                                             // (the arena gives the free starting Gun in slot 1 itself)
+                                            // + the best shield at the end (shields take no slot)
 accounts.returnLoadout(acc, weapons);       // left the arena alive: back into the stash
 // knocked out: just don't call returnLoadout, the weapons are lost
 
@@ -41,7 +42,8 @@ await accounts.flush();                     // on shutdown
 ```
 
 Every weapon can be bought (the starting Gun too: it goes into the backpack like the others). A backpack weapon
-that is no longer in the rules (like the old wooden sword) is dropped when the accounts are loaded.
+that is no longer in the rules (like the old wooden sword, or the Pistol, Rocket and the other weapons removed in #26)
+is dropped when the accounts are loaded, so old saved accounts still load.
 The backpack also counts Healing Potions (`potions`, any number; only 3 go into the arena). Older saved
 accounts without it load with 0 potions.
 

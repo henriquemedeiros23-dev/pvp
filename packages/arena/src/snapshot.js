@@ -1,8 +1,8 @@
 // What a player gets to see: the welcome message and the per-tick snapshot.
 
 import { itemMsg } from './loot.js';
-import { mineMsg } from './mines.js';
 import { playerInfo } from './players.js';
+import { isFrozen } from './effects.js';
 
 const round2 = v => +v.toFixed(2);
 
@@ -16,7 +16,6 @@ export function welcomeFor(A, id) {
     chests: A.chests.filter(c => c.openUntil > A.now).map(c => c.id),
     golden: A.golden ? { ...A.golden } : null,
     items: [...A.items.values()].map(itemMsg),
-    mines: [...A.mines.values()].map(mineMsg),
   };
 }
 
@@ -27,7 +26,10 @@ export function snapshotFor(A, id) {
   const near = [];
   for (const o of A.players.values()) {
     if (o !== p && Math.hypot(o.x - p.x, o.z - p.z) > A.tune.snapshotRadius) continue;
-    near.push([o.id, round2(o.x), round2(o.y), round2(o.z), round2(o.ry), round2(o.pitch), o.flags, o.weapons[o.slot] ?? '', o.hp, A.now < o.protectUntil ? 1 : 0]);
+    // status bits (see @pvp/net-protocol STATUS_*): 1 shield up, 2 shocked, 4 frozen
+    const status = (o.shieldUp ? 1 : 0) | (o.shock ? 2 : 0) | (isFrozen(A, o) ? 4 : 0);
+    near.push([o.id, round2(o.x), round2(o.y), round2(o.z), round2(o.ry), round2(o.pitch), o.flags, o.weapons[o.slot] ?? '',
+      o.hp, A.now < o.protectUntil ? 1 : 0, o.shield ? o.shield.id : '', status]);
   }
   return { t: 'snap', p: near, n: A.players.size };
 }

@@ -6,17 +6,20 @@ import { makeArena, drain, msgs, aimAt, RULES } from './helpers.js';
 const READY = RULES.SPAWN_PROTECT_MS + 100; // spawn protection is over
 const DRINK = RULES.POTION.drinkMs;
 
-// A shooter (sniper in slot 2) and a victim with potions, 20 m apart; the victim is hurt once (hp 25).
-function hurtPlayer({ potions = 2, victimLoadout = ['pistol'] } = {}) {
+// A shooter (Gun, Shootbm in slot 2, Supersword in slot 3) and a victim with potions 2 m in front of it;
+// the victim is hurt once by the Shootbm.
+const SHOOTBM = RULES.WEAPONS.shootbm.dmg;
+const HURT = RULES.MAX_HP - SHOOTBM;
+function hurtPlayer({ potions = 2, victimLoadout = ['icesword'] } = {}) {
   const arena = makeArena();
-  const s = arena.join('shooter', { loadout: ['sniper'] }).id;
+  const s = arena.join('shooter', { loadout: ['shootbm', 'supersword'] }).id;
   const v = arena.join('victim', { loadout: victimLoadout, potions }).id;
   arena.selectSlot(s, 1);
-  arena.teleport(s, { x: 0, z: 0 });
-  arena.teleport(v, { x: 20, z: 0 });
-  arena.fire(s, aimAt(arena, s, v), READY);
+  arena.teleport(s, { x: 0, z: 0, ry: 0 });
+  arena.teleport(v, { x: 0, z: 2 });
+  assert.equal(arena.fire(s, aimAt(arena, s, v), READY), true);
   drain(arena);
-  assert.equal(arena.getPlayer(v).hp, RULES.MAX_HP - RULES.WEAPONS.sniper.dmg);
+  assert.equal(arena.getPlayer(v).hp, HURT);
   return { arena, s, v };
 }
 
@@ -26,14 +29,14 @@ test('drinking heals to full after exactly 5 s, not before', () => {
   assert.equal(DRINK, 5000);
   assert.equal(arena.drink(v, t0), true);
   let out = drain(arena);
-  assert.deepEqual(msgs(out, 'drink', v), [{ t: 'drink', state: 'start', ms: 5000, hp: 25 }]);
+  assert.deepEqual(msgs(out, 'drink', v), [{ t: 'drink', state: 'start', ms: 5000, hp: HURT }]);
   assert.equal(msgs(out, 'inv', v).at(-1).potions, 1, 'the potion is used up when drinking starts');
   assert.deepEqual(arena.getPlayer(v).drink, { start: t0, end: t0 + DRINK });
 
   arena.tick(t0 + 2500);
   arena.tick(t0 + DRINK - 1);
   out = drain(arena);
-  assert.equal(arena.getPlayer(v).hp, 25, 'not healed before 5 s');
+  assert.equal(arena.getPlayer(v).hp, HURT, 'not healed before 5 s');
   assert.equal(msgs(out, 'drink').length, 0);
 
   arena.tick(t0 + DRINK);
@@ -53,10 +56,10 @@ test('switching to a weapon before 5 s cancels it: the potion is wasted', () => 
   drain(arena);
   assert.equal(arena.selectSlot(v, 1), true);
   let out = drain(arena);
-  assert.deepEqual(msgs(out, 'drink', v), [{ t: 'drink', state: 'cancel', ms: 0, hp: 25 }]);
+  assert.deepEqual(msgs(out, 'drink', v), [{ t: 'drink', state: 'cancel', ms: 0, hp: HURT }]);
   arena.tick(t0 + DRINK + 1000);
   out = drain(arena);
-  assert.equal(arena.getPlayer(v).hp, 25, 'no health');
+  assert.equal(arena.getPlayer(v).hp, HURT, 'no health');
   assert.equal(arena.getPlayer(v).potions, 1, 'the potion is gone');
   assert.equal(msgs(out, 'drink').length, 0);
 });
@@ -73,7 +76,7 @@ test('picking the slot you already hold does not cancel; a slot change after the
   const b = hurtPlayer();
   b.arena.drink(b.v, t0);
   b.arena.tick(t0 + DRINK - 10);
-  b.arena.setState(b.v, { x: 20, y: 0, z: 0, ry: 0, pitch: 0, f: 0 }, t0 + DRINK); // the clock moves on
+  b.arena.setState(b.v, { x: 0, y: 0, z: 2, ry: 0, pitch: 0, f: 0 }, t0 + DRINK); // the clock moves on
   b.arena.selectSlot(b.v, 1);
   const out = drain(b.arena);
   assert.deepEqual(msgs(out, 'drink', b.v).map(m => m.state), ['start', 'done']);
@@ -85,11 +88,11 @@ test('moving or getting hit does not stop drinking', () => {
   const t0 = READY + 1000;
   arena.drink(v, t0);
   // walk around while drinking
-  for (let i = 1; i <= 10; i++) arena.setState(v, { x: 20 + i * 0.2, y: 0, z: 0, ry: 0, pitch: 0, f: 4 }, t0 + i * 100);
-  // and get hit (with the Gun in slot 1: the sniper would knock out)
+  for (let i = 1; i <= 10; i++) arena.setState(v, { x: i * 0.1, y: 0, z: 2, ry: 0, pitch: 0, f: 4 }, t0 + i * 100);
+  // and get hit (with the Gun in slot 1)
   arena.selectSlot(s, 0);
-  arena.fire(s, aimAt(arena, s, v), t0 + 2000);
-  assert.equal(arena.getPlayer(v).hp, 25 - RULES.WEAPONS.gun.dmg, 'hit while drinking');
+  assert.equal(arena.fire(s, aimAt(arena, s, v), t0 + 2000), true);
+  assert.equal(arena.getPlayer(v).hp, HURT - RULES.WEAPONS.gun.dmg, 'hit while drinking');
   assert.ok(arena.getPlayer(v).drink, 'still drinking');
   arena.tick(t0 + DRINK);
   const out = drain(arena);
@@ -97,13 +100,14 @@ test('moving or getting hit does not stop drinking', () => {
   assert.deepEqual(msgs(out, 'drink', v).map(m => m.state), ['start', 'done']);
 });
 
-test('no firing while drinking; no second potion at the same time', () => {
+test('no firing or dropping the weapon while drinking; no second potion at the same time', () => {
   const { arena, v } = hurtPlayer({ potions: 3 });
   const t0 = READY + 1000;
   assert.equal(arena.drink(v, t0), true);
   assert.equal(arena.drink(v, t0 + 100), false, 'already drinking');
   assert.equal(arena.getPlayer(v).potions, 2);
   assert.equal(arena.fire(v, [0, 0, 1], t0 + 200), false, 'busy drinking');
+  assert.equal(arena.dropWeapon(v, t0 + 300), null, 'no dropping while drinking');
   arena.tick(t0 + DRINK);
   assert.equal(arena.fire(v, [0, 0, 1], t0 + DRINK + 10), true, 'can fire again after');
 });
@@ -112,7 +116,8 @@ test('knocked out while drinking: the potion is gone, the others drop on the gro
   const { arena, s, v } = hurtPlayer({ potions: 3 });
   const t0 = READY + 1000;
   arena.drink(v, t0);
-  arena.fire(s, aimAt(arena, s, v), t0 + 2000); // the sniper again: knocked out
+  arena.selectSlot(s, 2);
+  assert.equal(arena.fire(s, [0, 0, 1], t0 + 2000), true); // the Supersword: knocked out
   const out = drain(arena);
   assert.equal(arena.getPlayer(v), undefined);
   assert.equal(msgs(out, 'item+').filter(m => m.kind === 'potion').length, 2, 'the 2 left drop, the one being drunk is gone');

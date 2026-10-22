@@ -1,25 +1,28 @@
-// Damage, knockouts, explosions and firing. Weapon behaviour depends only on the
-// weapon's `type` (melee | gun | throw | rocket | mine) and its numbers in the rules.
+// Damage, knockouts and firing. Weapon behaviour depends only on the weapon's `type`
+// (melee | gun) and its numbers in the rules; shields and effects are in effects.js.
 
 import { rayBoxes, rayCylinder } from '@pvp/collision';
 import { droppedDurability } from '@pvp/game-rules';
 import { at, send, tellServer, weaponDef, heightOf, wearOf } from './state.js';
 import { removePlayer, inventoryMsg } from './players.js';
 import { dropItem } from './loot.js';
-import { launchProjectile } from './projectiles.js';
-import { placeMine } from './mines.js';
+import { strike, isFrozen } from './effects.js';
 
 const round2 = v => +v.toFixed(2);
 
-/** Hurt `victim`. `attacker` is a player object (may have left already) or null. */
-export function damage(A, victim, amount, attacker, weapon, kx = 0, kz = 0) {
-  if (!A.players.has(victim.id) || victim.hp <= 0) return;
-  if (A.now < victim.protectUntil) return;
+/**
+ * Hurt `victim` (no shield check: use strike() in effects.js for weapon hits).
+ * `attacker` is a player object (may have left already) or null; opts.byName names an attacker who left.
+ * Returns true if the damage was done (false: not in the arena, already out, or spawn protection).
+ */
+export function damage(A, victim, amount, attacker, weapon, kx = 0, kz = 0, opts = {}) {
+  if (!A.players.has(victim.id) || victim.hp <= 0) return false;
+  if (A.now < victim.protectUntil) return false;
   victim.hp = Math.max(0, victim.hp - Math.round(amount));
-  if (attacker) send(A, attacker.id, { t: 'hitmark', dead: victim.hp <= 0 });
+  if (attacker && A.players.has(attacker.id)) send(A, attacker.id, { t: 'hitmark', dead: victim.hp <= 0 });
   send(A, victim.id, { t: 'hurt', hp: victim.hp, kx, kz, from: attacker ? [attacker.x, attacker.z] : null });
-  if (victim.hp > 0) return;
-  knockOut(A, victim, attacker, weapon);
+  if (victim.hp <= 0) knockOut(A, victim, attacker, weapon, opts.byName);
+  return true;
 }
 
 /**
@@ -28,35 +31,27 @@ export function damage(A, victim, amount, attacker, weapon, kx = 0, kz = 0) {
  * A dropped weapon with more than half its durability keeps it; half or less is set to half
  * (rounded up), see droppedDurability in @pvp/game-rules.
  */
-function knockOut(A, victim, attacker, weapon) {
+function knockOut(A, victim, attacker, weapon, byName) {
   const spread = A.tune.koDropSpread;
   const lost = [...victim.weapons];
   victim.weapons.forEach((w, i) => {
     dropItem(A, 'weapon', w, victim.x, victim.z, spread, droppedDurability(w, victim.dur[i], A.rules.WEAPONS));
   });
+  if (victim.shield) { // the shield drops too, with the same rule
+    const { id, dur } = victim.shield;
+    lost.push(id);
+    dropItem(A, 'weapon', id, victim.x, victim.z, spread, droppedDurability(id, dur, A.rules.WEAPONS));
+  }
   for (let i = 0; i < victim.potions; i++) dropItem(A, 'potion', null, victim.x, victim.z, spread);
   victim.drink = null;
   removePlayer(A, victim);
-  const by = attacker ? attacker.name : null;
+  const by = attacker ? attacker.name : (byName ?? null);
   send(A, 'all', { t: 'ko', id: victim.id, x: victim.x, y: victim.y, z: victim.z, victim: victim.name, by, weapon });
   send(A, victim.id, { t: 'dead', by, weapon });
   tellServer(A, 'knockedOut', { playerId: victim.id, playerKey: victim.key, weapons: lost, by, byId: attacker ? attacker.id : null });
 }
 
-/** Explosion with damage falling off from the center. The owner is never hurt. */
-export function explode(A, x, y, z, def, owner, weapon) {
-  const T = A.tune;
-  send(A, 'all', { t: 'boom', x, y, z, r: def.radius });
-  for (const v of [...A.players.values()]) {
-    if (owner && v.id === owner.id) continue; // no self damage
-    const d = Math.hypot(v.x - x, v.y + 0.9 - y, v.z - z);
-    if (d > def.radius) continue;
-    const f = 1 - (d / def.radius) * T.explosionFalloff;
-    const len = Math.hypot(v.x - x, v.z - z) || 1;
-    damage(A, v, def.dmg * f, owner, weapon, ((v.x - x) / len) * T.explosionKnock, ((v.z - z) / len) * T.explosionKnock);
-  }
-}
-
+// Returns true if the swing hit someone (a player, or a raised shield); a swing at the air returns false.
 function melee(A, p, w, def) {
   const T = A.tune;
   send(A, 'all', { t: 'swing', id: p.id });
@@ -69,9 +64,10 @@ function melee(A, p, w, def) {
     if (d > T.meleeCloseRange && (vx * fx + vz * fz) / d < T.meleeFrontDot) continue; // must be in front
     best = d; target = v;
   }
-  if (!target) return;
+  if (!target) return false;
   const d = best || 1, k = def.knock || T.meleeKnock;
-  damage(A, target, def.dmg, p, w, ((target.x - p.x) / d) * k, ((target.z - p.z) / d) * k);
+  strike(A, p, target, w, def, ((target.x - p.x) / d) * k, ((target.z - p.z) / d) * k);
+  return true;
 }
 
 function gun(A, p, w, def, o, dir) {
@@ -91,17 +87,21 @@ function gun(A, p, w, def, o, dir) {
       const t = rayCylinder(o, sd, { x: v.x, y: v.y, z: v.z, height: heightOf(A, v), radius });
       if (t < dist) { dist = t; hit = v; }
     }
-    if (hit) damage(A, hit, def.dmg, p, w);
+    if (hit) strike(A, p, hit, w, def);
     tracers.push([round2(o.x + sx * dist), round2(o.y + sy * dist), round2(o.z + sz * dist)]);
   }
   send(A, 'all', { t: 'shot', id: p.id, w, from: [round2(o.x), round2(o.y), round2(o.z)], to: tracers });
 }
 
-/** Use the weapon in hand, aiming along dir ([x, y, z] or { x, y, z }). Returns true if it fired. */
+/**
+ * Use the weapon in hand, aiming along dir ([x, y, z] or { x, y, z }). Returns true if it fired.
+ * Not while frozen, and not while the shield is raised.
+ */
 export function fire(A, id, dir, now) {
   const p = A.players.get(id);
   if (!p) return false;
   now = at(A, now);
+  if (isFrozen(A, p) || p.shieldUp) return false;
   const w = p.weapons[p.slot];
   const def = weaponDef(A, w);
   if (p.drink) return false; // busy drinking a potion (switch slots to stop, the potion is wasted)
@@ -115,16 +115,38 @@ export function fire(A, id, dir, now) {
   const o = { x: p.x, y: p.y + heightOf(A, p) - A.tune.muzzleDrop, z: p.z };
 
   const slot = p.slot;
+  let used = true; // a gun shot always wears; a melee swing only when it hits someone (#34)
   switch (def.type) {
-    case 'melee': melee(A, p, w, def); break;
+    case 'melee': used = melee(A, p, w, def); break;
     case 'gun': gun(A, p, w, def, o, d); break;
-    case 'throw':
-    case 'rocket': launchProjectile(A, p, w, def, o, d, now); break;
-    case 'mine': placeMine(A, p, w, def, now); break;
     default: return false;
   }
-  wear(A, p, slot);
+  if (!A.players.has(p.id)) return true; // knocked out by a reflected hit: everything already dropped
+  if (used) wear(A, p, slot);
   return true;
+}
+
+/**
+ * Drop the weapon in your hand (#34) where you stand, with exactly the durability it has (no half rule:
+ * that is only for knockouts). Anyone can pick it up; you only after you stepped away from it once.
+ * The free starting Gun can be dropped too (it stays free: it never goes into a backpack).
+ * Not while frozen. Returns the ground item id, or null if there is nothing in your hand.
+ */
+export function dropWeapon(A, id, now) {
+  const p = A.players.get(id);
+  if (!p) return null;
+  at(A, now);
+  if (isFrozen(A, p) || p.drink || p.slot >= p.weapons.length) return null; // not while drinking a potion
+  const slot = p.slot;
+  const [weapon] = p.weapons.splice(slot, 1);
+  const [dur] = p.dur.splice(slot, 1);
+  const [free] = p.free.splice(slot, 1);
+  p.slot = Math.max(0, Math.min(slot, p.weapons.length - 1));
+  const it = dropItem(A, 'weapon', weapon, p.x, p.z, A.tune.dropSpread, dur);
+  it.ignore = p.id; // not picked straight back up by the one who dropped it
+  if (free) it.free = true;
+  send(A, p.id, inventoryMsg(p));
+  return it.id;
 }
 
 /** One use of the weapon in `slot`: lose wearPerUse durability; at 0 it breaks and is gone. */

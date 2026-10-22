@@ -6,9 +6,8 @@ import { createState, at, send } from './state.js';
 import * as players from './players.js';
 import { openChest, tickChests } from './chests.js';
 import { tickItems } from './loot.js';
-import { fire } from './combat.js';
-import { tickProjectiles } from './projectiles.js';
-import { tickMines } from './mines.js';
+import { fire, dropWeapon } from './combat.js';
+import { setShield, tickEffects, isFrozen, isShocked } from './effects.js';
 import { snapshotFor, welcomeFor } from './snapshot.js';
 
 export { ARENA_DEFAULTS } from './tuning.js';
@@ -19,6 +18,8 @@ const copyPlayer = p => p && {
   hp: p.hp, weapons: [...p.weapons], dur: [...p.dur], free: [...p.free], slot: p.slot, potions: p.potions,
   drink: p.drink ? { ...p.drink } : null,
   protectUntil: p.protectUntil,
+  shield: p.shield ? { ...p.shield } : null, shieldUp: p.shieldUp,
+  frozenUntil: p.frozenUntil, shock: p.shock ? { next: p.shock.next, left: p.shock.left, dmg: p.shock.dmg, everyMs: p.shock.everyMs, weapon: p.shock.weapon } : null,
 };
 
 /**
@@ -41,7 +42,14 @@ export function createArena(o = {}) {
     leave: (id, opts) => players.leave(A, id, opts),
     setState: (id, state, now) => players.setState(A, id, state, now),
     fire: (id, dir, now) => fire(A, id, dir, now),
+    /** Raise (true) or lower (false) the shield on the left arm. False if no shield, frozen or no change. */
+    setShield: (id, up, now) => setShield(A, id, up, now),
+    /** Is this player frozen (stuck) / shocked (losing HP over time) right now? */
+    isFrozen: id => isFrozen(A, A.players.get(id)),
+    isShocked: id => isShocked(A, A.players.get(id)),
     selectSlot: (id, i) => players.selectSlot(A, id, i),
+    /** Drop the weapon in hand on the ground with its exact durability (#34). Returns the item id or null. */
+    dropWeapon: (id, now) => dropWeapon(A, id, now),
     openChest: (id, chest, now) => openChest(A, id, chest, now),
     /** Start drinking a Healing Potion (full H.P after POTION.drinkMs). False if refused. */
     drink: (id, now) => players.startDrink(A, id, now),
@@ -49,17 +57,14 @@ export function createArena(o = {}) {
     /** Set a player's coins from the account (the real total). Queues an 'inv'. False if unknown id. */
     setCoins: (id, total) => players.setCoins(A, id, total),
 
-    /** Advance the world to nowMs: chests, golden chest, items, projectiles, mines, snapshots. */
+    /** Advance the world to nowMs: chests, golden chest, items, shock damage, snapshots. */
     tick(nowMs) {
-      const prev = A.lastTick;
       const now = at(A, nowMs);
-      const dt = Math.min(A.tune.maxStepS, Math.max(0, (now - prev) / 1000));
       A.lastTick = now;
       players.tickDrinks(A, now);
       tickChests(A, now);
       tickItems(A, now);
-      tickProjectiles(A, now, dt);
-      tickMines(A, now);
+      tickEffects(A, now);
       if (A.snapshots) for (const id of A.players.keys()) send(A, id, snapshotFor(A, id));
     },
 
@@ -83,8 +88,6 @@ export function createArena(o = {}) {
     chests: () => A.chests.map(c => ({ id: c.id, x: c.x, z: c.z, open: c.openUntil > A.now, openUntil: c.openUntil })),
     golden: () => (A.golden ? { ...A.golden } : null),
     nextGoldenAt: () => A.nextGolden,
-    items: () => [...A.items.values()].map(it => ({ ...it })),
-    projectiles: () => [...A.projectiles.values()].map(({ owner, ...pr }) => ({ ...pr, ownerId: owner.id })),
-    mines: () => [...A.mines.values()].map(({ owner, ...m }) => ({ ...m })),
+    items: () => [...A.items.values()].map(({ ignore, ...it }) => ({ ...it })),
   };
 }
