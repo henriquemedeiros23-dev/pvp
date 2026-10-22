@@ -148,8 +148,8 @@ input:focus { border-color: var(--gold); }
 .meter.hp .mfill.low { background: linear-gradient(90deg, #e2541a, #ffa53a); animation: blink 0.7s ease-in-out infinite alternate; }
 
 .slots { display: flex; gap: 6px; }
-/* Drop the weapon in your hand (#34): a small button right of the slots */
-.dropbtn { pointer-events: auto; align-self: center; width: calc(var(--slot) * 0.62); height: calc(var(--slot) * 0.62); border-radius: 10px; padding: 0;
+/* Drop the weapon in your hand (#34): a small button just above the right end of the slots (takes no room in the bar) */
+.dropbtn { pointer-events: auto; position: absolute; right: 0; bottom: calc(100% + 6px); width: calc(var(--slot) * 0.62); height: calc(var(--slot) * 0.62); border-radius: 10px; padding: 0;
   background: rgba(10, 8, 16, 0.6); border: 2px solid rgba(255,255,255,0.22); font-size: calc(var(--slot) * 0.3); line-height: 1; touch-action: none; }
 .dropbtn:active { background: rgba(255,255,255,0.3); }
 .slot {

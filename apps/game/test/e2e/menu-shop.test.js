@@ -376,12 +376,6 @@ test('weapon bar: Durability bar follows the held weapon, tap to switch, a broke
     for (let i = 0; i < 40 && sentShield.at(-1) !== false; i++) await p.waitForTimeout(50);
     assert.deepEqual(sentShield, [true, false]);
 
-    // the ⬇️ button drops the weapon in your hand (#34): tapping it asks the server
-    assert.equal(await p.locator('#btnDrop').isVisible(), true);
-    await p.locator('#btnDrop').tap();
-    for (let i = 0; i < 40 && !sentDrop; i++) await p.waitForTimeout(50);
-    assert.equal(sentDrop, 1);
-
     // tap a slot: the game asks the server for it
     await p.locator('#slots .slot').nth(1).tap();
     for (let i = 0; i < 40 && !sentSlots.includes(1); i++) await p.waitForTimeout(50);
@@ -400,6 +394,13 @@ test('weapon bar: Durability bar follows the held weapon, tap to switch, a broke
     assert.equal(await p.locator('#btnShield').isVisible(), false);
     assert.equal(await p.locator('#slots .slot.empty').count(), 2);
     await p.waitForFunction(() => !document.querySelector('#slots .slot.broke'), null, { timeout: 3000 });
+
+    // the ⬇️ button drops the weapon in your hand (#34): tapping it asks the server (the real server then
+    // drops the real Gun, so this comes last)
+    assert.equal(await p.locator('#btnDrop').isVisible(), true);
+    await p.locator('#btnDrop').tap();
+    for (let i = 0; i < 40 && !sentDrop; i++) await p.waitForTimeout(50);
+    assert.equal(sentDrop, 1);
 
     // every weapon broke (the Gun too): 5 empty slots and no errors
     toPage(encode('inv', { ...inv, weapons: [], dur: [], slot: 0 }));
