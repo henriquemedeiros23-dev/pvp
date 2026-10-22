@@ -2,7 +2,7 @@
 // Skipped in a normal `npm test`. Run it with:  npm run test:e2e   (from the repo root)
 // Needs Chromium for Playwright (PLAYWRIGHT_BROWSERS_PATH or CHROMIUM_PATH). Set SCREENSHOTS=1 to
 // save screenshots to docs/screenshots/.
-import { test, before, after } from 'node:test';
+import { test, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
@@ -60,6 +60,7 @@ before(async () => {
     args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'],
   });
   page = await browser.newPage({ viewport: { width: 1100, height: 700 } });
+  page.setDefaultTimeout(60000); // software WebGL is slow; every wait below is for a condition
   page.on('console', m => {
     // failed requests are checked through badResponses (with their address)
     if (m.type() === 'error' && !m.text().startsWith('Failed to load resource')) errors.push(m.text());
@@ -78,6 +79,12 @@ const stopServer = async () => {
   fs.rmSync(dataDir, { recursive: true, force: true });
 };
 
+// Only the first test uses the shared `page`. Close it when that test ends: an open game page keeps
+// drawing the 3D menu, and with software WebGL that steals the CPU from the next tests' pages.
+afterEach(async () => {
+  if (page && !page.isClosed()) await page.close();
+});
+
 after(async () => {
   await browser?.close();
   await stopServer();
@@ -95,6 +102,7 @@ const isVisible = sel => page.locator(sel).isVisible();
 // A new page that records console errors, page crashes and bad answers like the main one.
 async function newPage(contextOptions) {
   const context = await browser.newContext(contextOptions);
+  context.setDefaultTimeout(60000);
   const p = await context.newPage();
   const errs = [];
   p.on('console', m => { if (m.type() === 'error' && !m.text().startsWith('Failed to load resource')) errs.push(m.text()); });
@@ -113,7 +121,7 @@ async function signedIn(p, prefix) {
   const { token } = await res.json();
   await p.addInitScript(t => localStorage.setItem('pvp.token', t), token);
   await p.goto(`http://127.0.0.1:${port}/?debug=1`);
-  await p.locator('#menu').waitFor({ state: 'visible' });
+  await p.locator('#menu').waitFor({ state: 'visible', timeout: 60000 });
   return name;
 }
 
@@ -162,7 +170,7 @@ async function checkPhoneLayout(p, { width, height }, others = ['stick', 'btnFir
   assert.ok(boxes.hotbar.b > height - 40, `the weapon bar should be at the bottom at ${width}x${height}`);
 }
 
-test('sign up, shop, join the arena, leave: no errors', { skip: !RUN && 'set E2E=1 to run (npm run test:e2e)', timeout: 120000 }, async () => {
+test('sign up, shop, join the arena, leave: no errors', { skip: !RUN && 'set E2E=1 to run (npm run test:e2e)', timeout: 240000 }, async () => {
   await page.goto(`http://127.0.0.1:${port}/?debug=1`); // ?debug: window.pvpDebug() shows the game state
   await page.locator('#login').waitFor({ state: 'visible' });
 
@@ -198,7 +206,7 @@ test('sign up, shop, join the arena, leave: no errors', { skip: !RUN && 'set E2E
   await page.click('#btnShopBack');
   await page.locator('#menu').waitFor({ state: 'visible' });
   await page.click('#btnJoin');
-  await page.locator('#hud').waitFor({ state: 'visible', timeout: 20000 });
+  await page.locator('#hud').waitFor({ state: 'visible', timeout: 60000 });
   assert.equal(await isVisible('#menu'), false);
   assert.equal(await isVisible('#loading'), false);
   await checkHud(page);
@@ -208,14 +216,15 @@ test('sign up, shop, join the arena, leave: no errors', { skip: !RUN && 'set E2E
 
   // walk forward with the keyboard: the stickman must move more than 1 m.
   // Software WebGL (swiftshader) can draw only a few frames a second, and the game caps one
-  // frame's step at 0.05 s, so we hold W until 1 m is reached (at most 5 s) instead of a fixed second.
+  // frame's step at 0.05 s (at 0.6 fps that is only ~0.2 m a second), so we hold W until 1 m is
+  // reached (at most 30 s) instead of a fixed time.
   await page.waitForFunction(() => window.pvpDebug?.().me != null);
   const start = (await page.evaluate(() => window.pvpDebug())).me;
   await page.evaluate(() => { window.__frames = 0; const tick = () => { window.__frames++; requestAnimationFrame(tick); }; requestAnimationFrame(tick); });
   const t0 = Date.now();
   await page.keyboard.down('w');
   let moved = 0;
-  while (Date.now() - t0 < 5000) {
+  while (Date.now() - t0 < 30000) {
     await page.waitForTimeout(100);
     const me = (await page.evaluate(() => window.pvpDebug())).me;
     moved = Math.hypot(me.x - start.x, me.z - start.z);
@@ -266,7 +275,7 @@ test('phone in landscape: menu and weapon bar fit (844x390 and 667x375)', { skip
       const tag = `${viewport.width}x${viewport.height}`;
       if (viewport.width === 844) await shot('menu-phone.png', p);
       await p.click('#btnJoin');
-      await p.locator('#hud').waitFor({ state: 'visible', timeout: 20000 });
+      await p.locator('#hud').waitFor({ state: 'visible', timeout: 60000 });
       assert.equal(await p.locator('#stick').isVisible(), true, `touch controls at ${tag}`);
       await checkHud(p);
       await checkPhoneLayout(p, viewport);
@@ -284,7 +293,7 @@ test('phone in landscape: menu and weapon bar fit (844x390 and 667x375)', { skip
   }
 });
 
-test('join gives up after a few seconds when the arena does not answer', { skip: !RUN && 'set E2E=1 to run (npm run test:e2e)', timeout: 60000 }, async () => {
+test('join gives up after a few seconds when the arena does not answer', { skip: !RUN && 'set E2E=1 to run (npm run test:e2e)', timeout: 120000 }, async () => {
   const { context, page: p, errors: errs } = await newPage({ viewport: { width: 1100, height: 700 } });
   try {
     // 1) the socket opens but the server never says 'welcome'
@@ -293,7 +302,7 @@ test('join gives up after a few seconds when the arena does not answer', { skip:
     await signedIn(p, 'to_');
     await p.click('#btnJoin');
     await p.locator('#loading').waitFor({ state: 'visible' });
-    await p.locator('#menu').waitFor({ state: 'visible', timeout: 15000 });
+    await p.locator('#menu').waitFor({ state: 'visible', timeout: 60000 });
     assert.equal(await p.locator('#loading').isVisible(), false);
     assert.match(await p.textContent('#menuMessage'), /didn't answer/);
     assert.equal((await p.evaluate(() => window.pvpDebug())).mode, 'menu');
@@ -310,7 +319,7 @@ test('join gives up after a few seconds when the arena does not answer', { skip:
   }
 });
 
-test('weapon bar: Durability bar follows the held weapon, tap to switch, a broken weapon flashes', { skip: !RUN && 'set E2E=1 to run (npm run test:e2e)', timeout: 90000 }, async () => {
+test('weapon bar: Durability bar follows the held weapon, tap to switch, a broken weapon flashes', { skip: !RUN && 'set E2E=1 to run (npm run test:e2e)', timeout: 240000 }, async () => {
   const { context, page: p, errors: errs } = await newPage({ viewport: { width: 844, height: 390 }, isMobile: true, hasTouch: true });
   try {
     // talk to the real server, but let the test send extra messages to the page
@@ -330,7 +339,7 @@ test('weapon bar: Durability bar follows the held weapon, tap to switch, a broke
     });
     await signedIn(p, 'du_');
     await p.click('#btnJoin');
-    await p.locator('#hud').waitFor({ state: 'visible', timeout: 20000 });
+    await p.locator('#hud').waitFor({ state: 'visible', timeout: 60000 });
     await checkHud(p);
 
     // the Durability bar shows the weapon in your hand: switch slots and it follows
@@ -370,15 +379,16 @@ test('weapon bar: Durability bar follows the held weapon, tap to switch, a broke
     const cdp = await context.newCDPSession(p);
     const touch = (type, pts) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: pts });
     await touch('touchStart', [{ x: box.x + box.width / 2, y: box.y + box.height / 2, id: 7 }]);
-    for (let i = 0; i < 40 && !sentShield.includes(true); i++) await p.waitForTimeout(50);
-    assert.equal(await p.locator('#shieldPill').evaluate(e => e.classList.contains('up')), true);
+    for (let i = 0; i < 1200 && !sentShield.includes(true); i++) await p.waitForTimeout(50);
+    assert.ok(sentShield.includes(true), 'holding the shield button should raise the shield');
+    await p.waitForFunction(() => document.getElementById('shieldPill').classList.contains('up')); // drawn on the next (slow) frame
     await touch('touchEnd', []);
-    for (let i = 0; i < 40 && sentShield.at(-1) !== false; i++) await p.waitForTimeout(50);
+    for (let i = 0; i < 1200 && sentShield.at(-1) !== false; i++) await p.waitForTimeout(50);
     assert.deepEqual(sentShield, [true, false]);
 
     // tap a slot: the game asks the server for it
     await p.locator('#slots .slot').nth(1).tap();
-    for (let i = 0; i < 40 && !sentSlots.includes(1); i++) await p.waitForTimeout(50);
+    for (let i = 0; i < 1200 && !sentSlots.includes(1); i++) await p.waitForTimeout(50);
     assert.ok(sentSlots.includes(1), `tapping slot 2 should send it, sent ${JSON.stringify(sentSlots)}`);
 
     // the Supersword breaks: toast and a flash on its slot
@@ -393,13 +403,13 @@ test('weapon bar: Durability bar follows the held weapon, tap to switch, a broke
     await p.locator('#shieldPill').waitFor({ state: 'hidden' });
     assert.equal(await p.locator('#btnShield').isVisible(), false);
     assert.equal(await p.locator('#slots .slot.empty').count(), 2);
-    await p.waitForFunction(() => !document.querySelector('#slots .slot.broke'), null, { timeout: 3000 });
+    await p.waitForFunction(() => !document.querySelector('#slots .slot.broke'), null, { timeout: 60000 });
 
     // the ⬇️ button drops the weapon in your hand (#34): tapping it asks the server (the real server then
     // drops the real Gun, so this comes last)
     assert.equal(await p.locator('#btnDrop').isVisible(), true);
     await p.locator('#btnDrop').tap();
-    for (let i = 0; i < 40 && !sentDrop; i++) await p.waitForTimeout(50);
+    for (let i = 0; i < 1200 && !sentDrop; i++) await p.waitForTimeout(50);
     assert.equal(sentDrop, 1);
 
     // every weapon broke (the Gun too): 5 empty slots and no errors

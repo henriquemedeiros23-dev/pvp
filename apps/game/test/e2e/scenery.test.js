@@ -147,7 +147,7 @@ before(async () => {
   const url = `http://127.0.0.1:${port}/__scenery-test.html`;
   await page.route(url, r => r.fulfill({ contentType: 'text/html', body: PAGE }));
   await page.goto(url);
-  await page.waitForFunction(() => window.ready === true, null, { timeout: 30000 });
+  await page.waitForFunction(() => window.ready === true, null, { timeout: 60000 });
 });
 
 after(async () => {
@@ -178,7 +178,7 @@ test('no black shapes in the sky, from the middle and from the edge of the islan
   assert.deepEqual(errors, []);
 });
 
-test('ruins look like light stone', { skip, timeout: 60000 }, async () => {
+test('ruins look like light stone', { skip, timeout: 120000 }, async () => {
   // standing in the plaza, looking at the ruins around it (some sides in the sun, some in shade)
   for (const yaw of [0, Math.PI / 2, Math.PI, -Math.PI / 2]) {
     const r = await page.evaluate(view => window.view(view), { x: 0, z: 0, yaw, height: 1.7 });
@@ -189,7 +189,7 @@ test('ruins look like light stone', { skip, timeout: 60000 }, async () => {
   assert.deepEqual(errors, []);
 });
 
-test('chests: closed, open and golden', { skip, timeout: 60000 }, async () => {
+test('chests: closed, open and golden', { skip, timeout: 120000 }, async () => {
   await page.evaluate(() => window.chests());
   if (process.env.SCREENSHOTS === '1') {
     fs.mkdirSync(SHOTS, { recursive: true });

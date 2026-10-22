@@ -71,7 +71,7 @@ async function teleportTo(h, spot) {
 
 const hudNumber = async (page, sel) => Number(await page.textContent(sel));
 
-test('play: sign up, join, open a chest, pick up the loot, leave', { skip: SKIP, timeout: 180000 }, async () => {
+test('play: sign up, join, open a chest, pick up the loot, leave', { skip: SKIP, timeout: 300000 }, async () => {
   const h = await newPage(browser, undefined, { hooks: true });
   const { page } = h;
   try {
@@ -87,7 +87,7 @@ test('play: sign up, join, open a chest, pick up the loot, leave', { skip: SKIP,
 
     // join
     await page.click('#btnJoin');
-    await page.locator('#hud').waitFor({ state: 'visible', timeout: 20000 });
+    await page.locator('#hud').waitFor({ state: 'visible', timeout: 60000 });
     let s = await waitDebug(page, x => x.me && x.inv, { what: 'joining' });
     assert.equal(await hudNumber(page, '#hudCoins'), 0);
 
@@ -102,14 +102,14 @@ test('play: sign up, join, open a chest, pick up the loot, leave', { skip: SKIP,
     // jump close to it (test hook), then walk to it with the W key until the Open button shows
     await teleportTo(h, spot);
     assert.equal(await page.locator('#btnOpen').isVisible(), false);
-    s = await holdKey(page, 'w', x => x.nearChest === chest.id, 20000);
+    s = await holdKey(page, 'w', x => x.nearChest === chest.id, 90000); // ~0.2 m a second at 0.6 fps: wait for the condition, not a time
     assert.ok(s, `walking should reach chest ${chest.id}`);
     await page.locator('#btnOpen').waitFor({ state: 'visible' });
 
     // open it with the Open button
     const before = h.received.length;
     await page.click('#btnOpen', { force: true }); // force: the button pulses on purpose, so it is never "stable"
-    await page.waitForFunction(() => Number(document.getElementById('hudCoins').textContent) > 0, null, { timeout: 10000 });
+    await page.waitForFunction(() => Number(document.getElementById('hudCoins').textContent) > 0, null, { timeout: 60000 });
     const coins = await hudNumber(page, '#hudCoins');
     assert.equal(coins, 3, 'a chest gives exactly 3 coins');
     // the lid opens (it turns to about -1.9 radians)
@@ -132,12 +132,12 @@ test('play: sign up, join, open a chest, pick up the loot, leave', { skip: SKIP,
     const itemSpot = startSpot(drop, s.me.yaw, { dists: [3, 2.5, 3.5, 4, 2], stopShort: 1 });
     assert.ok(itemSpot, 'no clear path to the item');
     await teleportTo(h, itemSpot);
-    s = await holdKey(page, 'w', x => !x.items.some(it => it.id === drop.id), 20000);
+    s = await holdKey(page, 'w', x => !x.items.some(it => it.id === drop.id), 90000); // ~0.2 m a second at 0.6 fps: wait for the condition, not a time
     assert.ok(s, 'walking onto the item should pick it up');
     s = await waitDebug(page, x => x.inv.weapons.length + x.inv.bandages + x.inv.medkits > inv0.weapons.length + inv0.bandages + inv0.medkits, { what: 'the inventory to change' });
     if (drop.kind === 'weapon') assert.ok(s.inv.weapons.includes(drop.weapon));
     else assert.equal(s.inv[drop.kind + 's'], inv0[drop.kind + 's'] + 1);
-    await page.waitForFunction(() => document.getElementById('toast').textContent.startsWith('Picked up'), null, { timeout: 5000 });
+    await page.waitForFunction(() => document.getElementById('toast').textContent.startsWith('Picked up'), null, { timeout: 60000 });
     const hud1 = await counts();
     assert.notDeepEqual(hud1, hud0, 'the HUD should show the picked up item');
 
@@ -146,7 +146,7 @@ test('play: sign up, join, open a chest, pick up the loot, leave', { skip: SKIP,
     // leave: the menu shows the new coin total
     await page.click('#btnLeave');
     await page.locator('#menu').waitFor({ state: 'visible' });
-    await page.waitForFunction(c => document.getElementById('menuCoins').textContent === String(c), coins, { timeout: 5000 });
+    await page.waitForFunction(c => document.getElementById('menuCoins').textContent === String(c), coins, { timeout: 60000 });
     assert.equal((await debug(page)).mode, 'menu');
     assert.deepEqual(h.errors, []);
   } finally {
@@ -154,7 +154,7 @@ test('play: sign up, join, open a chest, pick up the loot, leave', { skip: SKIP,
   }
 });
 
-test('two players see each other; when one leaves the other sees it', { skip: SKIP, timeout: 180000 }, async () => {
+test('two players see each other; when one leaves the other sees it', { skip: SKIP, timeout: 300000 }, async () => {
   const a = await newPage(browser, undefined, { hooks: true });
   const b = await newPage(browser, undefined, { hooks: true });
   try {
@@ -162,7 +162,7 @@ test('two players see each other; when one leaves the other sees it', { skip: SK
     const nameB = await signedIn(b.page, server.url, 'pb_');
     for (const h of [a, b]) {
       await h.page.click('#btnJoin');
-      await h.page.locator('#hud').waitFor({ state: 'visible', timeout: 20000 });
+      await h.page.locator('#hud').waitFor({ state: 'visible', timeout: 60000 });
     }
     // spawns can be far apart (out of view): put B next to A
     const meA = (await waitDebug(a.page, s => s.me, { what: 'A to join' })).me;
@@ -172,17 +172,17 @@ test('two players see each other; when one leaves the other sees it', { skip: SK
 
     // each one sees 2 players and the other's stickman close by
     for (const [h, other] of [[a, nameB], [b, nameA]]) {
-      await h.page.waitForFunction(() => document.getElementById('hudPlayers').textContent === '2', null, { timeout: 15000 });
+      await h.page.waitForFunction(() => document.getElementById('hudPlayers').textContent === '2', null, { timeout: 60000 });
       // (the other stickman glides to where it is, so wait until it is drawn close by)
       const near = x => x.others.some(o => o.name === other && Math.hypot(o.x - x.me.x, o.z - x.me.z) < 6);
-      const s = await waitDebug(h.page, near, { timeout: 15000, what: `${other}'s stickman close by` });
+      const s = await waitDebug(h.page, near, { timeout: 60000, what: `${other}'s stickman close by` });
       assert.equal(s.others.length, 1);
     }
 
     // B leaves: A sees 1 player and no other stickman
     await b.page.click('#btnLeave');
     await b.page.locator('#menu').waitFor({ state: 'visible' });
-    await a.page.waitForFunction(() => document.getElementById('hudPlayers').textContent === '1', null, { timeout: 15000 });
+    await a.page.waitForFunction(() => document.getElementById('hudPlayers').textContent === '1', null, { timeout: 60000 });
     await waitDebug(a.page, x => x.others.length === 0, { what: "B's stickman to go away" });
 
     await a.page.click('#btnLeave');

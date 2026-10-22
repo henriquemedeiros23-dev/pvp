@@ -11,7 +11,7 @@
     "start": "npm start --workspace=@pvp/game",
     "test": "npm run catalog:check && npm test --workspaces --if-present",
     "catalog:check": "node scripts/catalog-check.mjs",
-    "test:e2e": "E2E=1 node --test apps/game/test/e2e/*.test.js",
+    "test:e2e": "E2E=1 node --test --test-concurrency=1 apps/game/test/e2e/*.test.js",
     "build:practice": "node scripts/build-practice.mjs"
   },
   "devDependencies": {

@@ -116,7 +116,7 @@ before(async () => {
   const url = `${server.url}/__gun-test.html`;
   await page.route(url, r => r.fulfill({ contentType: 'text/html', body: PAGE }));
   await page.goto(url);
-  await page.waitForFunction(() => window.ready === true, null, { timeout: 30000 });
+  await page.waitForFunction(() => window.ready === true, null, { timeout: 60000 });
 });
 
 after(async () => {
@@ -124,7 +124,7 @@ after(async () => {
   await server?.stop();
 });
 
-test('a stickman holds the Gun: it draws and shows in the hand', { skip: SKIP, timeout: 60000 }, async () => {
+test('a stickman holds the Gun: it draws and shows in the hand', { skip: SKIP, timeout: 120000 }, async () => {
   const r = await page.evaluate(() => window.gunPixels());
   assert.ok(r.meshes >= 10, `a detailed pistol (${r.meshes} parts)`);
   assert.ok(r.changed > 1500, `the Gun covers only ${r.changed} pixels`);
@@ -135,7 +135,7 @@ test('a stickman holds the Gun: it draws and shows in the hand', { skip: SKIP, t
   assert.deepEqual(errors, []);
 });
 
-test('the Gun alone, close up (like the boss\'s drawing)', { skip: SKIP, timeout: 60000 }, async () => {
+test('the Gun alone, close up (like the boss\'s drawing)', { skip: SKIP, timeout: 120000 }, async () => {
   await page.evaluate(() => window.modelShot());
   if (process.env.SCREENSHOTS === '1') await page.screenshot({ path: path.join(SHOTS, 'gun-model.png') });
   assert.deepEqual(errors, []);
