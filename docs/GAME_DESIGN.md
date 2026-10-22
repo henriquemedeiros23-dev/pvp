@@ -73,7 +73,7 @@ Decided by the boss through 22 questions.
 
 ## Chests and coins
 - Coins only come from **chests**.
-- Chests are always in the **same spots**. Each one comes back **15 seconds** after it's opened.
+- Chests are always in the **same spots**. Each one comes back **2 minutes** after it's opened.
 - Every normal chest gives **3 coins** and **exactly one weapon**, and **15%** of the time an **extra Healing Potion** next to it
   (picked up like other items, only if you have fewer than 3).
 - **Which weapon?** Every weapon card has a **chest number** (the "%" on the card). A chest always gives

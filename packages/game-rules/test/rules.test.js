@@ -20,10 +20,13 @@ test('real rules validate with zero problems', () => {
 const CHANGED = ['BASIC_WEAPON', 'RARITIES', 'LOOT_TABLE', 'WEAPONS'];
 // #28 removed bandages and medkits: the Healing Potion is the only heal.
 const REMOVED_IN_28 = ['HEALS', 'MAX_BANDAGES', 'MAX_MEDKITS', 'BANDAGE_HEAL', 'MEDKIT_HEAL'];
+// #36: an opened chest now comes back after 2 minutes (was 15 s).
+const CHANGED_IN_36 = { CHEST_RESPAWN_MS: 120000 };
 
-test('same named exports and values as the old apps/game/shared/config.js (except the #25/#26 changes)', () => {
+test('same named exports and values as the old apps/game/shared/config.js (except the #25/#26/#28/#36 changes)', () => {
   for (const [name, value] of Object.entries(oldConfig)) {
     if (CHANGED.includes(name)) continue;
+    if (name in CHANGED_IN_36) { assert.equal(rules[name], CHANGED_IN_36[name], `${name} changed in #36`); continue; }
     if (REMOVED_IN_28.includes(name)) { assert.ok(!(name in rules), `${name} should be gone (#28)`); continue; }
     assert.ok(name in rules, `missing export ${name}`);
     assert.deepEqual(rules[name], value, `export ${name} differs`);

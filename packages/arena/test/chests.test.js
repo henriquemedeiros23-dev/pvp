@@ -8,7 +8,7 @@ import { createState } from '../src/state.js';
 
 const shootbmOnly = chestAlways('shootbm');
 
-test('chest opens once, gives exactly CHEST_COINS coins and one full weapon, comes back after exactly 15 s', () => {
+test('chest opens once, gives exactly CHEST_COINS coins and one full weapon, comes back after exactly CHEST_RESPAWN_MS (2 min)', () => {
   const arena = makeArena();
   const a = arena.join('a', { coins: 10 });
   arena.teleport(a.id, { x: 11, z: 30 }); // chest 0 is at (10, 30)

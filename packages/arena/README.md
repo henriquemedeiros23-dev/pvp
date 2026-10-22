@@ -95,7 +95,7 @@ setInterval(() => {
   `GOLDEN_CHEST_COINS` (10) coins and one weapon, with the weights of Epic, Legendary and Megalegend weapons
   doubled (`GOLDEN_CHEST_BOOST`). **Every chest (the golden one too) also drops an extra Healing Potion**
   `POTION.chestChance` (15) % of the time, next to the weapon (seeded draws in a fixed order: weapon, its spot,
-  potion chance, potion spot).
+  potion chance, potion spot). An opened normal chest comes back full after `CHEST_RESPAWN_MS` (2 minutes).
   `chestWeights(rules, { golden })` and `rollChestWeapon(A, { golden })` live in `src/loot.js`.
 - **Healing Potion** (the only heal, numbers in `POTION` / `MAX_POTIONS` of `@pvp/game-rules`): a player carries
   0-3 potions (`getPlayer(id).potions`, the `inv` message's `potions`). Nobody gets free potions: they come from
