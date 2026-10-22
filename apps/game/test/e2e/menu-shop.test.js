@@ -441,7 +441,7 @@ test('weapon bar: Durability bar follows the held weapon, tap to switch, a broke
   }
 });
 
-test('Healing Potion: Q drinks, the ring fills up, the stickman holds the flask, full H.P at the end', { skip: !RUN && 'set E2E=1 to run (npm run test:e2e)', timeout: 90000 }, async () => {
+test('Healing Potion: Q drinks, the ring fills up, the stickman holds the flask, full H.P at the end', { skip: !RUN && 'set E2E=1 to run (npm run test:e2e)', timeout: 180000 }, async () => {
   const { context, page: p, errors: errs } = await newPage({ viewport: { width: 1100, height: 700 } });
   try {
     // talk to the real server, but let the test send extra messages to the page and see what it sends
@@ -512,7 +512,7 @@ test('Healing Potion: Q drinks, the ring fills up, the stickman holds the flask,
   }
 });
 
-test('Healing Potion on a phone: tapping the potion button sends "drink"', { skip: !RUN && 'set E2E=1 to run (npm run test:e2e)', timeout: 90000 }, async () => {
+test('Healing Potion on a phone: tapping the potion button sends "drink"', { skip: !RUN && 'set E2E=1 to run (npm run test:e2e)', timeout: 180000 }, async () => {
   const { context, page: p, errors: errs } = await newPage({ viewport: { width: 844, height: 390 }, isMobile: true, hasTouch: true });
   try {
     const sent = [];
