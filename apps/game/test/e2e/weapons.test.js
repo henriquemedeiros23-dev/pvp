@@ -190,7 +190,7 @@ before(async () => {
   const url = `${server.url}/__weapons-test.html`;
   await page.route(url, r => r.fulfill({ contentType: 'text/html', body: PAGE }));
   await page.goto(url);
-  await page.waitForFunction(() => window.ready === true, null, { timeout: 30000 });
+  await page.waitForFunction(() => window.ready === true, null, { timeout: 60000 });
 });
 
 after(async () => {
@@ -204,7 +204,7 @@ const save = async name => {
   await page.screenshot({ path: path.join(SHOTS, name) });
 };
 
-test('every weapon from the boss\'s cards draws, side by side with its name', { skip: SKIP, timeout: 60000 }, async () => {
+test('every weapon from the boss\'s cards draws, side by side with its name', { skip: SKIP, timeout: 120000 }, async () => {
   const r = await page.evaluate(() => window.weaponsShot());
   await save('weapons.png');
   assert.equal(r.cells, 7);
@@ -213,7 +213,7 @@ test('every weapon from the boss\'s cards draws, side by side with its name', { 
   assert.deepEqual(errors, []);
 });
 
-test('a stickman raises the shield in the arena', { skip: SKIP, timeout: 60000 }, async () => {
+test('a stickman raises the shield in the arena', { skip: SKIP, timeout: 120000 }, async () => {
   const r = await page.evaluate(() => window.shieldPixels());
   assert.equal(r.amount, 1);
   assert.ok(r.changed > 5000, `raising the shield changes only ${r.changed} pixels`);
@@ -221,7 +221,7 @@ test('a stickman raises the shield in the arena', { skip: SKIP, timeout: 60000 }
   assert.deepEqual(errors, []);
 });
 
-test('frozen and shocked stickmen', { skip: SKIP, timeout: 60000 }, async () => {
+test('frozen and shocked stickmen', { skip: SKIP, timeout: 120000 }, async () => {
   await page.evaluate(() => window.statusShot());
   await save('frozen-shocked.png');
   assert.deepEqual(errors, []);

@@ -16,6 +16,11 @@ const SERVER = path.join(HERE, '..', '..', 'server.js');
 export const RUN = process.env.E2E === '1';
 export const SKIP = !RUN && 'set E2E=1 to run (npm run test:e2e)';
 
+// How long a step may take before we call it stuck. Software WebGL draws only ~1-3 frames a second
+// (less when the machine is busy), so loading, joining and clicking can be slow but still correct.
+// Tests always wait for a condition (never a fixed sleep), so a long limit costs nothing when all is well.
+export const SLOW = 60000;
+
 const freePort = () => new Promise((resolve, reject) => {
   const s = net.createServer().listen(0, () => { const { port } = s.address(); s.close(() => resolve(port)); });
   s.on('error', reject);
@@ -79,6 +84,7 @@ export async function launchBrowser() {
  */
 export async function newPage(browser, contextOptions = { viewport: { width: 1100, height: 700 } }, { hooks = false } = {}) {
   const context = await browser.newContext(contextOptions);
+  context.setDefaultTimeout(SLOW);
   const page = await context.newPage();
   const errors = [];
   page.on('console', m => { if (m.type() === 'error' && !m.text().startsWith('Failed to load resource')) errors.push(m.text()); });
@@ -108,7 +114,7 @@ export async function signedIn(page, baseUrl, prefix) {
   const { token } = await res.json();
   await page.addInitScript(t => localStorage.setItem('pvp.token', t), token);
   await page.goto(`${baseUrl}/?debug=1`);
-  await page.locator('#menu').waitFor({ state: 'visible' });
+  await page.locator('#menu').waitFor({ state: 'visible', timeout: SLOW });
   return name;
 }
 
@@ -116,7 +122,7 @@ export async function signedIn(page, baseUrl, prefix) {
 export const debug = page => page.evaluate(() => window.pvpDebug());
 
 /** Wait until fn(debugState) is truthy; returns that state. Polls (the game draws only a few frames a second). */
-export async function waitDebug(page, fn, { timeout = 10000, what = 'debug condition' } = {}) {
+export async function waitDebug(page, fn, { timeout = 30000, what = 'debug condition' } = {}) {
   const t0 = Date.now();
   for (;;) {
     const s = await debug(page);

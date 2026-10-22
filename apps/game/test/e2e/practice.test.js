@@ -35,6 +35,7 @@ after(async () => { await browser?.close(); });
 // A page for the built file: every request that is not the file itself or the three.js CDN is an error.
 async function practicePage(contextOptions) {
   const context = await browser.newContext(contextOptions);
+  context.setDefaultTimeout(60000); // software WebGL is slow; every wait is for a condition
   const page = await context.newPage();
   const errors = [], outside = [];
   page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
@@ -90,7 +91,7 @@ test('practice file: no server, no login; join, walk, open a chest for +3 coins'
   try {
     await page.goto(`${pathToFileURL(file).href}?debug=1&seed=e2e`);
     // a local player is ready: straight to the menu
-    await page.locator('#menu').waitFor({ state: 'visible', timeout: 30000 });
+    await page.locator('#menu').waitFor({ state: 'visible', timeout: 60000 });
     await page.locator('#practiceBadge').waitFor({ state: 'visible' });
     assert.equal(await page.title(), 'PvP Island (Practice)');
     assert.equal(await page.textContent('#practiceBadge'), 'Practice mode');
@@ -109,13 +110,13 @@ test('practice file: no server, no login; join, walk, open a chest for +3 coins'
 
     // join: the bots are there too
     await page.click('#btnJoin');
-    await page.locator('#hud').waitFor({ state: 'visible', timeout: 20000 });
+    await page.locator('#hud').waitFor({ state: 'visible', timeout: 60000 });
     let s = await waitDebug(page, x => x.me && x.inv, { what: 'joining' });
-    await page.waitForFunction(() => Number(document.getElementById('hudPlayers').textContent) === 4, null, { timeout: 10000 });
+    await page.waitForFunction(() => Number(document.getElementById('hudPlayers').textContent) === 4, null, { timeout: 60000 });
 
     // walk: hold W and we move
     const p0 = s.me;
-    s = await holdKey(page, 'w', x => Math.hypot(x.me.x - p0.x, x.me.z - p0.z) > 1, 20000);
+    s = await holdKey(page, 'w', x => Math.hypot(x.me.x - p0.x, x.me.z - p0.z) > 1, 90000); // ~0.2 m a second at 0.6 fps: wait for the condition, not a time
     assert.ok(s, 'walking with W should move the player');
 
     // a closed chest with a clear path, far from the bots
@@ -129,23 +130,23 @@ test('practice file: no server, no login; join, walk, open a chest for +3 coins'
     }
     assert.ok(chest, 'no chest with a clear path');
     await teleportTo(page, spot);
-    s = await holdKey(page, 'w', x => x.nearChest === chest.id, 20000);
+    s = await holdKey(page, 'w', x => x.nearChest === chest.id, 90000); // ~0.2 m a second at 0.6 fps: wait for the condition, not a time
     assert.ok(s, `walking should reach chest ${chest.id}`);
     await page.locator('#btnOpen').waitFor({ state: 'visible' });
     await page.click('#btnOpen', { force: true });
-    await page.waitForFunction(() => Number(document.getElementById('hudCoins').textContent) > 0, null, { timeout: 10000 });
+    await page.waitForFunction(() => Number(document.getElementById('hudCoins').textContent) > 0, null, { timeout: 60000 });
     assert.equal(Number(await page.textContent('#hudCoins')), 3, 'a chest gives exactly 3 coins');
     await waitDebug(page, x => x.openChests.some(c => c.id === chest.id), { what: 'the chest to open' });
 
     // back to the menu: the coins are saved on the account
     await page.click('#btnLeave');
     await page.locator('#menu').waitFor({ state: 'visible' });
-    await page.waitForFunction(() => document.getElementById('menuCoins').textContent === '3', null, { timeout: 5000 });
+    await page.waitForFunction(() => document.getElementById('menuCoins').textContent === '3', null, { timeout: 60000 });
 
     // the page is kept: after a reload the same player with the same coins
     await page.reload();
-    await page.locator('#menu').waitFor({ state: 'visible', timeout: 30000 });
-    await page.waitForFunction(() => document.getElementById('menuName').textContent === 'Boss_Kid' && document.getElementById('menuCoins').textContent === '3', null, { timeout: 5000 });
+    await page.locator('#menu').waitFor({ state: 'visible', timeout: 60000 });
+    await page.waitForFunction(() => document.getElementById('menuName').textContent === 'Boss_Kid' && document.getElementById('menuCoins').textContent === '3', null, { timeout: 60000 });
 
     assert.deepEqual(h.errors, []);
     assert.deepEqual(h.outside, [], 'no outside requests except three.js');
@@ -173,7 +174,7 @@ test('artifact version: boots inside a wrapper page, join works, no console erro
   const { page } = h;
   try {
     await page.goto(`${pathToFileURL(wrapper).href}?debug=1&seed=artifact`);
-    await page.locator('#menu').waitFor({ state: 'visible', timeout: 30000 });
+    await page.locator('#menu').waitFor({ state: 'visible', timeout: 60000 });
     assert.equal(await page.title(), 'PvP Island');
     await page.locator('#practiceBadge').waitFor({ state: 'visible' });
     // full height inside the wrapper, with our own background
@@ -181,7 +182,7 @@ test('artifact version: boots inside a wrapper page, join works, no console erro
     assert.equal(size.h, 390);
     assert.equal(size.bg, 'rgb(22, 19, 31)');
     await page.click('#btnJoin');
-    await page.locator('#hud').waitFor({ state: 'visible', timeout: 20000 });
+    await page.locator('#hud').waitFor({ state: 'visible', timeout: 60000 });
     await waitDebug(page, x => x.me && x.inv, { what: 'joining' });
     assert.deepEqual(h.errors, []);
     assert.deepEqual(h.outside, []);
@@ -196,9 +197,9 @@ test('practice file: the island draws (screenshot on a phone in landscape)', { s
   const { page } = h;
   try {
     await page.goto(`${pathToFileURL(file).href}?debug=1&seed=screenshot`);
-    await page.locator('#menu').waitFor({ state: 'visible', timeout: 30000 });
+    await page.locator('#menu').waitFor({ state: 'visible', timeout: 60000 });
     await page.click('#btnJoin');
-    await page.locator('#hud').waitFor({ state: 'visible', timeout: 20000 });
+    await page.locator('#hud').waitFor({ state: 'visible', timeout: 60000 });
     await waitDebug(page, x => x.me && x.inv, { what: 'joining' });
     // stand in an open place (free 5 m behind for the camera, 14 m ahead) and put Bot 1 in front of us
     const s = await debug(page);
