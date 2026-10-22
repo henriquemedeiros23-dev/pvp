@@ -2,7 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRandom } from '@pvp/seeded-random';
 import { makeArena, drain, msgs, serverEvents, chestAlways, testIsland, RULES } from './helpers.js';
-import { rollChestWeapon, chestWeights } from '../src/loot.js';
+import { rollChestWeapon, chestWeights, rollLoot } from '../src/loot.js';
+import { ARENA_DEFAULTS } from '../src/tuning.js';
 import { createState } from '../src/state.js';
 
 const shootbmOnly = chestAlways('shootbm');
@@ -71,7 +72,7 @@ test('golden chest appears at 60 s, gives exactly 10 coins + one weapon, schedul
   assert.equal(RULES.GOLDEN_CHEST_COINS, 10);
   assert.equal(serverEvents(out, 'coins')[0].amount, 10);
   const drops = msgs(out, 'item+');
-  assert.equal(drops.length, 1, 'one weapon, no medkit');
+  assert.equal(drops.length, 1, 'one weapon (this seed gives no extra potion)');
   assert.equal(drops[0].kind, 'weapon');
   assert.equal(drops[0].dur, RULES.WEAPONS[drops[0].weapon].durability);
   assert.deepEqual(msgs(out, 'golden'), [{ t: 'golden', golden: null, by: 'a' }]);
@@ -184,13 +185,88 @@ test('chest chances are weights: they are normalized, and 0 never comes out', ()
   assert.equal(rollChestWeapon(none), null);
 });
 
-test('chest heals are a separate setting (off by default)', () => {
-  const arena = makeArena({ tuning: { chestHealChance: 1, bandageChance: 1 } });
+const potionChance = chestChance => ({ ...RULES, POTION: { ...RULES.POTION, chestChance } });
+
+test('a chest gives an extra Healing Potion POTION.chestChance % of the time, next to the weapon', () => {
+  const always = makeArena({ rules: potionChance(100) });
+  const a = always.join('a', {});
+  always.teleport(a.id, { x: 10, z: 30 });
+  always.openChest(a.id, 0, 0);
+  const loot = msgs(drain(always), 'item+');
+  assert.deepEqual(loot.map(m => m.kind), ['weapon', 'potion']);
+  assert.equal(loot[1].weapon, null);
+  assert.ok(Math.hypot(loot[1].x - 10, loot[1].z - 30) <= ARENA_DEFAULTS.dropSpread + 1e-9, 'lands next to the chest');
+
+  const never = makeArena({ rules: potionChance(0) });
+  const b = never.join('b', {});
+  never.teleport(b.id, { x: 10, z: 30 });
+  never.openChest(b.id, 0, 0);
+  assert.deepEqual(msgs(drain(never), 'item+').map(m => m.kind), ['weapon']);
+});
+
+test('chest potion chance is 15 % (fixed seed, 4000 chests)', () => {
+  const A = createState({ island: testIsland(), random: createRandom(5), rules: RULES });
+  let potions = 0;
+  for (let i = 0; i < 4000; i++) {
+    rollLoot(A, 0, 0);
+    potions += A.out.filter(e => e.msg.kind === 'potion').length;
+    A.out = [];
+  }
+  assert.equal(RULES.POTION.chestChance, 15);
+  assert.ok(Math.abs(potions / 4000 - 0.15) < 0.02, `got ${potions} potions`);
+});
+
+test('fixed seed: the same chests give the same potions', () => {
+  const run = () => {
+    const arena = makeArena({ seed: 9 });
+    const a = arena.join('a', {});
+    const kinds = [];
+    for (let i = 0; i < 40; i++) {
+      arena.teleport(a.id, { x: 10, z: 30 });
+      arena.openChest(a.id, 0, i * RULES.CHEST_RESPAWN_MS);
+      arena.tick(i * RULES.CHEST_RESPAWN_MS);
+      kinds.push(msgs(drain(arena), 'item+').map(m => m.kind).join('+'));
+    }
+    return kinds;
+  };
+  const one = run();
+  assert.deepEqual(run(), one);
+  assert.ok(one.includes('weapon+potion'), 'some chests give a potion');
+  assert.ok(one.every(k => k === 'weapon' || k === 'weapon+potion'), one.join());
+});
+
+test('golden chest: same potion chance as normal chests', () => {
+  const arena = makeArena({ rules: potionChance(100) });
   const a = arena.join('a', {});
-  arena.teleport(a.id, { x: 10, z: 30 });
-  arena.openChest(a.id, 0, 0);
-  const loot = msgs(drain(arena), 'item+').map(m => m.kind);
-  assert.deepEqual(loot, ['weapon', 'bandage']);
+  arena.tick(60000);
+  arena.teleport(a.id, { x: 31, z: -60 });
+  drain(arena);
+  assert.equal(arena.openChest(a.id, 'golden', 61000), true);
+  assert.deepEqual(msgs(drain(arena), 'item+').map(m => m.kind), ['weapon', 'potion']);
+});
+
+test('a potion is picked up only with fewer than MAX_POTIONS (3)', () => {
+  const arena = makeArena({ rules: potionChance(100) });
+  const full = arena.join('full', { potions: 5 });
+  assert.equal(arena.getPlayer(full.id).potions, 3, 'never more than 3, even from the backpack');
+  assert.equal(full.potions, 3, 'join says how many it took');
+  arena.teleport(full.id, { x: 10, z: 30 });
+  arena.openChest(full.id, 0, 0);
+  arena.tick(10);
+  arena.tick(20);
+  assert.ok(arena.items().some(i => i.kind === 'potion'), 'still on the ground');
+  assert.equal(arena.getPlayer(full.id).potions, 3);
+  arena.leave(full.id);
+  const two = arena.join('two', { potions: 2 });
+  const pot = arena.items().find(i => i.kind === 'potion');
+  arena.teleport(two.id, { x: pot.x, z: pot.z });
+  drain(arena);
+  arena.tick(30);
+  const out = drain(arena);
+  assert.equal(arena.getPlayer(two.id).potions, 3);
+  const inv = msgs(out, 'inv', two.id).at(-1);
+  assert.equal(inv.potions, 3);
+  assert.equal(inv.picked, 'Healing Potion');
 });
 
 test('picking up a copy of a weapon you already have is fine (a free slot is enough)', () => {

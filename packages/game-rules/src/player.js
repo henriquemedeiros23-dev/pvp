@@ -1,12 +1,8 @@
-// Player limits, healing, timers and movement.
+// Player limits, timers and movement. (The only heal, the Healing Potion, is in potion.js.)
 
 export const MAX_PLAYERS = 100;
 export const MAX_HP = 100;
 export const MAX_SLOTS = 5;          // weapon slots, including the starting weapon
-export const MAX_BANDAGES = 10;
-export const MAX_MEDKITS = 3;
-export const BANDAGE_HEAL = 25;
-export const MEDKIT_HEAL = 75;
 export const CHEST_RESPAWN_MS = 15000;
 export const CHEST_COINS = 3;       // coins from every normal chest (plus exactly one weapon)
 export const GOLDEN_CHEST_COINS = 10; // coins from the golden chest (plus exactly one weapon, rarer ones more likely)

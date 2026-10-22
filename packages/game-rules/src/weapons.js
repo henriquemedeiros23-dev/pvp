@@ -1,6 +1,5 @@
-// Weapons, heals and loot.
+// Weapons and loot.
 import { deepFreeze } from './freeze.js';
-import { BANDAGE_HEAL, MEDKIT_HEAL } from './player.js';
 
 // The weapon everyone gets when they join the arena (slot 1). It is a normal weapon:
 // it wears out, can be dropped on knockout, found in chests and bought in the shop.
@@ -105,11 +104,6 @@ export function chestChance(id, weapons = WEAPONS) {
   const c = own(weapons, id)?.chestChance;
   return typeof c === 'number' && Number.isFinite(c) && c > 0 ? c : 0;
 }
-
-export const HEALS = deepFreeze({
-  bandage: { name: 'Bandage', heal: BANDAGE_HEAL },
-  medkit:  { name: 'Medkit',  heal: MEDKIT_HEAL },
-});
 
 /** Weapon ids of one rarity, in table order. Returns a new (unfrozen) array. */
 export function weaponsByRarity(rarity, weapons = WEAPONS) {

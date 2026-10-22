@@ -3,7 +3,7 @@
 import { createApiClient } from '@pvp/api-client';
 import { shopTabs, shopItems, backpackSummary, swatchBackground } from '@pvp/shop-catalog';
 import { WEAPONS } from '@pvp/game-rules';
-import { WEAPON_ICONS } from '@pvp/hud-model';
+import { WEAPON_ICONS, POTION_ICON_SVG } from '@pvp/hud-model';
 import { Game } from './game.js';
 
 const $ = id => document.getElementById(id);
@@ -177,11 +177,16 @@ function cardElement(c) {
     const s = el('div', 'swatch');
     s.style.background = swatchBackground(c);
     card.append(s);
+  } else if (c.kind === 'potion') {
+    const icon = el('div', 'icon potion-icon');
+    icon.innerHTML = POTION_ICON_SVG; // the flask from the boss's drawing (@pvp/hud-model)
+    card.append(icon);
   } else {
     card.append(el('div', 'icon', c.kind === 'weapon' ? (WEAPON_ICONS[c.id] || '❔') : (c.icon || '❔')));
   }
   card.append(el('div', 'name', c.name));
-  if (c.kind === 'weapon') {
+  if (c.kind === 'potion') card.append(el('div', 'tag', `Full H.P · drink ${c.drinkSeconds} s · max ${c.maxCarry}`));
+  if (c.kind === 'weapon' || c.kind === 'potion') {
     const tag = el('div', 'tag');
     const rar = el('span', 'rar rar-' + c.rarity, c.rarityName);
     rar.style.color = c.rarityColor; // colors from RARITY_COLORS in @pvp/game-rules

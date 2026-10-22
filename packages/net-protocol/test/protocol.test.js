@@ -18,7 +18,7 @@ const CLIENT_EXAMPLES = {
   fire: { t: 'fire', d: [0.1, -0.2, 0.97] },
   slot: { t: 'slot', i: 2 },
   open: { t: 'open', id: 7 },
-  heal: { t: 'heal', kind: 'bandage' },
+  drink: { t: 'drink' },
   shield: { t: 'shield', up: true },
   drop: { t: 'drop' },
 };
@@ -30,13 +30,14 @@ const SERVER_EXAMPLES = {
     id: 3, x: 10, z: -20,
     players: [{ id: 3, name: 'Bob', skin: SKIN }],
     chests: [1, 4], golden: null,
-    items: [{ id: 9, kind: 'weapon', weapon: 'shootbm', x: 1, y: 0, z: 2 }, { id: 10, kind: 'medkit', weapon: null, x: 1, y: 0.5, z: 2 }],
+    items: [{ id: 9, kind: 'weapon', weapon: 'shootbm', x: 1, y: 0, z: 2 }, { id: 10, kind: 'potion', weapon: null, x: 1, y: 0.5, z: 2 }],
   },
   full: {},
   left: {},
   snap: { p: [[3, 1.5, 0, -2.25, 0.5, -0.1, 5, 'shootbm', 100, 1, 'shield', 5]], n: 4 },
-  inv: { weapons: ['fists', 'shootbm'], dur: [null, 12], slot: 0, bandages: 1, medkits: 0, coins: 120, hp: 100, shield: { id: 'megashield', dur: 64 } },
+  inv: { weapons: ['fists', 'shootbm'], dur: [null, 12], slot: 0, potions: 2, coins: 120, hp: 100, shield: { id: 'megashield', dur: 64 } },
   broke: { slot: 1, weapon: 'shootbm' },
+  drink: { state: 'start', ms: 5000, hp: 40 },
   pjoin: { id: 3, name: 'Bob', skin: SKIN },
   pleave: { id: 3 },
   pos: { x: 1, y: 0, z: 2 },
@@ -91,9 +92,14 @@ test('every valid client example passes and comes back equal', () => {
   }
 });
 
-test('open accepts "golden" and heal accepts medkit', () => {
+test('open accepts "golden"; drink has no fields; bandages and medkits are gone (#28)', () => {
   assert.deepEqual(parseClientMessage(J({ t: 'open', id: 'golden' })).msg, { t: 'open', id: 'golden' });
-  assert.ok(parseClientMessage(J({ t: 'heal', kind: 'medkit' })).ok);
+  assert.deepEqual(parseClientMessage(J({ t: 'drink' })).msg, { t: 'drink' });
+  rejected(J({ t: 'heal', kind: 'medkit' }));
+  rejected(J({ t: 'heal', kind: 'bandage' }));
+  assert.throws(() => encode('item+', { id: 1, kind: 'medkit', weapon: null, x: 0, y: 0, z: 0 }));
+  assert.throws(() => encode('drink', { state: 'half', ms: 0, hp: 1 }));
+  for (const state of ['start', 'done', 'cancel']) assert.ok(decodeServerMessage(encode('drink', { state, ms: 0, hp: 100 })).ok);
 });
 
 test('client message as Buffer / Uint8Array works', () => {
@@ -138,7 +144,7 @@ test('bad messages are rejected without throwing', () => {
   // missing field
   assert.match(rejected(J({ t: 'state', x: 1, y: 0, z: 1, ry: 0, pitch: 0 })), /state\.f: missing/);
   rejected(J({ t: 'fire' }));
-  rejected(J({ t: 'heal' }));
+  rejected(J({ t: 'drink', extra: 'x'.repeat(5000) }));
   // string instead of number
   assert.match(rejected(J({ ...CLIENT_EXAMPLES.state, x: '12' })), /state\.x: expected a number/);
   // NaN / Infinity (JSON cannot hold them, they turn into null or are invalid JSON)
@@ -150,7 +156,6 @@ test('bad messages are rejected without throwing', () => {
   rejected(J({ ...CLIENT_EXAMPLES.state, z: MAX_NUMBER * 10 }));
   rejected(J({ ...CLIENT_EXAMPLES.state, f: 1 << 20 }));
   rejected(J({ t: 'open', id: 1e9 }));
-  rejected(J({ t: 'heal', kind: 'x'.repeat(1000) }));
   // huge arrays and messages
   rejected(J({ t: 'fire', d: new Array(1000).fill(0) }));
   rejected(J({ t: 'fire', d: new Array(100000).fill(0) }));
@@ -168,7 +173,7 @@ test('bad messages are rejected without throwing', () => {
   rejected(J({ t: 'fire', d: [1, '0', 0] }));
   rejected(J({ t: 'fire', d: { 0: 1, 1: 0, 2: 0, length: 3 } }));
   // bad enum / union values
-  rejected(J({ t: 'heal', kind: 'potion' }));
+  rejected(J({ t: 'heal', kind: 'potion' }));  // no 'heal' message any more: it is 'drink'
   rejected(J({ t: 'open', id: 'silver' }));
   rejected(J({ t: 'open', id: true }));
   // deep nesting is fine to parse but still wrong
@@ -269,7 +274,7 @@ test('durability fields: optional (old messages still work), null = never breaks
   const { dur, ...oldInv } = SERVER_EXAMPLES.inv;
   assert.deepEqual(decodeServerMessage(encode('inv', oldInv)).msg, { t: 'inv', ...oldInv });
   assert.ok(decodeServerMessage(encode('item+', { id: 1, kind: 'weapon', weapon: 'gun', x: 0, y: 0, z: 0, dur: null })).ok);
-  assert.ok(decodeServerMessage(encode('item+', { id: 1, kind: 'bandage', weapon: null, x: 0, y: 0, z: 0 })).ok);
+  assert.ok(decodeServerMessage(encode('item+', { id: 1, kind: 'potion', weapon: null, x: 0, y: 0, z: 0 })).ok);
   const welcome = { ...SERVER_EXAMPLES.welcome, items: [{ id: 9, kind: 'weapon', weapon: 'shootbm', x: 1, y: 0, z: 2, dur: 3 }] };
   assert.deepEqual(decodeServerMessage(encode('welcome', welcome)).msg.items[0].dur, 3);
   for (const bad of [[-1], [1.5], ['5']]) {

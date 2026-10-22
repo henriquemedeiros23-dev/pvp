@@ -10,7 +10,8 @@ Pure functions that turn the game rules (`@pvp/game-rules`) and a player's accou
 import { shopTabs, shopItems, backpackSummary, swatchBackground, OUTFIT_ICONS } from '@pvp/shop-catalog';
 
 shopTabs();
-// [{ id: 'color', label: 'Colors', hint: '…' }, { id: 'hat', … }, … { id: 'weapon', label: 'Weapons', … }]
+// [{ id: 'color', label: 'Colors', hint: '…' }, { id: 'hat', … }, … { id: 'weapon', label: 'Weapons', … },
+//  { id: 'potion', label: 'Potions', … }]
 
 shopItems('hat', account);
 // [{ kind: 'hat', id: 'none', name: 'No Hat', price: 0, owned: true, equipped: true,
@@ -23,12 +24,17 @@ shopItems('weapon', account);
 //    stashCount: 0, owned: false, equipped: false, canAfford: true, action: 'buy' }, …]
 // rarity colors come from RARITY_COLORS in @pvp/game-rules (Megalegend's background is blue + black)
 
-backpackSummary(account);   // 'Backpack: 2× Shootbm, 1× Supersword' or 'Backpack is empty. Buy weapons in the shop!'
+shopItems('potion', account);
+// the Healing Potion card (the only heal): [{ kind: 'potion', id: 'potion', name: 'Healing Potion', price: 10,
+//   rarity: 'common', rarityName: 'Common', rarityColor: '#3cc24a', stashCount: 2 (in the backpack), action: 'buy',
+//   healPercent: 100, drinkSeconds: 5, chestChance: 15, maxCarry: 3, … }]   (also potionCard(account))
+
+backpackSummary(account);   // 'Backpack: 2× Shootbm, 1× Supersword, 2× Healing Potion' or 'Backpack is empty. Buy weapons in the shop!'
 swatchBackground(card);     // CSS background for a color card (gradients for patterns)
 ```
 
-- `account` is the server's account: `{ coins, owned: ['color:black', …], skin: { color, hat, … }, stash: { weaponId: count } }`.
-- `action` is `'equipped'` (wearing it), `'equip'` (owned, not worn) or `'buy'`. Weapons are always `'buy'`: you can buy more than one.
+- `account` is the server's account: `{ coins, owned: ['color:black', …], skin: { color, hat, … }, stash: { weaponId: count }, potions }`.
+- `action` is `'equipped'` (wearing it), `'equip'` (owned, not worn) or `'buy'`. Weapons and potions are always `'buy'`: you can buy more than one.
 - Every function takes an optional last `rules` argument (defaults to `RULES` from `@pvp/game-rules`), so tests or mods can use other rules.
 
 ## Determinism

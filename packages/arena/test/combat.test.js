@@ -5,10 +5,10 @@ import { makeArena, drain, msgs, serverEvents, aimAt, RULES, WALL } from './help
 const READY = RULES.SPAWN_PROTECT_MS + 100; // spawn protection is over
 
 // Two players: attacker with `loadout` in slot 2, victim with `victimLoadout`.
-function duel({ loadout = ['shootbm'], victimLoadout = [], rules, at = [[0, 0], [20, 0]] } = {}) {
+function duel({ loadout = ['shootbm'], victimLoadout = [], victimPotions = 0, rules, at = [[0, 0], [20, 0]] } = {}) {
   const arena = makeArena({ rules });
   const s = arena.join('shooter', { loadout }).id;
-  const v = arena.join('victim', { loadout: victimLoadout }).id;
+  const v = arena.join('victim', { loadout: victimLoadout, potions: victimPotions }).id;
   arena.selectSlot(s, 1);
   arena.teleport(s, { x: at[0][0], z: at[0][1] });
   arena.teleport(v, { x: at[1][0], z: at[1][1] });
@@ -65,14 +65,14 @@ test('spawn protection blocks damage', () => {
   assert.equal(msgs(drain(arena), 'hurt').length, 0);
 });
 
-test('knockout drops weapons, shield and heals, emits ko + dead + knockedOut', () => {
-  const { arena, s, v } = duel({ loadout: ['supersword'], victimLoadout: ['icesword', 'shootbm', 'shield'], at: [[0, 0], [0, 2]] });
+test('knockout drops weapons, shield and potions, emits ko + dead + knockedOut', () => {
+  const { arena, s, v } = duel({ loadout: ['supersword'], victimLoadout: ['icesword', 'shootbm', 'shield'], victimPotions: 2, at: [[0, 0], [0, 2]] });
   assert.equal(arena.fire(s, [0, 0, 1], READY), true);
   const out = drain(arena);
   assert.equal(arena.getPlayer(v), undefined);
   assert.equal(arena.playerCount(), 1);
   const drops = msgs(out, 'item+');
-  assert.deepEqual(drops.map(d => d.weapon ?? d.kind), ['gun', 'icesword', 'shootbm', 'shield', 'bandage'], 'the Gun and the shield drop too');
+  assert.deepEqual(drops.map(d => d.weapon ?? d.kind), ['gun', 'icesword', 'shootbm', 'shield', 'potion', 'potion'], 'the Gun, the shield and every potion drop too');
   assert.equal(drops.find(d => d.weapon === 'shield').dur, 60);
   const ko = msgs(out, 'ko')[0];
   assert.equal(ko.id, v);

@@ -186,7 +186,33 @@ input:focus { border-color: var(--gold); }
 .shield-pill[data-level="critical"] .sbar i { background: linear-gradient(90deg, #a8121f, #ff5964); }
 .shield-pill b { font-variant-numeric: tabular-nums; min-width: 2ch; text-align: right; }
 .shield-pill.up { box-shadow: 0 0 10px rgba(120,170,255,0.8); }
-.heal { background: rgba(0,0,0,0.55); border: 2px solid var(--line) !important; border-radius: 999px; padding: 2px 10px; height: 26px; font-size: 14px; display: flex; align-items: center; gap: 4px; }
+.potion-icon { width: 48px; height: 48px; margin: 0 auto; }
+/* Healing Potion button (#28), at the end of the H.P row. --p = drinking progress 0..1 (a ring that fills up). */
+.meter.hp { grid-template-columns: var(--label-w) var(--bar-w) var(--val-w) auto; }
+.potion {
+  pointer-events: auto; position: relative; width: calc(var(--bar-h) * 2.6); height: calc(var(--bar-h) * 2.6); margin: calc(var(--bar-h) * -0.9) 0;
+  border-radius: 50%; padding: 0; border: none !important; touch-action: none; --p: 0;
+  background: conic-gradient(#ff4d5e calc(var(--p) * 360deg), rgba(255,255,255,0.25) 0);
+  box-shadow: 0 0 0 2px rgba(0,0,0,0.5), 0 2px 8px rgba(0,0,0,0.4);
+}
+.potion::before { content: ''; position: absolute; inset: 3px; border-radius: 50%; background: radial-gradient(circle at 50% 40%, rgba(60,194,74,0.55), rgba(10,8,16,0.85) 75%); }
+.potion .picon { position: absolute; inset: 15%; }
+.potion .pcount {
+  position: absolute; right: -5px; bottom: -4px; min-width: 16px; height: 16px; padding: 0 3px; box-sizing: border-box; border-radius: 999px;
+  background: #3cc24a; color: #0b2a10; font-size: 11px; line-height: 16px; font-weight: 900; text-align: center; box-shadow: 0 0 0 2px rgba(0,0,0,0.55);
+}
+.potion.empty .picon { opacity: 0.4; filter: grayscale(1); }
+.potion.empty .pcount { background: #555; color: #ddd; }
+.potion.drinking { box-shadow: 0 0 0 2px rgba(0,0,0,0.5), 0 0 14px rgba(255,77,94,0.8); }
+/* Big ring around the crosshair while drinking */
+.drinkring { position: absolute; left: 50%; top: 50%; width: 120px; height: 120px; margin: -60px 0 0 -60px; --p: 0; pointer-events: none; }
+.drinkring .dfill {
+  position: absolute; inset: 0; border-radius: 50%;
+  background: conic-gradient(#ff4d5e calc(var(--p) * 360deg), rgba(0,0,0,0.4) 0);
+  -webkit-mask: radial-gradient(circle, transparent 49px, #000 50px); mask: radial-gradient(circle, transparent 49px, #000 50px);
+}
+.drinkring .dicon { position: absolute; left: 50%; top: -44px; width: 36px; height: 36px; margin-left: -18px; filter: drop-shadow(0 2px 3px rgba(0,0,0,0.6)); }
+.drinkring .dtext { position: absolute; left: 50%; top: 128px; transform: translateX(-50%); white-space: nowrap; font-weight: 900; font-size: 18px; color: #fff; text-shadow: 0 2px 4px #000, 0 0 2px #000; }
 .toast { position: absolute; left: 50%; top: 62%; transform: translateX(-50%); font-weight: 900; font-size: 18px; color: var(--gold); text-shadow: 0 2px 4px #000; opacity: 0; transition: opacity 0.4s; white-space: nowrap; }
 .toast.show { opacity: 1; transition: none; }
 
@@ -231,10 +257,16 @@ body.desktop .hotbar { bottom: 26px; --slot: 72px; --label-w: 88px; --bar-w: 180
   .slot .name { display: none; }
   .slot .icon { margin-top: 0; }
   .vitals { gap: 4px; }
-  .heal { height: 24px; padding: 2px 8px; font-size: 13px; }
   .shield-pill { height: 24px; font-size: 12px; }
   .shield-pill .sbar { width: 36px; }
   .shieldbtn { bottom: calc(182px + var(--safe-b)); right: calc(30px + var(--safe-r)); width: 58px; height: 58px; font-size: 24px; }
+  .potion .pcount { min-width: 14px; height: 14px; line-height: 14px; font-size: 10px; }
+  /* short phone screens: no room in the row, so the potion button sits just above the right end of the H.P bar panel
+     (the shield pill moves left to make room) */
+  .meters { position: relative; }
+  .heals { padding-right: 44px; }
+  .meter.hp { grid-template-columns: var(--label-w) var(--bar-w) var(--val-w); }
+  .meter.hp .potion { position: absolute; right: 2px; bottom: calc(100% + 8px); width: 34px; height: 34px; margin: 0; }
   .stick { width: 120px; height: 120px; left: calc(20px + var(--safe-l)); bottom: calc(18px + var(--safe-b)); }
   .fire { bottom: calc(96px + var(--safe-b)); width: 76px; height: 76px; }
   .open { bottom: calc(110px + var(--safe-b)); right: calc(118px + var(--safe-r)); }
@@ -255,6 +287,7 @@ body.desktop .hotbar { bottom: 26px; --slot: 72px; --label-w: 88px; --bar-w: 180
   .meter .mlabel { grid-area: label; } .meter .mbar { grid-area: bar; } .meter .mval { grid-area: val; }
   .meters { gap: 3px; padding: 4px 8px 6px; }
   .meter.dur.infinite .mval { line-height: 0.7; }
+  .meter.hp { grid-template-columns: minmax(0, 1fr) auto; }
   .stick { width: 108px; height: 108px; left: calc(14px + var(--safe-l)); bottom: calc(14px + var(--safe-b)); }
   .knob { width: 52px; height: 52px; margin: -26px 0 0 -26px; }
   .jump { right: calc(96px + var(--safe-r)); width: 60px; height: 60px; }

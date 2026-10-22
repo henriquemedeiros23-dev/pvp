@@ -2,7 +2,7 @@
 
 ## What it does
 
-Player accounts (sign up, log in on up to 2 devices, log out), coins, the shop (buy and equip skins, buy weapons into the backpack/"stash") and the loadout a player carries into the arena. Storage is pluggable: in memory, one JSON file, or `localStorage`. The main entry is for Node (uses `node:crypto` and `node:fs`); `@pvp/accounts-shop/browser` works in the browser. Prices and limits come from `@pvp/game-rules`.
+Player accounts (sign up, log in on up to 2 devices, log out), coins, the shop (buy and equip skins, buy weapons and Healing Potions into the backpack/"stash") and the loadout a player carries into the arena. Storage is pluggable: in memory, one JSON file, or `localStorage`. The main entry is for Node (uses `node:crypto` and `node:fs`); `@pvp/accounts-shop/browser` works in the browser. Prices and limits come from `@pvp/game-rules`.
 
 ## How to use
 
@@ -23,6 +23,7 @@ const acc = accounts.byToken(token);        // null if not logged in
 accounts.addCoins(acc, 25);                 // from a chest; never below 0, NaN throws
 accounts.buy(acc, 'hat', 'crown');          // kind: 'weapon' or a skin slot; returns publicView
 accounts.buy(acc, 'weapon', 'icesword');    // weapons stack in the stash: { icesword: 1 }
+accounts.buy(acc, 'potion', 'potion');      // Healing Potions (10 coins) stack too: account.potions
 accounts.equip(acc, 'hat', 'crown');        // must own it
 
 const weapons = accounts.takeLoadout(acc);  // most expensive stashed weapons first, copies too
@@ -32,6 +33,9 @@ const weapons = accounts.takeLoadout(acc);  // most expensive stashed weapons fi
 accounts.returnLoadout(acc, weapons);       // left the arena alive: back into the stash
 // knocked out: just don't call returnLoadout, the weapons are lost
 
+const potions = accounts.takePotions(acc);  // up to MAX_POTIONS (3) Healing Potions leave the backpack
+accounts.returnPotions(acc, 2);             // left alive: unused potions go back (knocked out: they are lost)
+
 accounts.rename(acc, 'New_Name');        // same name rules; tokens stay logged in
 accounts.logout(token);
 await accounts.flush();                     // on shutdown
@@ -40,6 +44,8 @@ await accounts.flush();                     // on shutdown
 Every weapon can be bought (the starting Gun too: it goes into the backpack like the others). A backpack weapon
 that is no longer in the rules (like the old wooden sword, or the Pistol, Rocket and the other weapons removed in #26)
 is dropped when the accounts are loaded, so old saved accounts still load.
+The backpack also counts Healing Potions (`potions`, any number; only 3 go into the arena). Older saved
+accounts without it load with 0 potions.
 
 Error codes: `BAD_NAME`, `BAD_PASSWORD`, `NAME_TAKEN`, `WRONG_LOGIN`, `UNKNOWN_ITEM`, `ALREADY_OWNED`, `NOT_ENOUGH_COINS`, `NOT_OWNED` (all `AccountError`). Passing an account object that didn't come from this service throws a `TypeError`.
 

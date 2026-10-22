@@ -26,7 +26,8 @@ export function damage(A, victim, amount, attacker, weapon, kx = 0, kz = 0, opts
 }
 
 /**
- * Knocked out: drop every weapon (the starting weapon too) and the heals, leave the arena.
+ * Knocked out: drop every weapon (the starting weapon too) and every Healing Potion, leave the arena.
+ * A potion being drunk is gone (it was used up when the drinking started).
  * A dropped weapon with more than half its durability keeps it; half or less is set to half
  * (rounded up), see droppedDurability in @pvp/game-rules.
  */
@@ -41,8 +42,8 @@ function knockOut(A, victim, attacker, weapon, byName) {
     lost.push(id);
     dropItem(A, 'weapon', id, victim.x, victim.z, spread, droppedDurability(id, dur, A.rules.WEAPONS));
   }
-  if (victim.medkits) dropItem(A, 'medkit', null, victim.x, victim.z, spread);
-  if (victim.bandages) dropItem(A, 'bandage', null, victim.x, victim.z, spread);
+  for (let i = 0; i < victim.potions; i++) dropItem(A, 'potion', null, victim.x, victim.z, spread);
+  victim.drink = null;
   removePlayer(A, victim);
   const by = attacker ? attacker.name : (byName ?? null);
   send(A, 'all', { t: 'ko', id: victim.id, x: victim.x, y: victim.y, z: victim.z, victim: victim.name, by, weapon });
@@ -103,6 +104,7 @@ export function fire(A, id, dir, now) {
   if (isFrozen(A, p) || p.shieldUp) return false;
   const w = p.weapons[p.slot];
   const def = weaponDef(A, w);
+  if (p.drink) return false; // busy drinking a potion (switch slots to stop, the potion is wasted)
   if (!def || now - p.lastFire < def.rate * 1000 * A.tune.fireRateSlack) return false;
   let [dx, dy, dz] = Array.isArray(dir) ? dir.map(Number) : dir ? [dir.x, dir.y, dir.z].map(Number) : [0, 0, 1];
   const len = Math.hypot(dx, dy, dz);
@@ -134,7 +136,7 @@ export function dropWeapon(A, id, now) {
   const p = A.players.get(id);
   if (!p) return null;
   at(A, now);
-  if (isFrozen(A, p) || p.slot >= p.weapons.length) return null;
+  if (isFrozen(A, p) || p.drink || p.slot >= p.weapons.length) return null; // not while drinking a potion
   const slot = p.slot;
   const [weapon] = p.weapons.splice(slot, 1);
   const [dur] = p.dur.splice(slot, 1);

@@ -1,19 +1,14 @@
-// Players: join, leave, movement updates (with anti-teleport), slot switch, healing.
+// Players: join, leave, movement updates (with anti-teleport), slot switch, drinking a Healing Potion.
 
 import { findSpawn } from '@pvp/world-gen';
+import { potionHeal } from '@pvp/game-rules';
 import { at, send, weaponDef, maxDurability, isShieldId } from './state.js';
 import { welcomeFor } from './snapshot.js';
 import { equipShield, isFrozen } from './effects.js';
 
-/** Heal kind -> the player field that counts it, and the rule with its limit. */
-export const HEAL_SLOTS = Object.freeze({
-  bandage: { field: 'bandages', max: 'MAX_BANDAGES' },
-  medkit: { field: 'medkits', max: 'MAX_MEDKITS' },
-});
-
 export function inventoryMsg(p, picked) {
   const msg = {
-    t: 'inv', weapons: [...p.weapons], dur: [...p.dur], slot: p.slot, bandages: p.bandages, medkits: p.medkits, coins: p.coins, hp: p.hp,
+    t: 'inv', weapons: [...p.weapons], dur: [...p.dur], slot: p.slot, potions: p.potions, coins: p.coins, hp: p.hp,
     shield: p.shield ? { id: p.shield.id, dur: p.shield.dur } : null,
   };
   if (picked !== undefined) msg.picked = picked;
@@ -22,7 +17,7 @@ export function inventoryMsg(p, picked) {
 
 export const playerInfo = p => ({ id: p.id, name: p.name, skin: { ...p.skin } });
 
-export function join(A, key, { name, skin, loadout = [], coins = 0 } = {}, now) {
+export function join(A, key, { name, skin, loadout = [], coins = 0, potions = 0 } = {}, now) {
   now = at(A, now);
   const R = A.rules;
   const oldId = A.byKey.get(key);
@@ -31,7 +26,10 @@ export function join(A, key, { name, skin, loadout = [], coins = 0 } = {}, now) 
 
   // Same account joins again: the old player leaves alive first.
   let replaced = null;
-  if (oldId !== undefined) replaced = { id: oldId, weapons: leave(A, oldId, { alive: true }) };
+  if (oldId !== undefined) {
+    const potionsBack = A.players.get(oldId)?.potions ?? 0;
+    replaced = { id: oldId, weapons: leave(A, oldId, { alive: true }), potions: potionsBack };
+  }
 
   // The starting weapon (free, slot 1), then weapons from the loadout in its order (best first is the
   // server's choice), copies of the same weapon too, as many as fit. Shields never take a slot:
@@ -56,7 +54,9 @@ export function join(A, key, { name, skin, loadout = [], coins = 0 } = {}, now) 
     coins: Number.isInteger(coins) && coins >= 0 ? coins : 0,
     x: spot.x, y: 0, z: spot.z, ry: 0, pitch: 0, flags: 0,
     // dur: uses left per slot (parallel to weapons), null = never breaks. Loadout weapons start full.
-    hp: R.MAX_HP, weapons, dur: weapons.map(w => maxDurability(A, w)), slot: 0, bandages: 1, medkits: 0, lastFire: -Infinity, lastHeal: -Infinity,
+    hp: R.MAX_HP, weapons, dur: weapons.map(w => maxDurability(A, w)), slot: 0, lastFire: -Infinity,
+    // Healing Potions carried (from the backpack, up to MAX_POTIONS) and the drinking in progress (or null)
+    potions: Math.min(maxPotions(A), Number.isInteger(potions) && potions > 0 ? potions : 0), drink: null,
     protectUntil: now + R.SPAWN_PROTECT_MS, lastState: now,
     // free: per slot (parallel to weapons), true for the free starting weapon (not put in the backpack on leave)
     free: weapons.map((w, i) => freeStart && i === 0),
@@ -72,7 +72,7 @@ export function join(A, key, { name, skin, loadout = [], coins = 0 } = {}, now) 
   send(A, p.id, welcomeFor(A, p.id));
   send(A, p.id, inventoryMsg(p));
   send(A, 'all', { t: 'pjoin', ...playerInfo(p) }, p.id);
-  return { ok: true, id: p.id, weapons: taken, replaced };
+  return { ok: true, id: p.id, weapons: taken, potions: p.potions, replaced };
 }
 
 /**
@@ -151,21 +151,56 @@ export function teleport(A, id, { x, y = 0, z, ry } = {}) {
 export function selectSlot(A, id, i) {
   const p = A.players.get(id);
   if (!p || !Number.isInteger(i) || i < 0 || i >= p.weapons.length || isFrozen(A, p)) return false;
+  // Switching to another weapon while drinking cancels it: the potion is wasted
+  // (unless the drinking time is already over and only the tick did not come yet).
+  if (p.drink && A.now >= p.drink.end) finishDrink(A, p);
+  if (p.drink && i !== p.slot) cancelDrink(A, p);
   p.slot = i;
   send(A, p.id, inventoryMsg(p));
   return true;
 }
 
-export function heal(A, id, kind, now) {
+// ---------------------------------------------------------------- Healing Potion
+
+const potionRules = A => A.rules.POTION;
+export const maxPotions = A => (Number.isInteger(A.rules.MAX_POTIONS) ? A.rules.MAX_POTIONS : 0);
+
+/**
+ * Start drinking a Healing Potion. The potion is used up right away; after POTION.drinkMs the
+ * player gets full health (in tick). Moving or getting hit does not stop it; a slot change cancels it
+ * (the potion is wasted), and so does leaving or being knocked out.
+ * Refused (false) with no potion, at full health, or while already drinking.
+ */
+export function startDrink(A, id, now) {
   const p = A.players.get(id);
-  const slot = Object.hasOwn(HEAL_SLOTS, kind) ? HEAL_SLOTS[kind] : null;
-  const def = slot && Object.hasOwn(A.rules.HEALS, kind) ? A.rules.HEALS[kind] : null;
-  if (!p || !def) return false;
+  const P = potionRules(A);
+  if (!p || !P) return false;
   now = at(A, now);
-  if (now - p.lastHeal < A.tune.healCooldownMs || p.hp >= A.rules.MAX_HP || p[slot.field] <= 0) return false;
-  p[slot.field]--;
-  p.hp = Math.min(A.rules.MAX_HP, p.hp + def.heal);
-  p.lastHeal = now;
+  if (p.drink || p.potions <= 0 || p.hp >= A.rules.MAX_HP) return false;
+  p.potions--;
+  p.drink = { start: now, end: now + P.drinkMs };
+  send(A, p.id, { t: 'drink', state: 'start', ms: P.drinkMs, hp: p.hp });
   send(A, p.id, inventoryMsg(p));
   return true;
+}
+
+/** Stop drinking without healing (the potion is already gone). */
+export function cancelDrink(A, p) {
+  if (!p.drink) return false;
+  p.drink = null;
+  send(A, p.id, { t: 'drink', state: 'cancel', ms: 0, hp: p.hp });
+  return true;
+}
+
+/** Finish every drinking that is done by `now`: full health. Players in Map order (join order). */
+export function tickDrinks(A, now) {
+  for (const p of A.players.values()) if (p.drink && now >= p.drink.end) finishDrink(A, p);
+}
+
+/** Drinking is done: full health (POTION.healPercent of MAX_HP). */
+function finishDrink(A, p) {
+  p.drink = null;
+  p.hp = potionHeal(p.hp, A.rules.MAX_HP, potionRules(A));
+  send(A, p.id, { t: 'drink', state: 'done', ms: 0, hp: p.hp });
+  send(A, p.id, inventoryMsg(p));
 }

@@ -48,16 +48,16 @@ graph LR
 | Package | What it does | Runs in | Determinism | Tests |
 |---|---|---|---|---|
 | `@pvp/seeded-random` | Random numbers from a seed: same seed, same numbers. | both | fully: only the seed and the calls decide | 11 |
-| `@pvp/game-rules` | All the game's numbers (the boss's weapons and shields, rarities and their colors, chest weights, heals, skins, prices, limits) as frozen data. | both | fully: constant data and pure helpers | 19 |
+| `@pvp/game-rules` | All the game's numbers (the boss's weapons and shields, rarities and their colors, chest weights, the Healing Potion, skins, prices, limits) as frozen data. | both | fully: constant data and pure helpers | 21 |
 | `@pvp/collision` | Walls, jumping, landing and ray hits in a world made of boxes. | both | fully: pure math, no random, no time | 18 |
 | `@pvp/world-gen` | Builds the island of ruins (houses, towers, chests) from a seed. | both | fully: all random comes from the seed | 12 |
 | `@pvp/net-protocol` | Every message between phone and server, with builders and checks. | both | fully: pure functions and frozen data | 18 |
-| `@pvp/accounts-shop` | Accounts, log in, coins, buying skins and weapons, the backpack. | Node (browser via `/browser`) | partly: logic is pure, tokens/clock are passed in, file saving is real I/O | 32 |
-| `@pvp/arena` | The fight itself: players, chests, loot, weapons, shields, shock and freeze, damage, knockouts. | both | fully: time and seeded random are passed in (replay tests) | 68 |
-| `@pvp/shop-catalog` | Turns the rules and an account into the cards the shop screen shows. | both | fully: pure functions of their inputs | 9 |
-| `@pvp/hud-model` | Turns your inventory and health into the in-game HUD: Durability bar of the held weapon, H.P bar, 5 slots, shield pill. | both | fully: pure functions of their inputs | 12 |
+| `@pvp/accounts-shop` | Accounts, log in, coins, buying skins, weapons and potions, the backpack. | Node (browser via `/browser`) | partly: logic is pure, tokens/clock are passed in, file saving is real I/O | 34 |
+| `@pvp/arena` | The fight itself: players, chests, loot, weapons, shields, shock and freeze, drinking potions, damage, knockouts. | both | fully: time and seeded random are passed in (replay tests) | 81 |
+| `@pvp/shop-catalog` | Turns the rules and an account into the cards the shop screen shows. | both | fully: pure functions of their inputs | 10 |
+| `@pvp/hud-model` | Turns your inventory and health into the in-game HUD: Durability bar of the held weapon, H.P bar, 5 slots, shield pill, potion button with drinking ring. | both | fully: pure functions of their inputs (time passed in) | 16 |
 | `@pvp/api-client` | Talks to the server's account and shop API and keeps the login token. | both | fully: fetch and storage are passed in | 10 |
-| `@pvp/stickman-3d` | A three.js stickman with skins, outfits, the boss's weapons and shields, frozen/shocked looks and animation. | browser (pose math also in Node) | partly: pose math is pure, how it looks depends on the renderer | 23 |
+| `@pvp/stickman-3d` | A three.js stickman with skins, outfits, the boss's weapons and shields, the Healing Potion flask, frozen/shocked looks and animation. | browser (pose math also in Node) | partly: pose math is pure, how it looks depends on the renderer | 24 |
 | `@pvp/island-scene` | The 3D island: sky, sun, ground, water, palms, ruins and chests. | browser (also builds in Node) | partly: all placement and colors from a seed, how it looks depends on the renderer | 8 |
 | `@pvp/local-server` | The game server inside the page (practice mode): arena, accounts in localStorage, tick, fake WebSocket, bots. | browser (also Node) | partly: seeded arena and bots, time and timer passed in; tokens and localStorage are real | 14 |
 | `@pvp/touch-controls` | Joystick, aim by dragging, buttons, held actions (shield), keyboard and mouse. | browser (core also in Node) | partly: the core is pure, the DOM part depends on real fingers and mice | 21 |
@@ -84,11 +84,12 @@ graph LR
 
 ## `@pvp/game-rules`
 
-**Purpose:** all the game's rules as frozen plain data (limits, movement, the boss's weapons and shields with their specials, the starting weapon, rarities and their colors, chest weights and coins, heals, colors, outfits, prices), plus small helpers.
+**Purpose:** all the game's rules as frozen plain data (limits, movement, the boss's weapons and shields with their specials, the starting weapon, rarities and their colors, chest weights and coins, the Healing Potion, colors, outfits, prices), plus small helpers.
 
 | Export | Example |
 |---|---|
-| `WEAPONS`, `HEALS`, `COLORS`, `OUTFITS`, `MAX_HP` | `WEAPONS.icesword.freezeMs; // 2000` |
+| `WEAPONS`, `COLORS`, `OUTFITS`, `MAX_HP` | `WEAPONS.icesword.freezeMs; // 2000` |
+| `POTION`, `MAX_POTIONS`, `potionHeal` | `POTION.drinkMs; // 5000: the only heal, full H.P` |
 | `STARTING_WEAPON` | `'gun'`: everyone gets it on join |
 | `RARITIES`, `RARITY_COLORS`, `rarityStyle(r)` | `RARITY_COLORS.epic.color; // purple` |
 | `chestChance(id)`, `CHEST_COINS`, `GOLDEN_CHEST_COINS`, `GOLDEN_CHEST_BOOST` | `chestChance('gun'); // 15 (a weight: 15 / 46.3 of chests)` |
@@ -161,6 +162,7 @@ graph LR
 | `accounts.signup` / `accounts.login` | `const { token, account } = accounts.signup('Stick_Kid', 'secret');` |
 | `accounts.buy` / `accounts.equip` | `accounts.buy(acc, 'hat', 'crown'); accounts.equip(acc, 'hat', 'crown');` |
 | `accounts.takeLoadout` / `returnLoadout` | `const weapons = accounts.takeLoadout(acc);` |
+| `accounts.takePotions` / `returnPotions` | `const potions = accounts.takePotions(acc); // up to 3` |
 | `createJsonFileStore(file, opts)` | `createJsonFileStore('data/accounts.json', { saveDelayMs: 1000 });` |
 | `createWebStorageStore(storage, key)` | `createWebStorageStore(localStorage, 'pvp.accounts'); // memory if blocked` |
 | `accounts.rename` | `accounts.rename(acc, 'New_Name');` |
@@ -181,6 +183,7 @@ graph LR
 | `arena.setShield` | `arena.setShield(id, true, now); // raise the shield (no firing while up)` |
 | `arena.dropWeapon` | `arena.dropWeapon(id, now); // drop the weapon in hand, exact durability (#34)` |
 | `arena.openChest` | `arena.openChest(id, 3, now); // or 'golden'` |
+| `arena.drink` | `arena.drink(id, now); // Healing Potion: full H.P after 5 s, a slot change wastes it` |
 | `arena.setCoins` | `arena.setCoins(id, account.coins); // the account's total wins, queues an 'inv'` |
 | `arena.tick` / `arena.drain` | `arena.tick(now); for (const ev of arena.drain()) send(ev);` |
 | `ARENA_DEFAULTS` | `createArena({ ..., tuning: { ...ARENA_DEFAULTS, snapshotRadius: 200 } });` |
@@ -196,6 +199,7 @@ graph LR
 |---|---|
 | `shopTabs()` | `shopTabs(); // [{ id: 'color', label: 'Colors', hint }, ...]` |
 | `shopItems(tab, account)` | `shopItems('hat', account); // cards with action 'buy' / 'equip' / 'equipped'` |
+| `potionCard(account)` | `potionCard(account); // the Healing Potion card (tab 'potion')` |
 | `shopWeaponIds(rules)` | `shopWeaponIds(); // every weapon, sorted by rarity, then price` |
 | `backpackSummary(account)` | `backpackSummary(account); // 'Backpack: 2× Shootbm, 1× Supersword'` |
 | `swatchBackground(card)` | `el.style.background = swatchBackground(card);` |
@@ -217,6 +221,8 @@ graph LR
 | `pickSlot(inv, action)` | `pickSlot(inv, '+'); // next filled slot, or null` |
 | `brokeMessage(id)` | `brokeMessage('shootbm'); // 'Your Shootbm broke!'` |
 | `shieldView(inv, up)` | `shieldView({ shield: { id: 'shield', dur: 45 } }); // { name: 'Shield', label: '45', percent: 75, … } or null` |
+| `potionView(inv, { drink, now })` / `drinkState` | `potionView(inv, { drink, now }).progress; // drinking ring 0..1` |
+| `POTION_ICON_SVG` | `btn.innerHTML = POTION_ICON_SVG; // the flask from the drawing` |
 | `WEAPON_ICONS` | `WEAPON_ICONS.icesword; // '❄️'` |
 
 **Depends on:** `@pvp/game-rules`.
@@ -249,6 +255,7 @@ graph LR
 | `sm.setShield` / `sm.shieldUp` | `sm.setShield('megashield'); sm.shieldUp = true;` |
 | `sm.setStatus` | `sm.setStatus({ frozen: true, shocked: false }); // ice block / lightning` |
 | `buildWeapon(id)` | `const loot = buildWeapon('supersword'); loot.userData.update?.(time); // a THREE.Group` |
+| `buildPotion()` / `holdPotion(sm, on)` | `scene.add(buildPotion()); holdPotion(sm, true); // drinking` |
 | `computePose(state, prev, dt)` | `const pose = computePose({ speed: 3, time }, null, dt);` |
 | `weaponModelKind(id)` | `weaponModelKind('shootbm'); // 'special:shootbm'` |
 | `disposeObject(obj)` | `disposeObject(loot); // free geometries and materials` |

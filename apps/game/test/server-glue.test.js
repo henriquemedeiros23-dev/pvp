@@ -84,7 +84,7 @@ function messages(ws) {
 test('sign up, join the arena, bad messages are dropped, leave', async () => {
   const signup = await post('/api/signup', { name: NAME, password: 'secret1' });
   assert.equal(signup.status, 200);
-  assert.deepEqual(Object.keys(signup.body.account).sort(), ['coins', 'name', 'owned', 'skin', 'stash']);
+  assert.deepEqual(Object.keys(signup.body.account).sort(), ['coins', 'name', 'owned', 'potions', 'skin', 'stash']);
 
   const taken = await post('/api/signup', { name: NAME, password: 'secret1' });
   assert.equal(taken.status, 400);
@@ -105,7 +105,11 @@ test('sign up, join the arena, bad messages are dropped, leave', async () => {
   const w = await welcome;
   assert.equal(typeof w.id, 'number');
   assert.ok(w.players.some(p => p.id === w.id && p.name === NAME));
-  assert.deepEqual((await inv).weapons, ['gun']);
+  const firstInv = await inv;
+  assert.deepEqual(firstInv.weapons, ['gun']);
+  assert.equal(firstInv.potions, 0, 'no free potions');
+  ws.send(JSON.stringify({ t: 'drink' })); // no potion, full health: ignored
+  ws.send(JSON.stringify({ t: 'heal', kind: 'bandage' })); // gone: dropped like junk
 
   const snap = await inbox.next('snap');
   assert.ok(snap.p.some(a => a[0] === w.id));

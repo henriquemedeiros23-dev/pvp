@@ -77,6 +77,7 @@
       <button data-tab="back">Back</button>
       <button data-tab="shirt">Clothes</button>
       <button data-tab="weapon">Weapons</button>
+      <button data-tab="potion">Potions</button>
     </nav>
     <p id="shopHint" class="hint"></p>
     <div id="shopGrid" class="grid"></div>
@@ -87,6 +88,10 @@
   <section id="hud" class="hidden">
     <div class="crosshair"><i></i><i></i><i></i><i></i></div>
     <div id="hitmark" class="hitmark">✕</div>
+    <!-- Drinking a Healing Potion: a big progress ring around the crosshair (#28) -->
+    <div id="drinkRing" class="drinkring hidden" role="progressbar" aria-label="Drinking a Healing Potion" aria-valuemin="0" aria-valuemax="100">
+      <div id="drinkFill" class="dfill"></div><span id="drinkIcon" class="dicon"></span><span id="drinkText" class="dtext"></span>
+    </div>
     <div id="banner" class="banner hidden"></div>
     <div id="feed" class="feed"></div>
     <div class="hud-top">
@@ -105,8 +110,6 @@
           <div id="shieldPill" class="shield-pill hidden" role="progressbar" aria-label="Shield" aria-valuemin="0" aria-valuemax="100">
             <span id="shieldIcon" class="sicon">🛡️</span><span class="sbar"><i id="shieldFill"></i></span><b id="shieldText">0</b>
           </div>
-          <button id="btnBandage" class="heal" title="Bandage (Q)">🩹 <b id="bandageCount">0</b></button>
-          <button id="btnMedkit" class="heal" title="Medkit (F)">💊 <b id="medkitCount">0</b></button>
         </div>
         <div class="meters">
           <div id="durMeter" class="meter dur">
@@ -118,6 +121,10 @@
             <span class="mlabel">H.P</span>
             <div class="mbar hpbar" role="progressbar" aria-label="Health" aria-valuemin="0" aria-valuemax="100"><div id="hpFill" class="mfill"></div></div>
             <span id="hpText" class="mval">100%</span>
+            <!-- Healing Potion button next to the H.P bar (#28): count, and a ring that fills while drinking -->
+            <button id="btnPotion" class="potion empty" title="Healing Potion (Q)" aria-label="Healing Potion: 0">
+              <span id="potionIcon" class="picon"></span><b id="potionCount" class="pcount">0</b>
+            </button>
           </div>
         </div>
       </div>
@@ -136,7 +143,7 @@
       <button id="btnCrouch" class="tbtn crouch">⤓</button>
       <button id="btnShield" class="tbtn shieldbtn hidden" aria-label="Hold to raise your shield">🛡️</button>
     </div>
-    <p id="keysHelp" class="keys hidden">WASD move · hold Shift shield · Space jump · C crouch/slide · Click shoot · E open · G drop weapon · 1-5 weapons · Q bandage · F medkit · Esc free mouse</p>
+    <p id="keysHelp" class="keys hidden">WASD move · hold Shift shield · Space jump · C crouch/slide · Click shoot · E open · G drop weapon · 1-5 weapons · Q drink potion · Esc free mouse</p>
   </section>
 
   <!-- Knocked out -->

@@ -150,12 +150,20 @@ export function createLocalServer({
     }
   }
 
+  // Leave alive: carried weapons and unused Healing Potions go back into the backpack.
+  function leaveArenaAlive(acc, id) {
+    if (!arena.hasPlayer(id)) return;
+    const potions = arena.getPlayer(id).potions;
+    accounts.returnLoadout(acc, arena.leave(id, { alive: true }));
+    if (potions) accounts.returnPotions(acc, potions);
+  }
+
   function leaveAlive(conn) {
     const id = conn.playerId;
     if (id == null) return;
     conn.playerId = null;
     conns.delete(id);
-    if (arena.hasPlayer(id)) accounts.returnLoadout(conn.acc, arena.leave(id, { alive: true }));
+    leaveArenaAlive(conn.acc, id);
   }
 
   function join(conn, t) {
@@ -164,22 +172,26 @@ export function createLocalServer({
     if (oldId !== undefined) {
       const old = conns.get(oldId);
       if (old) { leaveAlive(old); if (old !== conn) sendRaw(old, encode('left')); }
-      else accounts.returnLoadout(acc, arena.leave(oldId, { alive: true }));
+      else leaveArenaAlive(acc, oldId);
     }
     const loadout = accounts.takeLoadout(acc);
-    const r = arena.join(playerKey(acc), { name: acc.name, skin: { ...acc.skin }, loadout, coins: acc.coins }, t);
+    const potions = accounts.takePotions(acc); // up to 3 Healing Potions come along
+    const r = arena.join(playerKey(acc), { name: acc.name, skin: { ...acc.skin }, loadout, coins: acc.coins, potions }, t);
     if (!r.ok) {
       accounts.returnLoadout(acc, loadout);
+      accounts.returnPotions(acc, potions);
       sendRaw(conn, encode('full'));
       return;
     }
     const rest = [...loadout];
     for (const w of r.weapons) { const i = rest.indexOf(w); if (i >= 0) rest.splice(i, 1); }
     if (rest.length) accounts.returnLoadout(acc, rest);
+    if (r.potions < potions) accounts.returnPotions(acc, potions - r.potions);
     if (r.replaced) {
       const old = conns.get(r.replaced.id);
       if (old) { old.playerId = null; conns.delete(r.replaced.id); }
       accounts.returnLoadout(acc, r.replaced.weapons);
+      if (r.replaced.potions) accounts.returnPotions(acc, r.replaced.potions);
     }
     conn.playerId = r.id;
     conns.set(r.id, conn);
@@ -195,7 +207,7 @@ export function createLocalServer({
       case 'fire': if (id != null) arena.fire(id, m.d, t); break;
       case 'slot': if (id != null) arena.selectSlot(id, m.i); break;
       case 'open': if (id != null) arena.openChest(id, m.id, t); break;
-      case 'heal': if (id != null) arena.heal(id, m.kind, t); break;
+      case 'drink': if (id != null) arena.drink(id, t); break;
       case 'shield': if (id != null) arena.setShield(id, m.up, t); break;
       case 'drop': if (id != null) arena.dropWeapon(id, t); break;
     }

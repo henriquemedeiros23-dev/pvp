@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as rules from '../src/index.js';
 import {
-  RULES, WEAPONS, COLORS, OUTFITS, DEFAULT_SKIN, LOOT_TABLE, HEALS, STARTING_WEAPON, RARITIES, RARITY_COLORS,
+  RULES, WEAPONS, COLORS, OUTFITS, DEFAULT_SKIN, LOOT_TABLE, POTION, MAX_POTIONS, potionPrice, potionHeal, STARTING_WEAPON, RARITIES, RARITY_COLORS,
   CHEST_COINS, GOLDEN_CHEST_COINS, GOLDEN_CHEST_BOOST, WEAPON_TYPES, isShield, rarityRank, rarityStyle, droppedDurability, chestChance, validateRules, weaponPrice, weaponDurability, weaponWear, skinPrice, isBuyable, itemPrice, weaponsByRarity,
 } from '../src/index.js';
 import { readFileSync } from 'node:fs';
@@ -18,10 +18,13 @@ test('real rules validate with zero problems', () => {
 // The old file has no durability (#21), chest chances or the new rarities (#25).
 // #25 replaced BASIC_WEAPON / RARITIES / LOOT_TABLE; #26 replaced every weapon with the boss's cards.
 const CHANGED = ['BASIC_WEAPON', 'RARITIES', 'LOOT_TABLE', 'WEAPONS'];
+// #28 removed bandages and medkits: the Healing Potion is the only heal.
+const REMOVED_IN_28 = ['HEALS', 'MAX_BANDAGES', 'MAX_MEDKITS', 'BANDAGE_HEAL', 'MEDKIT_HEAL'];
 
 test('same named exports and values as the old apps/game/shared/config.js (except the #25/#26 changes)', () => {
   for (const [name, value] of Object.entries(oldConfig)) {
     if (CHANGED.includes(name)) continue;
+    if (REMOVED_IN_28.includes(name)) { assert.ok(!(name in rules), `${name} should be gone (#28)`); continue; }
     assert.ok(name in rules, `missing export ${name}`);
     assert.deepEqual(rules[name], value, `export ${name} differs`);
   }
@@ -264,11 +267,48 @@ test('weaponsByRarity', () => {
 });
 
 test('exported data is deep-frozen', () => {
-  for (const obj of [RULES, WEAPONS, WEAPONS.shootbm, WEAPONS.electricsword.shock, HEALS.medkit, LOOT_TABLE, LOOT_TABLE.epic, RARITY_COLORS, RARITY_COLORS.epic,
+  for (const obj of [RULES, WEAPONS, WEAPONS.shootbm, WEAPONS.electricsword.shock, POTION, LOOT_TABLE, LOOT_TABLE.epic, RARITY_COLORS, RARITY_COLORS.epic,
     COLORS, COLORS.gold, OUTFITS, OUTFITS.hat, OUTFITS.hat.crown, DEFAULT_SKIN]) {
     assert.ok(Object.isFrozen(obj));
   }
   assert.throws(() => { WEAPONS.shootbm.dmg = 999; }, TypeError);
   assert.throws(() => { LOOT_TABLE.epic.push('supersword'); }, TypeError);
   assert.equal(WEAPONS.shootbm.dmg, 5);
+});
+
+test('the Healing Potion, from the boss\'s card (#28): the only heal', () => {
+  assert.equal(POTION.id, 'potion');
+  assert.equal(POTION.name, 'Healing Potion');
+  assert.equal(POTION.healPercent, 100, 'full H.P');
+  assert.equal(POTION.drinkMs, 5000, 'drinking takes 5 seconds');
+  assert.equal(POTION.chestChance, 15, '15% from chests');
+  assert.equal(POTION.price, 10, '10 coins');
+  assert.equal(POTION.rarity, 'common', 'Common (green)');
+  assert.equal(MAX_POTIONS, 3);
+  assert.equal(RULES.POTION, POTION);
+  assert.equal(RULES.MAX_POTIONS, 3);
+  assert.equal(potionPrice('potion'), 10);
+  assert.equal(potionPrice('bandage'), undefined);
+  assert.equal(itemPrice('potion', 'potion'), 10);
+  assert.equal(isBuyable('potion', 'potion'), true);
+  assert.equal(isBuyable('potion', 'medkit'), false);
+  assert.equal(potionHeal(1, 100), 100);
+  assert.equal(potionHeal(0, 100), 100);
+  assert.equal(potionHeal(60, 100, { ...POTION, healPercent: 25 }), 85);
+  for (const gone of ['HEALS', 'MAX_BANDAGES', 'MAX_MEDKITS', 'BANDAGE_HEAL', 'MEDKIT_HEAL']) assert.ok(!(gone in RULES), gone);
+});
+
+test('validateRules checks the potion', () => {
+  const r = copy();
+  r.POTION = { ...r.POTION, drinkMs: 0, price: -1, rarity: 'mythic', healPercent: 0 };
+  r.MAX_POTIONS = -1;
+  const p = validateRules(r);
+  assert.ok(p.includes('POTION: drinkMs must be a whole number > 0'), p);
+  assert.ok(p.includes('POTION: price must be a number >= 0'));
+  assert.ok(p.includes('POTION: unknown rarity "mythic"'));
+  assert.ok(p.includes('POTION: healPercent must be a number from 1 to 100'));
+  assert.ok(p.includes('MAX_POTIONS must be a whole number >= 0'));
+  delete r.POTION;
+  r.MAX_POTIONS = 3;
+  assert.deepEqual(validateRules(r), [], 'rules without a potion are fine');
 });

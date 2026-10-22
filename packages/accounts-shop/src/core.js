@@ -30,6 +30,7 @@ function sameString(a, b) {
 }
 
 const safeCoins = n => (Number.isFinite(n) && n > 0 ? Math.floor(n) : 0);
+const safeCount = n => (Number.isInteger(n) && n > 0 ? n : 0);
 
 /**
  * Create the accounts service.
@@ -51,6 +52,7 @@ export function createAccounts({
   if (typeof randomBytes !== 'function') throw new TypeError('createAccounts needs randomBytes');
   if (typeof hashPassword !== 'function') throw new TypeError('createAccounts needs hashPassword');
   const { STARTING_WEAPON, WEAPONS, MAX_SLOTS, DEFAULT_SKIN, COLORS, OUTFITS, SKIN_SLOTS } = rules;
+  const MAX_POTIONS = Number.isInteger(rules.MAX_POTIONS) ? rules.MAX_POTIONS : 0;
   const itemPrice = rules.itemPrice ?? gameRules.itemPrice;
 
   // Records keyed by lower-case name. No prototype, so a name like "__proto__" is just a name.
@@ -65,6 +67,8 @@ export function createAccounts({
     rec.owned ??= freeItems();
     rec.skin ??= { ...DEFAULT_SKIN };
     rec.stash ??= {};
+    // Healing Potions in the backpack (older accounts have none: 0).
+    rec.potions = safeCount(rec.potions);
     // Weapons that are no longer in the game (e.g. the old wooden sword, or the Pistol and the others removed
     // in #26) are dropped from the backpack.
     for (const id of Object.keys(rec.stash)) if (!Object.hasOwn(WEAPONS, id)) delete rec.stash[id];
@@ -119,6 +123,7 @@ export function createAccounts({
       owned: freeItems(),
       skin: { ...DEFAULT_SKIN },
       stash: {},
+      potions: 0,
       tokens: [],
       createdAt: now(),
     };
@@ -162,6 +167,7 @@ export function createAccounts({
       owned: [...a.owned],
       skin: { ...a.skin },
       stash: { ...a.stash },
+      potions: a.potions,
     };
   }
 
@@ -178,10 +184,12 @@ export function createAccounts({
     const a = own(account);
     const price = typeof kind === 'string' && typeof id === 'string' ? itemPrice(kind, id) : undefined;
     if (price === undefined) fail('UNKNOWN_ITEM', 'That item is not in the shop');
-    if (kind !== 'weapon' && a.owned.includes(`${kind}:${id}`)) fail('ALREADY_OWNED', 'You already have that');
+    const stackable = kind === 'weapon' || kind === 'potion'; // can be bought again and again
+    if (!stackable && a.owned.includes(`${kind}:${id}`)) fail('ALREADY_OWNED', 'You already have that');
     if (a.coins < price) fail('NOT_ENOUGH_COINS', 'Not enough coins');
     a.coins = safeCoins(a.coins - price);
     if (kind === 'weapon') a.stash[id] = (a.stash[id] || 0) + 1;
+    else if (kind === 'potion') a.potions++;
     else a.owned.push(`${kind}:${id}`);
     save();
     return publicView(a);
@@ -246,8 +254,29 @@ export function createAccounts({
     return publicView(a);
   }
 
+  /**
+   * Healing Potions to carry into the arena: as many as the backpack has, at most MAX_POTIONS (3).
+   * They leave the backpack. Returns how many.
+   */
+  function takePotions(account) {
+    const a = own(account);
+    const n = Math.min(a.potions, MAX_POTIONS);
+    a.potions -= n;
+    save();
+    return n;
+  }
+
+  /** Left the arena alive (or the arena did not take them): unused potions go back. Bad counts are ignored. */
+  function returnPotions(account, n) {
+    const a = own(account);
+    a.potions += safeCount(n);
+    save();
+    return publicView(a);
+  }
+
   return {
     signup, login, logout, byToken, publicView, addCoins, buy, equip, rename, takeLoadout, returnLoadout,
+    takePotions, returnPotions,
     /** Write any pending changes now (tests, shutdown). */
     flush: () => store.flush(),
   };

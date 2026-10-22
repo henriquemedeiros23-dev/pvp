@@ -26,12 +26,12 @@ test('loadout is capped at MAX_SLOTS', () => {
 
 test('arena full refuses, and joining again replaces the old player', () => {
   const arena = makeArena({ rules: { ...RULES, MAX_PLAYERS: 2 } });
-  const a = arena.join('a', { loadout: ['shootbm'] });
+  const a = arena.join('a', { loadout: ['shootbm'], potions: 2 });
   arena.join('b', {});
   assert.deepEqual(arena.join('c', {}), { ok: false, reason: 'full' });
   const again = arena.join('a', {});
   assert.equal(again.ok, true);
-  assert.deepEqual(again.replaced, { id: a.id, weapons: ['shootbm'] });
+  assert.deepEqual(again.replaced, { id: a.id, weapons: ['shootbm'], potions: 2 }, 'unused potions go back too');
   assert.equal(arena.playerCount(), 2);
   assert.equal(arena.idOf('a'), again.id);
 });
@@ -60,13 +60,18 @@ test('anti-teleport: a too-big jump is refused with a pos correction', () => {
   assert.equal(arena.getPlayer(a.id).x, 1);
 });
 
-test('slot switch and heal', () => {
+test('slot switch; drinking is refused at full health or without a potion', () => {
   const arena = makeArena();
-  const a = arena.join('a', { loadout: ['shootbm'] });
+  const a = arena.join('a', { loadout: ['shootbm'], potions: 1 });
   assert.equal(arena.selectSlot(a.id, 1), true);
   assert.equal(arena.selectSlot(a.id, 2), false);
-  assert.equal(arena.heal(a.id, 'bandage', 100), false); // full health
+  assert.equal(arena.drink(a.id, 100), false); // full health
+  assert.equal(arena.getPlayer(a.id).potions, 1);
   assert.equal(arena.getPlayer(a.id).slot, 1);
+  const b = arena.join('b', {});
+  assert.equal(arena.getPlayer(b.id).potions, 0, 'no free potions: they come from the backpack or chests');
+  assert.equal(arena.drink(b.id, 100), false);
+  assert.equal(arena.heal, undefined, 'no bandages or medkits any more');
 });
 
 test('a bought Gun goes into slot 2 next to the free one; only the bought copy goes back on leave', () => {

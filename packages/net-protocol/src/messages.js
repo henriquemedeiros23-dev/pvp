@@ -33,8 +33,8 @@ export const FLAG_MOVING = 4;
 export const FLAG_AIR = 8;
 export const FLAGS_MASK = FLAG_CROUCH | FLAG_SLIDE | FLAG_MOVING | FLAG_AIR;
 
-const ITEM_KINDS = ['weapon', 'bandage', 'medkit'];
-const HEAL_KINDS = ['bandage', 'medkit'];
+const ITEM_KINDS = ['weapon', 'potion'];
+const DRINK_STATES = ['start', 'done', 'cancel'];
 const BIG_INT = { type: 'int', min: 0, max: 2 ** 31 - 1 };      // coins can grow past MAX_NUMBER
 const FLAGS = { type: 'int', min: 0, max: 255 };
 const ANGLE = { type: 'number', min: -1000, max: 1000 };          // radians, may wind up a bit
@@ -92,9 +92,7 @@ export const CLIENT_MESSAGES = deepFreeze({
   shield: m('Raise (up: true) or lower my shield. Ignored without a shield or while frozen.', {
     up: ['bool', 'true = raise the shield, false = lower it'],
   }),
-  heal: m('Use a heal item.', {
-    kind: [{ enum: HEAL_KINDS }, '"bandage" or "medkit"'],
-  }),
+  drink: m('Start drinking a Healing Potion (takes a few seconds; switching weapon slots cancels it).'),
 });
 
 /** Messages the server sends to phones. */
@@ -118,8 +116,7 @@ export const SERVER_MESSAGES = deepFreeze({
     weapons: [{ list: 'string', max: 32 }, 'Weapon ids, one per slot'],
     dur: [{ optional: { list: DUR, max: 32 } }, 'Uses left per slot, same order as weapons (null = never breaks); max is the weapon\'s durability in the rules'],
     slot: ['uint', 'Slot in hand'],
-    bandages: ['uint', 'Bandages carried'],
-    medkits: ['uint', 'Medkits carried'],
+    potions: ['uint', 'Healing Potions carried (max MAX_POTIONS in the rules)'],
     coins: [BIG_INT, 'Your coins'],
     hp: ['int', 'Your health'],
     shield: [{ optional: { nullable: SHIELD } }, 'The shield on your arm { id, dur } (dur = blocked hits left), or null'],
@@ -139,10 +136,15 @@ export const SERVER_MESSAGES = deepFreeze({
     by: ['string?', 'Name of who opened it (only when gone)'],
   }),
   'item+': m('An item dropped on the ground.', {
-    id: ['uint', 'Item id'], kind: [{ enum: ITEM_KINDS }, '"weapon", "bandage" or "medkit"'],
+    id: ['uint', 'Item id'], kind: [{ enum: ITEM_KINDS }, '"weapon" or "potion"'],
     weapon: [{ nullable: 'string' }, 'Weapon id when kind is "weapon", else null'],
     x: ['number', 'X'], y: ['number', 'Height'], z: ['number', 'Z'],
     dur: [{ optional: DUR }, 'Weapon only: uses left (null = never breaks)'],
+  }),
+  drink: m('Your potion drinking started, finished (full health) or was cancelled (potion wasted).', {
+    state: [{ enum: DRINK_STATES }, '"start", "done" or "cancel"'],
+    ms: ['uint', 'Drinking time left in ms (the whole time on "start", 0 when done or cancelled)'],
+    hp: ['int', 'Your health now'],
   }),
   broke: m('Your weapon broke (durability 0) and is gone. An "inv" follows.', {
     slot: ['uint', 'Slot it was in'], weapon: ['string', 'Weapon id'],

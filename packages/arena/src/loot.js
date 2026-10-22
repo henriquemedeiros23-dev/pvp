@@ -3,7 +3,7 @@
 import { circleHitsBox } from '@pvp/collision';
 import { chestChance } from '@pvp/game-rules';
 import { send, weaponDef, maxDurability, isShieldId, rankOf } from './state.js';
-import { HEAL_SLOTS, inventoryMsg } from './players.js';
+import { inventoryMsg, maxPotions } from './players.js';
 import { equipShield } from './effects.js';
 
 export const itemMsg = it => {
@@ -13,7 +13,7 @@ export const itemMsg = it => {
 };
 
 /**
- * Drop an item near (x, z). kind: 'weapon' (with a weapon id) or a heal kind.
+ * Drop an item near (x, z). kind: 'weapon' (with a weapon id) or 'potion' (a Healing Potion).
  * dur (weapons): uses left; left out = full (new chest loot).
  */
 export function dropItem(A, kind, weapon, x, z, spread = A.tune.dropSpread, dur) {
@@ -62,16 +62,16 @@ export function rollChestWeapon(A, { golden = false } = {}, r = A.rnd.loot) {
 }
 
 /**
- * Loot from a normal chest: exactly one weapon (full durability), picked by chestChance.
- * Heals from chests are a separate setting (tuning chestHealChance, 0 = off for now).
+ * Loot from a chest: exactly one weapon (full durability), picked by chestChance (golden: boosted),
+ * and POTION.chestChance % of the time an extra Healing Potion next to it.
+ * Draws from the seeded loot stream in a fixed order: weapon, weapon spot, potion chance, potion spot.
  */
-export function rollLoot(A, x, z) {
+export function rollLoot(A, x, z, { golden = false } = {}) {
   const r = A.rnd.loot;
-  const w = rollChestWeapon(A, {}, r);
+  const w = rollChestWeapon(A, { golden }, r);
   if (w) dropItem(A, 'weapon', w, x, z);
-  if (A.tune.chestHealChance > 0 && r.next() < A.tune.chestHealChance) {
-    dropItem(A, r.next() < A.tune.bandageChance ? 'bandage' : 'medkit', null, x, z);
-  }
+  const P = A.rules.POTION;
+  if (P && P.chestChance > 0 && r.next() * 100 < P.chestChance) dropItem(A, 'potion', null, x, z);
 }
 
 /**
@@ -95,10 +95,9 @@ function take(A, p, it) {
     p.free.push(!!it.free); // a dropped free starting Gun stays free (never goes into a backpack)
     return weaponDef(A, it.weapon)?.name ?? it.weapon;
   }
-  const slot = HEAL_SLOTS[it.kind];
-  if (!slot || p[slot.field] >= A.rules[slot.max]) return null;
-  p[slot.field]++;
-  return A.rules.HEALS[it.kind]?.name ?? it.kind;
+  if (it.kind !== 'potion' || p.potions >= maxPotions(A)) return null; // only with fewer than MAX_POTIONS
+  p.potions++;
+  return A.rules.POTION?.name ?? it.kind;
 }
 
 export function tickItems(A, now) {
