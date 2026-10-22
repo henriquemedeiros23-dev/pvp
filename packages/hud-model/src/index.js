@@ -5,8 +5,7 @@ import { RULES } from '@pvp/game-rules';
 
 /** One emoji per weapon id, for slots, the kill feed and the shop. */
 export const WEAPON_ICONS = Object.freeze({
-  gun: '🔫', sword: '⚔️', bat: '🏏', spear: '🔱', axe: '🪓', pistol: '🔫', shotgun: '💥',
-  rifle: '🎯', sniper: '🔭', grenade: '💣', rocket: '🚀', mine: '🧨',
+  gun: '🔫', shootbm: '🎯', electricsword: '⚡', icesword: '❄️', shield: '🛡️', megashield: '🛡️', supersword: '🗡️',
 });
 
 /** Durability bar colors: above `good` is 'good' (green), from `low` up to `good` is 'low' (yellow), below `low` is 'critical' (red). */
@@ -17,6 +16,11 @@ export const HEALTH_LOW = 0.35;
 const own = (obj, key) => (obj && Object.hasOwn(obj, key) ? obj[key] : undefined);
 const clamp01 = v => Math.max(0, Math.min(1, v));
 const isPosInt = v => Number.isInteger(v) && v > 0;
+// A weapon that can be held in a slot (not a shield), or undefined.
+const slotWeapon = (rules, id) => {
+  const w = typeof id === 'string' ? own(rules.WEAPONS, id) : undefined;
+  return w && w.type !== 'shield' ? w : undefined;
+};
 
 /**
  * Durability view for one weapon: { usesLeft, max, ratio, percent, level } or null if it never breaks.
@@ -43,7 +47,7 @@ export function slotBar(inv, rules = RULES) {
   const out = [];
   for (let i = 0; i < n; i++) {
     const id = weapons[i];
-    const w = typeof id === 'string' ? own(rules.WEAPONS, id) : undefined;
+    const w = slotWeapon(rules, id); // shields are worn on the arm, never held
     const base = { index: i, key: String(i + 1) };
     if (!w) {
       out.push({ ...base, weapon: null, name: '', icon: '', rarity: null, active: false, empty: true, durability: null });
@@ -86,7 +90,7 @@ export function heldDurabilityView(inv, rules = RULES) {
   const weapons = Array.isArray(inv?.weapons) ? inv.weapons : [];
   const slot = Number.isInteger(inv?.slot) ? inv.slot : 0;
   const id = weapons[slot];
-  const w = typeof id === 'string' ? own(rules.WEAPONS, id) : undefined;
+  const w = slotWeapon(rules, id); // shields are worn on the arm, never held
   if (!w) return { weapon: null, name: '', ratio: 0, percent: 0, level: null, label: '–', infinite: false, empty: true };
   const dur = Array.isArray(inv.dur) ? inv.dur[slot] : undefined;
   const d = durabilityView(id, dur, rules);
@@ -107,7 +111,22 @@ export function pickSlot(inv, action) {
   return Number.isInteger(i) && i >= 0 && i < count && i !== cur ? i : null;
 }
 
-/** Toast text for a 'broke' message: 'Your Pistol broke!'. */
+/**
+ * The small Shield bar (next to Durability and H.P): the shield worn on the other arm.
+ * inv.shield is { id, dur } from the 'inv' message, or null. up: is it raised right now.
+ * Returns null without a shield, else { weapon, name, icon, usesLeft, max, ratio, percent, level, label, up }.
+ */
+export function shieldView(inv, up = false, rules = RULES) {
+  const s = inv?.shield;
+  const w = s && typeof s.id === 'string' ? own(rules.WEAPONS, s.id) : undefined;
+  if (!w) return null;
+  const d = durabilityView(s.id, s.dur, rules);
+  const base = { weapon: s.id, name: w.name, icon: own(WEAPON_ICONS, s.id) || '🛡️', up: !!up };
+  if (!d) return { ...base, usesLeft: null, max: null, ratio: 1, percent: 100, level: 'good', label: '∞' };
+  return { ...base, usesLeft: d.usesLeft, max: d.max, ratio: d.ratio, percent: d.percent, level: d.level, label: String(d.usesLeft) };
+}
+
+/** Toast text for a 'broke' message: 'Your Shootbm broke!'. Shields too ('Your Shield broke!'). */
 export function brokeMessage(weaponId, rules = RULES) {
   const name = own(own(rules.WEAPONS, weaponId), 'name');
   return `Your ${name || 'weapon'} broke!`;

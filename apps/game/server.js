@@ -208,6 +208,8 @@ function onMessage(conn, m) {
     case 'slot': if (id != null) arena.selectSlot(id, m.i); break;
     case 'open': if (id != null) arena.openChest(id, m.id, now); break;
     case 'heal': if (id != null) arena.heal(id, m.kind, now); break;
+    case 'shield': if (id != null) arena.setShield(id, m.up, now); break;
+    case 'drop': if (id != null) arena.dropWeapon(id, now); break;
   }
   pump();
 }

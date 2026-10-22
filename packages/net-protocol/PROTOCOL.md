@@ -1,4 +1,4 @@
-# PvP network protocol (version 1)
+# PvP network protocol (version 2)
 
 Phone and server talk over a WebSocket (`/?token=<login token>`). Every message is **one JSON object**.
 The field `t` says what kind of message it is. A phone may send at most **4096 bytes** per message.
@@ -18,17 +18,20 @@ The exact rules live in `src/messages.js`.
 | `slot` | `i` int 0–31 | Switch to weapon slot `i` (0 = the first slot; it may hold nothing if your weapons broke). |
 | `open` | `id` int or `"golden"` | Open the chest next to me (chest index, or the golden chest). |
 | `heal` | `kind` `"bandage"` or `"medkit"` | Use a heal item. |
+| `drop` | – | Drop the weapon in my hand on the ground, with exactly the durability it has (#34). Anyone can pick it up. |
+| `shield` | `up` bool | Raise (`true`, Shift / the shield button held) or lower my shield. Ignored without a shield or while frozen. |
 
 ## Server → phone
 
 | `t` | Fields | Meaning |
 |---|---|---|
-| `welcome` | `id`, `x`, `z`, `players` [{id, name, skin}], `chests` [chest index], `golden` {x, z} or null, `items` [{id, kind, weapon, x, y, z}], `mines` [{id, x, z, owner}] | You joined. Your id, spawn spot and everything in the arena. |
+| `welcome` | `id`, `x`, `z`, `players` [{id, name, skin}], `chests` [chest index], `golden` {x, z} or null, `items` [{id, kind, weapon, x, y, z}] | You joined. Your id, spawn spot and everything in the arena. |
 | `full` | – | Arena is full. |
 | `left` | – | You left (answer to `leave`). |
 | `snap` | `p` [snapshot player], `n` uint | 20 times a second: players near you, and how many are in the arena. |
-| `inv` | `weapons` [weapon id], `dur?` [uint or null], `slot`, `bandages`, `medkits`, `coins`, `hp`, `picked?` string | Your inventory and health (`picked` = name of what you just picked up). `dur` = uses left per slot, same order as `weapons`; `null` = never breaks. The max is the weapon's `durability` in `@pvp/game-rules`. |
-| `broke` | `slot` uint, `weapon` id | Your weapon in `slot` broke (durability 0) and is gone, e.g. show "Your Pistol broke!". An updated `inv` follows. |
+| `inv` | `weapons` [weapon id], `dur?` [uint or null], `slot`, `bandages`, `medkits`, `coins`, `hp`, `shield?` {id, dur} or null, `picked?` string | Your inventory and health (`picked` = name of what you just picked up). `dur` = uses left per slot, same order as `weapons`; `null` = never breaks. The max is the weapon's `durability` in `@pvp/game-rules`. `shield` = the shield on your other arm and the blocks it has left (never in a slot). |
+| `broke` | `slot` uint, `weapon` id | Your weapon in `slot` broke (durability 0) and is gone, e.g. show "Your Shootbm broke!". An updated `inv` follows. |
+| `shieldbroke` | `weapon` id | Your shield broke (no blocks left) and is gone. An updated `inv` follows. |
 | `pjoin` | `id`, `name`, `skin` {color, hat, face, back, shirt} | A player joined. |
 | `pleave` | `id` | A player left. |
 | `pos` | `x, y, z` | Server put you back here (you moved too far too fast). |
@@ -39,12 +42,8 @@ The exact rules live in `src/messages.js`.
 | `item-` | `id`, `by?` player id | Item gone (`by` picked it up; missing = it expired). |
 | `shot` | `id` shooter, `w` weapon id, `from` vec3, `to` [vec3] | Gun fired; one `to` per bullet. |
 | `swing` | `id` | Melee swing. |
-| `proj` | `id`, `kind` weapon id, `x, y, z`, `vx, vy, vz` | Grenade or rocket launched. |
-| `proj-` | `id` | Projectile gone (it exploded). |
-| `boom` | `x, y, z`, `r` radius | Explosion. |
-| `mine+` | `id`, `x, y, z`, `owner` | Mine placed. |
-| `mine-` | `id` | Mine gone. |
-| `hitmark` | `dead` bool | You hit someone (`dead` = you knocked them out). |
+| `block` | `id` defender, `by` attacker | A raised shield blocked a hit (draw a flash in front of `id`). |
+| `hitmark` | `dead` bool, `blocked?` bool | You hit someone (`dead` = you knocked them out, `blocked` = their shield stopped it). |
 | `hurt` | `hp`, `kx, kz` knockback, `from` vec2 or null | You got hurt. |
 | `ko` | `id`, `x, y, z`, `victim` name, `by` name or null, `weapon` | Someone was knocked out. |
 | `dead` | `by` name or null, `weapon` | You were knocked out. |
@@ -63,6 +62,8 @@ Each item of `snap.p` is an array (constants in `SNAP`):
 | 7 | `WEAPON` | Weapon id in hand |
 | 8 | `HP` | Health |
 | 9 | `PROTECTED` | 1 = spawn protection on, 0 = off |
+| 10 | `SHIELD` | Shield id worn on the left arm, `''` = none |
+| 11 | `STATUS` | Bits: `1` shield raised (`STATUS_SHIELD_UP`), `2` shocked (`STATUS_SHOCKED`), `4` frozen (`STATUS_FROZEN`) |
 
 ## Movement flags
 

@@ -6,8 +6,11 @@ export const STAND_HIP_Y = 0.95;
 export const CROUCH_HIP_Y = 0.62;
 export const SLIDE_HIP_Y = 0.45;
 
-/** Weapon types that hold the arms forward to aim (melee swings, mines are placed). */
-export const AIM_TYPES = Object.freeze(['gun', 'throw', 'rocket']);
+/** Weapon types that hold the arms forward to aim (melee swings). */
+export const AIM_TYPES = Object.freeze(['gun']);
+
+/** The left arm while the shield is raised: forward, holding it in front of the chest (the face stays visible). */
+export const SHIELD_ARM = Object.freeze({ x: -1.2, z: 0.2 });
 
 /** The pose of a stickman before any animation has run. */
 export function restPose() {
@@ -26,12 +29,13 @@ export function restPose() {
 
 /**
  * Compute the next pose.
- * state: { speed, crouch, slide, air, pitch, time, weaponType, swing, recoil }
+ * state: { speed, crouch, slide, air, pitch, time, weaponType, swing, recoil, shield }
  *   speed            horizontal speed (units/s)
  *   crouch/slide/air booleans
  *   pitch            look up/down angle (radians)
  *   time             seconds, passed in (idle breathing and cape flutter)
- *   weaponType       'melee' | 'gun' | 'throw' | 'rocket' | 'mine' | null
+ *   weaponType       'melee' | 'gun' | null
+ *   shield           how far the shield is raised, 0 (down) -> 1 (up in front of you)
  *   swing            melee swing progress, 1 (just started) -> 0
  *   recoil           gun recoil, 1 -> 0
  * prev: the previous pose (null/undefined starts from restPose()). It is not changed.
@@ -41,7 +45,7 @@ export function restPose() {
 export function computePose(state = {}, prev, dt = 0) {
   const {
     speed = 0, crouch = false, slide = false, air = false, pitch = 0, time = 0,
-    weaponType = null, swing = 0, recoil = 0,
+    weaponType = null, swing = 0, recoil = 0, shield = 0,
   } = state;
   const p = prev || restPose();
 
@@ -72,6 +76,9 @@ export function computePose(state = {}, prev, dt = 0) {
     armR = { x: -s * swingAmt * 0.8 - 0.3 - sw * 2.2, z: 0.12 };
     armL = { x: s * swingAmt * 0.8, z: -0.12 };
   }
+  // shield raised: the left arm holds it straight out in front
+  const sh = Math.min(1, Math.max(0, shield));
+  if (sh > 0) armL = { x: armL.x + (SHIELD_ARM.x - armL.x) * sh, z: armL.z + (SHIELD_ARM.z - armL.z) * sh };
 
   return {
     walk,

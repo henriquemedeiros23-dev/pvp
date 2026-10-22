@@ -25,72 +25,75 @@ const durOf = (arena, id) => arena.getPlayer(id).dur;
 
 test('join: every weapon starts full, the starting Gun too', () => {
   const arena = makeArena();
-  const id = arena.join('a', { loadout: ['sniper', 'pistol'] }).id;
+  const id = arena.join('a', { loadout: ['shootbm', 'icesword', 'shield'] }).id;
   const inv = msgs(drain(arena), 'inv', id)[0];
-  assert.deepEqual(inv.weapons, ['gun', 'sniper', 'pistol']);
-  assert.deepEqual(inv.dur, [15, RULES.WEAPONS.sniper.durability, RULES.WEAPONS.pistol.durability]);
+  assert.deepEqual(inv.weapons, ['gun', 'shootbm', 'icesword']);
+  assert.deepEqual(inv.dur, [15, 20, 50]);
+  assert.deepEqual(inv.shield, { id: 'shield', dur: 60 });
   assert.deepEqual(durOf(arena, id), inv.dur);
 });
 
 test('each use that passes the rate check costs 1; refused fires cost nothing', () => {
-  const { arena, id } = holder('pistol');
-  const max = RULES.WEAPONS.pistol.durability;
+  const { arena, id } = holder('shootbm');
+  const max = RULES.WEAPONS.shootbm.durability;
   assert.equal(arena.fire(id, [0, 0, 1], READY), true);
   assert.equal(durOf(arena, id)[1], max - 1);
   assert.deepEqual(msgs(drain(arena), 'inv', id).at(-1).dur, [15, max - 1]);
   assert.equal(arena.fire(id, [0, 0, 1], READY + 10), false); // too fast
   assert.equal(durOf(arena, id)[1], max - 1);
-  assert.equal(arena.fire(id, [0, 0, 0], READY + 1000), false); // no direction
+  assert.equal(arena.fire(id, [0, 0, 0], READY + 3000), false); // no direction
   assert.equal(durOf(arena, id)[1], max - 1);
 });
 
 test('wearPerUse is used', () => {
-  const { arena, id } = holder('pistol', { rules: rulesWith({ pistol: { durability: 10, wearPerUse: 3 } }) });
+  const { arena, id } = holder('shootbm', { rules: rulesWith({ shootbm: { durability: 10, wearPerUse: 3 } }) });
   arena.fire(id, [0, 0, 1], READY);
   assert.equal(durOf(arena, id)[1], 7);
 });
 
-test('every weapon type wears out: swing, shot, throw, rocket, mine', () => {
-  for (const w of ['sword', 'shotgun', 'grenade', 'rocket', 'mine']) {
+test('every weapon wears out: each shot, and each swing that hits someone, costs 1', () => {
+  for (const w of ['shootbm', 'electricsword', 'icesword', 'supersword']) {
     const { arena, id } = holder(w);
+    const v = arena.join('v', {}).id;
+    arena.teleport(v, { x: 0, z: 2 }); // right in front
     assert.equal(arena.fire(id, [0, 0, 1], READY), true, w);
     assert.equal(durOf(arena, id)[1], RULES.WEAPONS[w].durability - 1, w);
   }
 });
 
 test('breaks exactly at 0: disappears, sends broke + inv, hand moves to a valid slot', () => {
-  const rules = rulesWith({ sniper: { durability: 3 } });
-  const { arena, id } = holder('sniper', { rules, loadout: ['sniper', 'pistol'] });
+  const rules = rulesWith({ shootbm: { durability: 3 } });
+  const { arena, id } = holder('shootbm', { rules, loadout: ['shootbm', 'icesword'] });
   let t = READY;
-  for (let i = 0; i < 2; i++, t += 2000) assert.equal(arena.fire(id, [0, 0, 1], t), true);
-  assert.deepEqual(arena.getPlayer(id).weapons, ['gun', 'sniper', 'pistol'], 'still there at 1');
+  for (let i = 0; i < 2; i++, t += 3000) assert.equal(arena.fire(id, [0, 0, 1], t), true);
+  assert.deepEqual(arena.getPlayer(id).weapons, ['gun', 'shootbm', 'icesword'], 'still there at 1');
   assert.equal(durOf(arena, id)[1], 1);
   drain(arena);
 
   assert.equal(arena.fire(id, [0, 0, 1], t), true); // last use still fires
   const out = drain(arena);
   assert.equal(msgs(out, 'shot').length, 1);
-  assert.deepEqual(msgs(out, 'broke', id), [{ t: 'broke', slot: 1, weapon: 'sniper' }]);
+  assert.deepEqual(msgs(out, 'broke', id), [{ t: 'broke', slot: 1, weapon: 'shootbm' }]);
   const order = out.filter(e => e.to === id).map(e => e.msg.t);
   assert.ok(order.indexOf('broke') < order.lastIndexOf('inv'), 'inv after broke');
   const inv = msgs(out, 'inv', id).at(-1);
-  assert.deepEqual(inv.weapons, ['gun', 'pistol']);
-  assert.deepEqual(inv.dur, [15, RULES.WEAPONS.pistol.durability]);
+  assert.deepEqual(inv.weapons, ['gun', 'icesword']);
+  assert.deepEqual(inv.dur, [15, RULES.WEAPONS.icesword.durability]);
   assert.equal(inv.slot, 1);
   const p = arena.getPlayer(id);
-  assert.deepEqual(p.weapons, ['gun', 'pistol']);
+  assert.deepEqual(p.weapons, ['gun', 'icesword']);
   assert.equal(p.slot, 1);
-  // gone for good: leaving alive gives back only the pistol
-  assert.deepEqual(arena.leave(id, { alive: true }), ['pistol']);
+  // gone for good: leaving alive gives back only the Ice Sword
+  assert.deepEqual(arena.leave(id, { alive: true }), ['icesword']);
 });
 
 test('breaking the last slot moves the hand to the slot before it', () => {
-  const { arena, id } = holder('rocket', { rules: rulesWith({ rocket: { durability: 1 } }) });
+  const { arena, id } = holder('shootbm', { rules: rulesWith({ shootbm: { durability: 1 } }) });
   arena.fire(id, [0, 0, 1], READY);
   const p = arena.getPlayer(id);
   assert.deepEqual(p.weapons, ['gun']);
   assert.equal(p.slot, 0);
-  assert.equal(arena.projectiles().length, 1, 'the last rocket still flies');
+  assert.equal(msgs(drain(arena), 'shot').length, 1, 'the last shot still fires');
 });
 
 test('the starting Gun: 2 damage, one shot every 2 s, breaks after 15 shots and disappears', () => {
@@ -114,17 +117,17 @@ test('the starting Gun: 2 damage, one shot every 2 s, breaks after 15 shots and 
 });
 
 test('never breaks is a per-weapon setting', () => {
-  const rules = rulesWith({ gun: { durability: 2 }, pistol: { durability: null } });
+  const rules = rulesWith({ gun: { durability: 2 }, shootbm: { durability: null } });
   const arena = makeArena({ rules });
-  const id = arena.join('a', { loadout: ['pistol'] }).id;
+  const id = arena.join('a', { loadout: ['shootbm'] }).id;
   arena.fire(id, [0, 0, 1], READY);
   arena.fire(id, [0, 0, 1], READY + 3000);
-  assert.deepEqual(arena.getPlayer(id).weapons, ['pistol'], 'the gun broke');
+  assert.deepEqual(arena.getPlayer(id).weapons, ['shootbm'], 'the gun broke');
   assert.equal(arena.getPlayer(id).slot, 0);
-  assert.equal(arena.snapshotFor(id).p[0][7], 'pistol');
+  assert.equal(arena.snapshotFor(id).p[0][7], 'shootbm');
   let t = READY + 6000;
-  for (let i = 0; i < 100; i++, t += 1000) arena.fire(id, [0, 0, 1], t);
-  assert.deepEqual(arena.getPlayer(id).weapons, ['pistol']);
+  for (let i = 0; i < 100; i++, t += 3000) arena.fire(id, [0, 0, 1], t);
+  assert.deepEqual(arena.getPlayer(id).weapons, ['shootbm']);
 });
 
 test('an empty inventory is safe: nothing to fire, snapshot still valid, picking up works', () => {
@@ -150,22 +153,22 @@ test('an empty inventory is safe: nothing to fire, snapshot still valid, picking
 
 test('knockout drops weapons with their wear; picking one up keeps it', () => {
   const arena = makeArena();
-  const s = arena.join('shooter', { loadout: ['sniper'] }).id;
-  const v = arena.join('victim', { loadout: ['pistol'] }).id;
+  const s = arena.join('shooter', { loadout: ['supersword'] }).id;
+  const v = arena.join('victim', { loadout: ['shootbm'] }).id;
   const w = arena.join('walker', {}).id;
   arena.teleport(s, { x: 0, z: 0 });
-  arena.teleport(v, { x: 20, z: 0 });
+  arena.teleport(v, { x: 0, z: 2 });
   arena.teleport(w, { x: -40, z: 0 });
   arena.selectSlot(v, 1);
-  arena.fire(v, [0, 1, 0], READY); // victim wears the pistol a bit
-  arena.fire(v, [0, 1, 0], READY + 1000);
-  const left = RULES.WEAPONS.pistol.durability - 2;
+  arena.fire(v, [0, 1, 0], READY); // victim wears the shootbm a bit
+  arena.fire(v, [0, 1, 0], READY + 3000);
+  const left = RULES.WEAPONS.shootbm.durability - 2;
   arena.selectSlot(s, 1);
-  arena.fire(s, aimAt(arena, s, v), READY + 2000);
-  arena.fire(s, aimAt(arena, s, v), READY + 4000);
+  arena.fire(s, [0, 0, 1], READY + 4000); // one Supersword hit
+  arena.teleport(s, { x: 60, z: 60 }); // step away from the drops
   const out = drain(arena);
   assert.equal(arena.getPlayer(v), undefined, 'knocked out');
-  const drop = msgs(out, 'item+').find(m => m.weapon === 'pistol');
+  const drop = msgs(out, 'item+').find(m => m.weapon === 'shootbm');
   assert.equal(drop.dur, left);
   assert.equal(msgs(out, 'item+').find(m => m.kind === 'bandage').dur, undefined, 'heals have no dur');
   assert.equal(arena.items().find(i => i.id === drop.id).dur, left);
@@ -174,38 +177,38 @@ test('knockout drops weapons with their wear; picking one up keeps it', () => {
   arena.teleport(w, { x: drop.x, z: drop.z });
   arena.tick(READY + 4050);
   const inv = msgs(drain(arena), 'inv', w).at(-1);
-  assert.deepEqual(inv.weapons, ['gun', 'pistol']);
+  assert.deepEqual(inv.weapons, ['gun', 'shootbm']);
   assert.deepEqual(inv.dur, [15, left], 'more than half left: keeps it');
 });
 
 test('dropped weapons with half or less durability come back at half (rounded up); more than half keeps it', () => {
-  const rules = rulesWith({ pistol: { durability: 11 } });
+  const rules = rulesWith({ shootbm: { durability: 11 } });
   const arena = makeArena({ rules });
-  const s = arena.join('shooter', { loadout: ['sniper'] }).id;
-  const v = arena.join('victim', { loadout: ['pistol'] }).id;
+  const s = arena.join('shooter', { loadout: ['supersword'] }).id;
+  const v = arena.join('victim', { loadout: ['shootbm'] }).id;
   const w = arena.join('walker', {}).id;
   arena.teleport(s, { x: 0, z: 0 });
-  arena.teleport(v, { x: 20, z: 0 });
+  arena.teleport(v, { x: 0, z: 2 });
   arena.teleport(w, { x: -40, z: 0 });
   arena.selectSlot(v, 1);
   let t = READY;
-  for (let i = 0; i < 9; i++, t += 1000) arena.fire(v, [0, 1, 0], t); // pistol: 2 of 11 left
+  for (let i = 0; i < 9; i++, t += 3000) arena.fire(v, [0, 1, 0], t); // shootbm: 2 of 11 left
   arena.selectSlot(v, 0);
   t += 2000;
   assert.equal(arena.fire(v, [0, 1, 0], t), true); // gun: 14 of 15 left
   arena.selectSlot(s, 1);
-  arena.fire(s, aimAt(arena, s, v), t + 100);
-  arena.fire(s, aimAt(arena, s, v), t + 2100);
+  arena.fire(s, [0, 0, 1], t + 2100);
+  arena.teleport(s, { x: 60, z: 60 }); // step away from the drops
   const out = drain(arena);
   assert.equal(arena.getPlayer(v), undefined, 'knocked out');
   const drops = msgs(out, 'item+');
-  assert.equal(drops.find(m => m.weapon === 'pistol').dur, 6, '2 of 11 -> 5.5 rounded up');
+  assert.equal(drops.find(m => m.weapon === 'shootbm').dur, 6, '2 of 11 -> 5.5 rounded up');
   assert.equal(drops.find(m => m.weapon === 'gun').dur, 14, '14 of 15 is more than half: kept');
-  const pistol = drops.find(m => m.weapon === 'pistol');
-  arena.teleport(w, { x: pistol.x, z: pistol.z });
+  const shootbm = drops.find(m => m.weapon === 'shootbm');
+  arena.teleport(w, { x: shootbm.x, z: shootbm.z });
   arena.tick(t + 2200);
   const inv = msgs(drain(arena), 'inv', w).at(-1);
-  assert.deepEqual(inv.weapons, ['gun', 'pistol']);
+  assert.deepEqual(inv.weapons, ['gun', 'shootbm']);
   assert.deepEqual(inv.dur, [15, 6]);
 });
 
@@ -220,10 +223,10 @@ test('chest loot starts full', () => {
 });
 
 test('leaving alive returns worn weapons as plain ids (full again next join)', () => {
-  const { arena, id } = holder('pistol');
+  const { arena, id } = holder('shootbm');
   arena.fire(id, [0, 0, 1], READY);
   const back = arena.leave(id, { alive: true });
-  assert.deepEqual(back, ['pistol']);
+  assert.deepEqual(back, ['shootbm']);
   const again = arena.join('a', { loadout: back }).id;
-  assert.equal(durOf(arena, again)[1], RULES.WEAPONS.pistol.durability);
+  assert.equal(durOf(arena, again)[1], RULES.WEAPONS.shootbm.durability);
 });

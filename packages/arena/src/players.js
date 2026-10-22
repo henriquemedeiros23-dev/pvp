@@ -1,8 +1,9 @@
 // Players: join, leave, movement updates (with anti-teleport), slot switch, healing.
 
 import { findSpawn } from '@pvp/world-gen';
-import { at, send, weaponDef, maxDurability } from './state.js';
+import { at, send, weaponDef, maxDurability, isShieldId } from './state.js';
 import { welcomeFor } from './snapshot.js';
+import { equipShield, isFrozen } from './effects.js';
 
 /** Heal kind -> the player field that counts it, and the rule with its limit. */
 export const HEAL_SLOTS = Object.freeze({
@@ -11,7 +12,10 @@ export const HEAL_SLOTS = Object.freeze({
 });
 
 export function inventoryMsg(p, picked) {
-  const msg = { t: 'inv', weapons: [...p.weapons], dur: [...p.dur], slot: p.slot, bandages: p.bandages, medkits: p.medkits, coins: p.coins, hp: p.hp };
+  const msg = {
+    t: 'inv', weapons: [...p.weapons], dur: [...p.dur], slot: p.slot, bandages: p.bandages, medkits: p.medkits, coins: p.coins, hp: p.hp,
+    shield: p.shield ? { id: p.shield.id, dur: p.shield.dur } : null,
+  };
   if (picked !== undefined) msg.picked = picked;
   return msg;
 }
@@ -30,12 +34,20 @@ export function join(A, key, { name, skin, loadout = [], coins = 0 } = {}, now) 
   if (oldId !== undefined) replaced = { id: oldId, weapons: leave(A, oldId, { alive: true }) };
 
   // The starting weapon (free, slot 1), then weapons from the loadout in its order (best first is the
-  // server's choice), copies of the same weapon too, as many as fit.
-  const freeStart = Boolean(weaponDef(A, R.STARTING_WEAPON));
+  // server's choice), copies of the same weapon too, as many as fit. Shields never take a slot:
+  // the first shield in the loadout goes on the left arm, other shields are not taken.
+  const freeStart = Boolean(weaponDef(A, R.STARTING_WEAPON)) && !isShieldId(A, R.STARTING_WEAPON);
   const weapons = freeStart ? [R.STARTING_WEAPON] : [];
+  const taken = [];
+  let shield = null;
   for (const w of Array.isArray(loadout) ? loadout : []) {
-    if (weapons.length >= R.MAX_SLOTS) break;
-    if (weaponDef(A, w)) weapons.push(w);
+    if (!weaponDef(A, w)) continue;
+    if (isShieldId(A, w)) {
+      if (!shield) { shield = w; taken.push(w); }
+    } else if (weapons.length < R.MAX_SLOTS) {
+      weapons.push(w);
+      taken.push(w);
+    }
   }
 
   const spot = findSpawn(A.island, [...A.players.values()], A.rnd.spawn);
@@ -48,14 +60,19 @@ export function join(A, key, { name, skin, loadout = [], coins = 0 } = {}, now) 
     protectUntil: now + R.SPAWN_PROTECT_MS, lastState: now,
     // free: per slot (parallel to weapons), true for the free starting weapon (not put in the backpack on leave)
     free: weapons.map((w, i) => freeStart && i === 0),
+    // shield on the left arm: { id, dur } (dur = blocked hits left) or null; shieldUp while raised
+    shield: null, shieldUp: false,
+    frozenUntil: 0,   // completely stuck until this time (ms)
+    shock: null,      // { dmg, everyMs, left, next, byId, by, weapon } while losing HP over time
   };
+  if (shield) equipShield(A, p, shield);
   A.players.set(p.id, p);
   A.byKey.set(key, p.id);
 
   send(A, p.id, welcomeFor(A, p.id));
   send(A, p.id, inventoryMsg(p));
   send(A, 'all', { t: 'pjoin', ...playerInfo(p) }, p.id);
-  return { ok: true, id: p.id, weapons: weapons.slice(freeStart ? 1 : 0), replaced };
+  return { ok: true, id: p.id, weapons: taken, replaced };
 }
 
 /**
@@ -78,7 +95,7 @@ export function removePlayer(A, p) {
 
 /**
  * Leaves the arena. Alive: returns the weapons to put back in the backpack: everything carried
- * except the free starting weapon given at join (if it has not broken).
+ * except the free starting weapon given at join (if it has not broken), then the shield (if any).
  * Broken weapons are already gone; worn ones go back as plain ids (the backpack keeps no durability,
  * so they are full again next time).
  */
@@ -88,7 +105,9 @@ export function leave(A, id, { alive = true } = {}) {
   removePlayer(A, p);
   send(A, 'all', { t: 'pleave', id: p.id });
   if (!alive) return [];
-  return p.weapons.filter((w, i) => !p.free[i]);
+  const back = p.weapons.filter((w, i) => !p.free[i]);
+  if (p.shield) back.push(p.shield.id);
+  return back;
 }
 
 /** A movement update from the player. Returns false if refused (a `pos` correction is queued). */
@@ -101,6 +120,11 @@ export function setState(A, id, s, now) {
   p.lastState = now;
   const x = Number(s.x), y = Number(s.y), z = Number(s.z);
   if (![x, y, z].every(Number.isFinite)) return false;
+  // Frozen: completely stuck. Moving gets a 'pos' back to where the ice holds you; turning is ignored.
+  if (isFrozen(A, p)) {
+    if (Math.hypot(x - p.x, z - p.z) > T.frozenSlack || Math.abs(y - p.y) > T.frozenSlack) send(A, p.id, { t: 'pos', x: p.x, y: p.y, z: p.z });
+    return false;
+  }
   // Light anti-cheat: refuse impossible teleports.
   const maxMove = A.rules.SLIDE_SPEED * dt * T.teleportSlack + T.teleportExtra;
   if (Math.hypot(x - p.x, z - p.z) > maxMove || Math.abs(y - p.y) > T.maxFallSpeed * dt + T.fallExtra) {
@@ -126,7 +150,7 @@ export function teleport(A, id, { x, y = 0, z, ry } = {}) {
 
 export function selectSlot(A, id, i) {
   const p = A.players.get(id);
-  if (!p || !Number.isInteger(i) || i < 0 || i >= p.weapons.length) return false;
+  if (!p || !Number.isInteger(i) || i < 0 || i >= p.weapons.length || isFrozen(A, p)) return false;
   p.slot = i;
   send(A, p.id, inventoryMsg(p));
   return true;

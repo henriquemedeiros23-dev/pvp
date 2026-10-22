@@ -1,11 +1,11 @@
-// 3D weapon models. A weapon gets a special model when its id is known and its type still
-// matches; otherwise a generic model is picked by its type (melee/gun/throw/rocket/mine).
+// 3D weapon models (the boss's cards). A weapon gets a special model when its id is known and its type still
+// matches; otherwise a generic model is picked by its type (melee/gun/shield).
 import * as THREE from 'three';
 import { WEAPONS } from '@pvp/game-rules';
 import { std } from './materials.js';
 
 /** The weapon types that have a generic model. Unknown types use the melee model. */
-export const MODEL_TYPES = Object.freeze(['melee', 'gun', 'throw', 'rocket', 'mine']);
+export const MODEL_TYPES = Object.freeze(['melee', 'gun', 'shield']);
 
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 
@@ -75,33 +75,245 @@ function buildGun({ g, mesh, box }) {
   part(0.062, 0.098, 0.016, darkMat, -0.175); // magazine plate
 }
 
+// ---------------------------------------------------------------- shapes shared by the boss's weapons
+
+// A glowing material that ignores light (lightning, snowflakes, magic dots).
+const glow = (color, opacity = 1) => new THREE.MeshBasicMaterial({ color, transparent: opacity < 1, opacity, toneMapped: false });
+
+// A lightning bolt: a zigzag of thin boxes in the x-z plane, about `len` long along z.
+function bolt(mat, len = 0.22, w = 0.018) {
+  const g = new THREE.Group();
+  const pts = [[0, 0], [0.05, 0.3], [-0.03, 0.45], [0.04, 0.75], [-0.02, 1]].map(([x, z]) => [x * len * 2.2, z * len]);
+  for (let i = 0; i < pts.length - 1; i++) {
+    const [x1, z1] = pts[i], [x2, z2] = pts[i + 1];
+    const l = Math.hypot(x2 - x1, z2 - z1);
+    const m = new THREE.Mesh(new THREE.BoxGeometry(w, w * 0.6, l + w * 0.6), mat);
+    m.position.set((x1 + x2) / 2, 0, (z1 + z2) / 2);
+    m.rotation.y = Math.atan2(x2 - x1, z2 - z1);
+    g.add(m);
+  }
+  return g;
+}
+
+// A snowflake: three crossing bars with little side twigs, in the x-z plane.
+function snowflake(mat, r = 0.06) {
+  const g = new THREE.Group();
+  const w = r * 0.18;
+  for (let i = 0; i < 3; i++) {
+    const arm = new THREE.Group();
+    arm.rotation.y = (i * Math.PI) / 3;
+    arm.add(new THREE.Mesh(new THREE.BoxGeometry(w, w * 0.5, r * 2), mat));
+    for (const s of [-1, 1]) for (const k of [-1, 1]) {
+      const twig = new THREE.Mesh(new THREE.BoxGeometry(w * 0.8, w * 0.5, r * 0.45), mat);
+      twig.position.set(s * r * 0.12, 0, k * r * 0.6);
+      twig.rotation.y = s * k * 0.75;
+      arm.add(twig);
+    }
+    g.add(arm);
+  }
+  g.add(new THREE.Mesh(new THREE.OctahedronGeometry(w * 1.3), mat));
+  return g;
+}
+
+// Block letters made of boxes (no fonts, works in Node): 'P', 'V' and '.'. Returns the letter width.
+function letter(g, ch, mat, x, h, depth) {
+  const t = h * 0.2; // stroke
+  const bar = (w, hh, px, py, rz = 0) => {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(w, hh, depth), mat);
+    m.position.set(px, py, 0); m.rotation.z = rz; g.add(m);
+  };
+  if (ch === 'P') {
+    const w = h * 0.55;
+    bar(t, h, x + t / 2, 0);                                   // stem
+    bar(w - t / 2, t, x + w / 2, h / 2 - t / 2);                // top
+    bar(w - t / 2, t, x + w / 2, 0.02 * h);                     // middle
+    bar(t, h / 2 + t * 0.1, x + w - t / 2, h / 4 - t * 0.05 + 0.01 * h); // bowl side
+    return w;
+  }
+  if (ch === 'V') {
+    const w = h * 0.7, a = Math.atan2(w / 2 - t / 2, h);
+    const len = Math.hypot(w / 2, h) * 1.02;
+    bar(t, len, x + w / 4 + t / 4, 0, a);
+    bar(t, len, x + (3 * w) / 4 - t / 4, 0, -a);
+    return w;
+  }
+  bar(t, t, x + t / 2, -h / 2 + t / 2); // '.'
+  return t;
+}
+
+function lettering(text, mat, h, depth) {
+  const g = new THREE.Group();
+  const gap = h * 0.22;
+  let x = 0;
+  for (const ch of text) x += letter(g, ch, mat, x, h, depth) + gap;
+  const width = x - gap;
+  for (const c of g.children) c.position.x -= width / 2;
+  return g;
+}
+
+// ---------------------------------------------------------------- the boss's weapons
+
+// Shootbm: a long gun like the drawing: a stepped stock at the back, a long straight barrel and
+// a round sight on top near the front. Gun frame: forward is -y, up is +z; the hand is at the grip.
+function buildShootbm({ g, mesh, box }) {
+  const body = std('#3b4250', { metalness: 0.55, roughness: 0.4 });
+  const dark = std('#191b20', { roughness: 0.7 });
+  const steel = std('#c3c9d1', { metalness: 0.85, roughness: 0.2 });
+  const wood = std('#8a5a2b', { roughness: 0.8 });
+  g.scale.setScalar(1.2);
+  // one long straight body, front to back (the long rectangle of the drawing)
+  box(0.065, 0.86, 0.085, body, 0, -0.39, 0.09);
+  box(0.067, 0.7, 0.012, dark, 0, -0.45, 0.138);                                     // top strip
+  mesh(new THREE.CylinderGeometry(0.026, 0.026, 0.06, 16), steel, 0, -0.85, 0.09);  // muzzle
+  mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.062, 10), dark, 0, -0.852, 0.09); // muzzle hole
+  for (let i = 0; i < 4; i++) box(0.068, 0.012, 0.05, dark, 0, -0.55 - i * 0.04, 0.09); // cooling slots
+  // round sight on top near the front: a post and a ring you look through
+  box(0.014, 0.018, 0.07, steel, 0, -0.68, 0.17);
+  const ring = mesh(new THREE.TorusGeometry(0.045, 0.01, 10, 28), steel, 0, -0.68, 0.24);
+  ring.rotation.x = Math.PI / 2; // you look through it along the barrel
+  // stepped stock at the back: three steps going down, like the drawing
+  const steps = [[0.04, 0.14, 0.08, 0.1], [0.18, 0.14, 0.035, 0.1], [0.32, 0.14, -0.01, 0.1]];
+  for (const [y0, len, z, h] of steps) box(0.062, len, h, wood, 0, y0 + len / 2, z);
+  box(0.064, 0.02, 0.1, dark, 0, 0.47, -0.01); // butt plate
+  // grip and trigger (the little curve under the body in the drawing)
+  box(0.05, 0.07, 0.15, wood, 0, 0.0, -0.03).rotation.x = 0.25;
+  const guard = mesh(new THREE.TorusGeometry(0.035, 0.008, 8, 20), dark, 0, -0.09, 0.04);
+  guard.rotation.y = Math.PI / 2;
+  box(0.012, 0.012, 0.035, steel, 0, -0.085, 0.035).rotation.x = -0.3;
+}
+
+// A long straight blade along +z with a pointed tip. Returns the blade group.
+function blade(g, { len, width, thick = 0.016, mat, from = 0.14 }) {
+  const b = new THREE.Mesh(new THREE.BoxGeometry(width, thick, len), mat);
+  b.position.z = from + len / 2;
+  g.add(b);
+  const tip = new THREE.Mesh(new THREE.CylinderGeometry(0, width / 2, width * 1.6, 4), mat);
+  tip.rotation.x = Math.PI / 2;
+  tip.rotation.y = Math.PI / 4;
+  tip.scale.set(1, 1, thick / width * 1.4);
+  tip.position.z = from + len + width * 0.8;
+  g.add(tip);
+}
+
+// Electric Sword: long thin straight blade, small crossguard and handle, yellow lightning bolts around it.
+function buildElectricSword({ g, mesh, box }) {
+  blade(g, { len: 0.95, width: 0.06, mat: std('#e9eef5', { metalness: 0.35, roughness: 0.25, emissive: '#fff6c0', emissiveIntensity: 0.12 }) });
+  box(0.2, 0.035, 0.035, std('#d4a531', { metalness: 0.8, roughness: 0.3 }), 0, 0, 0.12); // small guard
+  mesh(new THREE.CylinderGeometry(0.022, 0.022, 0.2, 10), std('#2a2d33'), 0, 0, 0.02).rotation.x = Math.PI / 2;
+  mesh(new THREE.SphereGeometry(0.03, 10, 8), std('#d4a531', { metalness: 0.8 }), 0, 0, -0.09);
+  const yellow = glow('#ffe23a');
+  const bolts = [];
+  for (const [x, z, flip] of [[0.11, 0.3, 1], [-0.12, 0.55, -1], [0.12, 0.8, 1], [-0.11, 0.98, -1]]) {
+    const b = bolt(yellow, 0.2);
+    b.position.set(x, 0, z);
+    b.rotation.y = flip * 0.35;
+    b.scale.x = flip;
+    g.add(b);
+    bolts.push(b);
+  }
+  // the bolts flicker and jump a little (time in seconds is passed in)
+  g.userData.update = time => {
+    bolts.forEach((b, i) => {
+      const f = Math.sin(time * 23 + i * 2.1) + Math.sin(time * 37 + i);
+      b.visible = f > -1.2;
+      b.position.y = Math.sin(time * 17 + i) * 0.015;
+    });
+  };
+}
+
+// Ice Sword: a thin tapered sword with blue snowflakes around it.
+function buildIceSword({ g, mesh, box }) {
+  const ice = std('#cdefff', { metalness: 0.3, roughness: 0.15, emissive: '#5ab8ff', emissiveIntensity: 0.25 });
+  const b = mesh(new THREE.CylinderGeometry(0.004, 0.035, 0.95, 4), ice, 0, 0, 0.14 + 0.475);
+  b.rotation.x = Math.PI / 2;
+  b.scale.set(1, 1, 0.3);
+  b.rotation.y = Math.PI / 4;
+  box(0.16, 0.03, 0.03, std('#7fc8ff', { metalness: 0.6 }), 0, 0, 0.12); // small guard
+  for (const s of [-1, 1]) box(0.025, 0.03, 0.06, std('#7fc8ff', { metalness: 0.6 }), s * 0.08, 0, 0.145); // little horns, like the drawing
+  mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.2, 10), std('#1e3a66'), 0, 0, 0.02).rotation.x = Math.PI / 2;
+  const blue = glow('#3fb6ff');
+  const flakes = [];
+  for (const [x, z, r] of [[0.13, 0.32, 0.06], [-0.13, 0.48, 0.05], [0.12, 0.78, 0.055], [-0.12, 0.95, 0.06]]) {
+    const f = snowflake(blue, r);
+    f.position.set(x, 0, z); // flat like the blade, so you see the star shape from the side
+    g.add(f);
+    flakes.push(f);
+  }
+  g.userData.update = time => {
+    flakes.forEach((f, i) => {
+      f.rotation.y = time * 0.8 + i;
+      f.position.y = Math.sin(time * 2 + i * 1.7) * 0.02;
+    });
+  };
+}
+
+// Supersword (Megalegend, blue + black): a very long thin straight blade, a small diamond guard and a long handle.
+function buildSupersword({ g, mesh, box }) {
+  const black = std('#101218', { metalness: 0.6, roughness: 0.3 });
+  const blue = std('#2f6fff', { metalness: 0.5, roughness: 0.25, emissive: '#2f6fff', emissiveIntensity: 0.6 });
+  const from = 0.2, len = 1.45;
+  blade(g, { len, width: 0.05, thick: 0.014, mat: black, from });
+  for (const s of [-1, 1]) box(0.008, 0.016, len, blue, s * 0.027, 0, from + len / 2); // glowing blue edges
+  box(0.012, 0.018, len * 0.85, blue, 0, 0, from + len * 0.45);                       // and a blue line in the middle
+  const diamond = mesh(new THREE.OctahedronGeometry(0.075), blue, 0, 0, 0.17);
+  diamond.scale.set(1.3, 0.35, 0.8);
+  mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.36, 10), black, 0, 0, 0.0).rotation.x = Math.PI / 2; // long handle
+  for (const z of [-0.12, -0.04, 0.04, 0.12]) mesh(new THREE.TorusGeometry(0.022, 0.005, 6, 14), blue, 0, 0, z);
+  mesh(new THREE.OctahedronGeometry(0.035), blue, 0, 0, -0.2);
+}
+
+// Shields: a square plate with "P.V.P" on the front. Shield frame: the plate is in the x-y plane,
+// the front faces +z, up is +y. Stickman turns it onto the left arm.
+export function buildShieldModel({ g, mesh, box }, def = {}, { mega = false } = {}) {
+  const size = 0.6, thick = 0.04;
+  const face = mega ? std('#ffc531', { metalness: 0.25, roughness: 0.3, emissive: '#ffb000', emissiveIntensity: 0.3 })
+    : std(def.color || '#e6e9ee', { metalness: 0.15, roughness: 0.45 });
+  const rim = mega ? std('#d99a00', { metalness: 0.3, roughness: 0.3 }) : std('#8a93a3', { metalness: 0.3, roughness: 0.35 });
+  const ink = mega ? std('#3a2600', { roughness: 0.5 }) : std('#1e2a4a', { roughness: 0.5 });
+  box(size, size, thick, face, 0, 0, 0);
+  for (const [w, h, x, y] of [[size + 0.04, 0.04, 0, size / 2], [size + 0.04, 0.04, 0, -size / 2], [0.04, size, size / 2, 0], [0.04, size, -size / 2, 0]]) {
+    box(w, h, thick + 0.02, rim, x, y, 0);
+  }
+  box(0.08, 0.3, 0.05, std('#3a3e45'), 0, 0, -thick / 2 - 0.025); // handle at the back
+  const word = lettering('P.V.P', ink, 0.15, 0.012);
+  word.position.z = thick / 2 + 0.006;
+  g.add(word);
+  if (!mega) return;
+  // Mega Shield: glowing dots all around it and a sparkle, like the card
+  const dotMat = glow('#fff07a');
+  const dots = [];
+  const n = 7, d = size / 2 + 0.08;
+  for (let i = 0; i < n; i++) {
+    const t = -d + (2 * d * (i + 0.5)) / n;
+    for (const [x, y] of [[t, d], [t, -d], [d, t], [-d, t]]) dots.push(mesh(new THREE.SphereGeometry(0.018, 8, 6), dotMat, x, y, 0));
+  }
+  const star = new THREE.Group(); // a sparkle: a long + and a small x
+  const starMat = glow('#ffe95c');
+  for (const [r, l] of [[0, 0.16], [Math.PI / 2, 0.16], [Math.PI / 4, 0.08], [-Math.PI / 4, 0.08]]) {
+    const ray = new THREE.Mesh(new THREE.OctahedronGeometry(0.5), starMat);
+    ray.scale.set(0.035, l, 0.02);
+    ray.rotation.z = r;
+    star.add(ray);
+  }
+  star.position.set(d + 0.02, d + 0.02, 0);
+  g.add(star);
+  g.userData.update = time => {
+    dots.forEach((m, i) => m.scale.setScalar(0.75 + 0.45 * (0.5 + 0.5 * Math.sin(time * 4 + i * 0.7))));
+    star.rotation.z = Math.sin(time * 1.5) * 0.3;
+    star.scale.setScalar(0.85 + 0.25 * Math.sin(time * 3));
+  };
+}
+
 // Melee weapons are held like a sword: handle in hand, blade forward (+z).
-// Ranged weapons point along -y (the direction the arm points when aiming).
+// Guns point along -y (the direction the arm points when aiming). Shields: see buildShieldModel.
 const SPECIAL = {
   gun: { type: 'gun', build: buildGun },
-  sword: { type: 'melee', build: ({ m, box }) => { box(0.06, 0.06, 0.2, m.dark()); box(0.28, 0.05, 0.05, std('#d4a531', { metalness: 0.8 }), 0, 0, 0.1); box(0.08, 0.02, 0.9, m.steel(), 0, 0, 0.58); } },
-  bat: { type: 'melee', build: ({ m, mesh }) => { mesh(new THREE.CylinderGeometry(0.07, 0.035, 0.95, 10), m.wood(), 0, 0, 0.4).rotation.x = Math.PI / 2; } },
-  spear: { type: 'melee', build: ({ m, mesh }) => {
-    mesh(new THREE.CylinderGeometry(0.025, 0.025, 1.8, 8), m.wood(), 0, 0, 0.5).rotation.x = Math.PI / 2;
-    mesh(new THREE.ConeGeometry(0.06, 0.25, 8), m.steel(), 0, 0, 1.5).rotation.x = Math.PI / 2;
-  } },
-  axe: { type: 'melee', build: ({ m, mesh, box }) => {
-    mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.9, 8), m.wood(), 0, 0, 0.35).rotation.x = Math.PI / 2;
-    box(0.04, 0.32, 0.22, m.steel(), 0, 0.12, 0.72);
-  } },
-  pistol: { type: 'gun', build: ({ m, box }) => { box(0.07, 0.3, 0.1, m.dark(), 0, -0.12, 0); box(0.06, 0.08, 0.16, m.dark(), 0, 0, -0.06); } },
-  shotgun: { type: 'gun', build: ({ m, box }) => { box(0.09, 0.85, 0.1, m.wood(), 0, -0.2, 0); box(0.06, 0.6, 0.06, m.dark(), 0, -0.45, 0.05); } },
-  rifle: { type: 'gun', build: ({ m, box }) => { box(0.08, 0.95, 0.12, m.dark(), 0, -0.25, 0); box(0.05, 0.15, 0.18, m.dark(), 0, -0.1, -0.1); box(0.04, 0.22, 0.06, std('#555'), 0, -0.25, 0.09); } },
-  sniper: { type: 'gun', build: ({ m, mesh, box }) => { box(0.07, 1.35, 0.1, std('#3a4a2a'), 0, -0.45, 0); mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.35, 10), m.dark(), 0, -0.3, 0.1); } },
-  rocket: { type: 'rocket', build: ({ mesh }) => {
-    mesh(new THREE.CylinderGeometry(0.1, 0.1, 1.2, 12), std('#3f5f3a'), 0, -0.3, 0);
-    mesh(new THREE.ConeGeometry(0.09, 0.2, 10), std('#d33'), 0, -0.98, 0).rotation.x = Math.PI;
-  } },
-  grenade: { type: 'throw', build: ({ m, mesh, box }) => { mesh(new THREE.SphereGeometry(0.1, 12, 10), std('#4b6b2f'), 0, -0.08, 0); box(0.04, 0.06, 0.04, m.dark(), 0, 0.04, 0); } },
-  mine: { type: 'mine', build: ({ mesh }) => {
-    mesh(new THREE.CylinderGeometry(0.14, 0.14, 0.06, 14), std('#555'), 0, -0.08, 0);
-    mesh(new THREE.SphereGeometry(0.03), new THREE.MeshBasicMaterial({ color: '#f22' }), 0, -0.08, 0.04);
-  } },
+  shootbm: { type: 'gun', build: buildShootbm },
+  electricsword: { type: 'melee', build: buildElectricSword },
+  icesword: { type: 'melee', build: buildIceSword },
+  supersword: { type: 'melee', build: buildSupersword },
+  shield: { type: 'shield', build: (k, def) => buildShieldModel(k, def) },
+  megashield: { type: 'shield', build: (k, def) => buildShieldModel(k, def, { mega: true }) },
 };
 
 // Generic models, one per type. Sizes follow the weapon's data a little (longer reach, longer weapon).
@@ -118,18 +330,7 @@ const GENERIC = {
     box(0.06, 0.08, 0.16, m.dark(), 0, 0, -0.06);
     box(0.03, len * 0.5, 0.03, m.steel(), 0, -len + 0.08 - len * 0.2, 0.04);
   },
-  throw: ({ m, mesh, box }) => {
-    mesh(new THREE.SphereGeometry(0.1, 12, 10), m.main('#4b6b2f'), 0, -0.08, 0);
-    box(0.04, 0.06, 0.04, m.dark(), 0, 0.04, 0);
-  },
-  rocket: ({ m, mesh }) => {
-    mesh(new THREE.CylinderGeometry(0.1, 0.1, 1.1, 12), m.main('#3f5f3a'), 0, -0.3, 0);
-    mesh(new THREE.ConeGeometry(0.09, 0.2, 10), std('#d33'), 0, -0.95, 0).rotation.x = Math.PI;
-  },
-  mine: ({ m, mesh }) => {
-    mesh(new THREE.CylinderGeometry(0.14, 0.14, 0.06, 14), m.main('#555'), 0, -0.08, 0);
-    mesh(new THREE.SphereGeometry(0.03), new THREE.MeshBasicMaterial({ color: '#f22' }), 0, -0.08, 0.04);
-  },
+  shield: (k, def) => buildShieldModel(k, def),
 };
 
 /**
@@ -144,9 +345,11 @@ export function weaponModelKind(id, weapons = WEAPONS) {
 }
 
 /**
- * Build the 3D model of a weapon as a THREE.Group.
+ * Build the 3D model of a weapon (or shield) as a THREE.Group.
  * options: { weapons = game-rules WEAPONS, castShadow = true }
  * An id missing from the weapons table gives an empty group.
+ * Some models move (lightning, snowflakes, glowing dots): call group.userData.update(timeInSeconds)
+ * every frame if it is there (Stickman does this for the weapon and the shield it carries).
  * The caller owns the group: dispose its geometries and materials when done.
  */
 export function buildWeapon(id, { weapons = WEAPONS, castShadow = true } = {}) {
@@ -160,6 +363,8 @@ export function buildWeapon(id, { weapons = WEAPONS, castShadow = true } = {}) {
   else GENERIC[name](k, def);
   g.userData.weaponId = id;
   g.userData.model = kind;
-  g.traverse(o => { if (o.isMesh) o.castShadow = castShadow; });
+  g.traverse(o => { if (o.isMesh) o.castShadow = castShadow && !o.material.isMeshBasicMaterial; });
   return g;
 }
+
+export { bolt, snowflake };

@@ -10,9 +10,10 @@ export {
   PROTOCOL_VERSION, MAX_CLIENT_MESSAGE_SIZE, MAX_SERVER_MESSAGE_SIZE, MAX_SLOT_INDEX,
   CLIENT_MESSAGES, SERVER_MESSAGES, CLIENT_SPECS, SERVER_SPECS,
   SNAP, SNAP_LENGTH, FLAG_CROUCH, FLAG_SLIDE, FLAG_MOVING, FLAG_AIR, FLAGS_MASK,
+  STATUS_SHIELD_UP, STATUS_SHOCKED, STATUS_FROZEN,
 } from './messages.js';
 export { MAX_NUMBER, MAX_STRING, MAX_ARRAY, check } from './schema.js';
-export { packSnapshotPlayer, unpackSnapshotPlayer, makeFlags, readFlags } from './snapshot.js';
+export { packSnapshotPlayer, unpackSnapshotPlayer, makeFlags, readFlags, makeStatus, readStatus } from './snapshot.js';
 
 /** Short alias: the most a client may send in one message (bytes). */
 export const MAX_MESSAGE_SIZE = MAX_CLIENT_MESSAGE_SIZE;

@@ -65,7 +65,8 @@ export function createAccounts({
     rec.owned ??= freeItems();
     rec.skin ??= { ...DEFAULT_SKIN };
     rec.stash ??= {};
-    // Weapons that are no longer in the game (e.g. the old wooden sword) are dropped from the backpack.
+    // Weapons that are no longer in the game (e.g. the old wooden sword, or the Pistol and the others removed
+    // in #26) are dropped from the backpack.
     for (const id of Object.keys(rec.stash)) if (!Object.hasOwn(WEAPONS, id)) delete rec.stash[id];
     for (const t of rec.tokens) tokens.set(t, rec);
   }
@@ -211,23 +212,25 @@ export function createAccounts({
 
   /**
    * Weapons to carry into the arena from the backpack: the most expensive stashed weapons first,
-   * every copy counts (2 Shotguns take 2 slots), until the slots are full. They leave the stash.
+   * every copy counts (2 Ice Swords take 2 slots), until the slots are full. They leave the stash.
    * The arena gives the free starting weapon itself, so one slot is kept for it (when the rules have one).
+   * Shields never take a slot: the best (most expensive) shield in the backpack comes along too, at the
+   * end of the list, to be worn on the other arm. Other shields stay in the backpack.
    */
   function takeLoadout(account) {
     const a = own(account);
     const weapons = [];
+    const isShield = id => WEAPONS[id].type === 'shield';
     const room = MAX_SLOTS - (STARTING_WEAPON && Object.hasOwn(WEAPONS, STARTING_WEAPON) ? 1 : 0);
     const best = Object.keys(a.stash)
       .filter(id => a.stash[id] > 0 && Object.hasOwn(WEAPONS, id))
       .sort((x, y) => WEAPONS[y].price - WEAPONS[x].price || (x < y ? -1 : x > y ? 1 : 0));
-    for (const id of best) {
-      while (weapons.length < room && a.stash[id] > 0) {
-        weapons.push(id);
-        a.stash[id]--;
-      }
-      if (!a.stash[id]) delete a.stash[id];
+    const take = id => { weapons.push(id); a.stash[id]--; if (!a.stash[id]) delete a.stash[id]; };
+    for (const id of best.filter(id => !isShield(id))) {
+      while (weapons.length < room && a.stash[id] > 0) take(id);
     }
+    const shield = best.find(isShield);
+    if (shield) take(shield);
     save();
     return weapons;
   }

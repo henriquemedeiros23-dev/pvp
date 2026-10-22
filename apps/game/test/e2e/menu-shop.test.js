@@ -258,7 +258,7 @@ test('sign up, shop, join the arena, leave: no errors', { skip: !RUN && 'set E2E
   assert.deepEqual(badResponses, ['400 /api/login']);
 });
 
-test('phone in landscape: menu and weapon bar fit (844x390 and 667x375)', { skip: !RUN && 'set E2E=1 to run (npm run test:e2e)', timeout: 120000 }, async () => {
+test('phone in landscape: menu and weapon bar fit (844x390 and 667x375)', { skip: !RUN && 'set E2E=1 to run (npm run test:e2e)', timeout: 240000 }, async () => {
   for (const viewport of [{ width: 844, height: 390 }, { width: 667, height: 375 }]) {
     const { context, page: p, errors: errs } = await newPage({ viewport, isMobile: true, hasTouch: true });
     try {
@@ -315,11 +315,18 @@ test('weapon bar: Durability bar follows the held weapon, tap to switch, a broke
   try {
     // talk to the real server, but let the test send extra messages to the page
     let toPage = null;
-    const sentSlots = [];
+    const sentSlots = [], sentShield = [];
+    let sentDrop = 0;
     await p.routeWebSocket(/\/\?token=/, ws => {
       const server = ws.connectToServer();
       toPage = msg => ws.send(msg);
-      ws.onMessage(m => { if (String(m).includes('"slot"')) sentSlots.push(JSON.parse(m).i); server.send(m); });
+      ws.onMessage(m => {
+        const msg = JSON.parse(String(m));
+        if (msg.t === 'slot') sentSlots.push(msg.i);
+        if (msg.t === 'shield') sentShield.push(msg.up);
+        if (msg.t === 'drop') sentDrop++;
+        server.send(m);
+      });
     });
     await signedIn(p, 'du_');
     await p.click('#btnJoin');
@@ -327,7 +334,7 @@ test('weapon bar: Durability bar follows the held weapon, tap to switch, a broke
     await checkHud(p);
 
     // the Durability bar shows the weapon in your hand: switch slots and it follows
-    const inv = { weapons: ['gun', 'pistol', 'shotgun', 'sniper'], dur: [3, 60, 10, 1], slot: 1, bandages: 2, medkits: 1, coins: 0, hp: 100 };
+    const inv = { weapons: ['gun', 'shootbm', 'icesword', 'supersword'], dur: [3, 20, 20, 1], slot: 1, bandages: 2, medkits: 1, coins: 0, hp: 100, shield: { id: 'megashield', dur: 52 } };
     const durBar = async () => p.evaluate(() => ({
       text: document.getElementById('durText').textContent,
       level: document.getElementById('durMeter').dataset.level,
@@ -341,34 +348,64 @@ test('weapon bar: Durability bar follows the held weapon, tap to switch, a broke
       // server's own value is checked here (a fake 'inv' hp could be overwritten before we read it)
       if (hp === 100) assert.equal(await p.textContent('#hpText'), '100%');
     };
-    await holding(1, 100, { text: '100%', level: 'good', width: '100%' });     // a new pistol
-    await holding(3, 100, { text: '8%', level: 'critical', width: '8%' });     // sniper, 1 shot of 12 left
+    await holding(1, 100, { text: '100%', level: 'good', width: '100%' });     // a new Shootbm
+    await holding(3, 100, { text: '3%', level: 'critical', width: '3%' });     // Supersword, 1 hit of 40 left
     await holding(0, 90, { text: '20%', level: 'low', width: '20%' });         // the Gun, 3 shots of 15 left
-    await holding(2, 72, { text: '40%', level: 'low', width: '40%' });         // shotgun, 10 of 25 left
+    await holding(2, 72, { text: '40%', level: 'low', width: '40%' });         // Ice Sword, 20 of 50 left
     assert.equal(await p.locator('#slots .slot.empty').count(), 1);
     assert.equal(await p.textContent('#bandageCount'), '2');
-    // rarity accents come from RARITY_COLORS: the Gun's slot is green (Common), the sniper's yellow (Legendary)
+    // rarity accents come from RARITY_COLORS: the Gun's slot is green (Common), the Supersword's blue + black (Megalegend)
     const bg = await p.$$eval('#slots .slot', els => els.map(b => b.style.background));
     assert.ok(bg[0].includes('rgba(60, 194, 74'), bg[0]);
-    assert.ok(bg[3].includes('rgba(255, 197, 49'), bg[3]);
+    assert.ok(bg[3].includes('rgba(47, 111, 255'), bg[3]);
+    // the Mega Shield on the other arm: a small pill next to the bars, and a shield button on the phone
+    assert.equal(await p.locator('#shieldPill').isVisible(), true);
+    assert.equal(await p.textContent('#shieldText'), '52');
+    assert.equal(await p.locator('#shieldFill').evaluate(e => e.style.width), '74%');
+    assert.equal(await p.locator('#btnShield').isVisible(), true);
     await shot('hud-phone-weapons.png', p);
+
+    // hold the shield button: the game asks the server to raise the shield, letting go lowers it
+    const box = await p.locator('#btnShield').boundingBox();
+    const cdp = await context.newCDPSession(p);
+    const touch = (type, pts) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: pts });
+    await touch('touchStart', [{ x: box.x + box.width / 2, y: box.y + box.height / 2, id: 7 }]);
+    for (let i = 0; i < 40 && !sentShield.includes(true); i++) await p.waitForTimeout(50);
+    assert.equal(await p.locator('#shieldPill').evaluate(e => e.classList.contains('up')), true);
+    await touch('touchEnd', []);
+    for (let i = 0; i < 40 && sentShield.at(-1) !== false; i++) await p.waitForTimeout(50);
+    assert.deepEqual(sentShield, [true, false]);
 
     // tap a slot: the game asks the server for it
     await p.locator('#slots .slot').nth(1).tap();
     for (let i = 0; i < 40 && !sentSlots.includes(1); i++) await p.waitForTimeout(50);
     assert.ok(sentSlots.includes(1), `tapping slot 2 should send it, sent ${JSON.stringify(sentSlots)}`);
 
-    // the sniper breaks: toast and a flash on its slot
-    toPage(encode('broke', { slot: 3, weapon: 'sniper' }));
+    // the Supersword breaks: toast and a flash on its slot
+    toPage(encode('broke', { slot: 3, weapon: 'supersword' }));
     toPage(encode('inv', { ...inv, weapons: inv.weapons.slice(0, 3), dur: inv.dur.slice(0, 3) }));
     await p.waitForFunction(() => document.querySelector('#slots .slot:nth-child(4)').classList.contains('broke'));
-    assert.equal(await p.textContent('#toast'), 'Your Sniper broke!');
+    assert.equal(await p.textContent('#toast'), 'Your Supersword broke!');
+
+    // the shield breaks: the pill and the shield button go away
+    toPage(encode('shieldbroke', { weapon: 'megashield' }));
+    toPage(encode('inv', { ...inv, weapons: inv.weapons.slice(0, 3), dur: inv.dur.slice(0, 3), shield: null }));
+    await p.locator('#shieldPill').waitFor({ state: 'hidden' });
+    assert.equal(await p.locator('#btnShield').isVisible(), false);
     assert.equal(await p.locator('#slots .slot.empty').count(), 2);
     await p.waitForFunction(() => !document.querySelector('#slots .slot.broke'), null, { timeout: 3000 });
+
+    // the ⬇️ button drops the weapon in your hand (#34): tapping it asks the server (the real server then
+    // drops the real Gun, so this comes last)
+    assert.equal(await p.locator('#btnDrop').isVisible(), true);
+    await p.locator('#btnDrop').tap();
+    for (let i = 0; i < 40 && !sentDrop; i++) await p.waitForTimeout(50);
+    assert.equal(sentDrop, 1);
 
     // every weapon broke (the Gun too): 5 empty slots and no errors
     toPage(encode('inv', { ...inv, weapons: [], dur: [], slot: 0 }));
     await p.waitForFunction(() => document.querySelectorAll('#slots .slot.empty').length === 5);
+    assert.equal(await p.locator('#btnDrop').isVisible(), false, 'nothing in your hand: nothing to drop');
     assert.equal(await p.textContent('#durText'), '–'); // nothing in hand
 
     await p.click('#btnLeave');

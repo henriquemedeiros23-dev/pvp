@@ -5,7 +5,7 @@ import { makeArena, drain, msgs, serverEvents, chestAlways, testIsland, RULES } 
 import { rollChestWeapon, chestWeights } from '../src/loot.js';
 import { createState } from '../src/state.js';
 
-const sniperOnly = chestAlways('sniper');
+const shootbmOnly = chestAlways('shootbm');
 
 test('chest opens once, gives exactly CHEST_COINS coins and one full weapon, comes back after exactly 15 s', () => {
   const arena = makeArena();
@@ -90,9 +90,11 @@ test('golden chest doubles the weights of Epic, Legendary and Megalegend (Common
   const normal = new Map(chestWeights(RULES));
   assert.equal(normal.get('gun'), 15);
   assert.equal(golden.get('gun'), 15);
-  assert.equal(golden.get('sword'), normal.get('sword'));
-  assert.equal(golden.get('shotgun'), 2 * normal.get('shotgun'));
-  assert.equal(golden.get('sniper'), 2 * normal.get('sniper'));
+  assert.equal(golden.get('shootbm'), normal.get('shootbm'));
+  assert.equal(golden.get('icesword'), 2 * normal.get('icesword'));
+  assert.equal(golden.get('shield'), 2 * normal.get('shield'));
+  assert.equal(golden.get('megashield'), 2 * normal.get('megashield'));
+  assert.equal(golden.get('supersword'), 2 * normal.get('supersword'));
   const mega = { ...RULES, WEAPONS: { c: { rarity: 'common', chestChance: 50 }, m: { rarity: 'megalegend', chestChance: 50 } } };
   assert.deepEqual(chestWeights(mega, { golden: true }), [['c', 50], ['m', 100]]);
 
@@ -114,8 +116,8 @@ test('golden chest doubles the weights of Epic, Legendary and Megalegend (Common
 });
 
 test('items are picked up into a free slot; full slots refuse', () => {
-  const arena = makeArena({ rules: sniperOnly });
-  const full = arena.join('full', { loadout: ['sword', 'bat', 'spear', 'axe'] }); // + the Gun = 5
+  const arena = makeArena({ rules: shootbmOnly });
+  const full = arena.join('full', { loadout: ['shootbm', 'icesword', 'electricsword', 'supersword'] }); // + the Gun = 5
   const free = arena.join('free', {});
   arena.teleport(full.id, { x: 10, z: 31 });
   arena.teleport(free.id, { x: -50, z: 50 });
@@ -139,7 +141,7 @@ test('items are picked up into a free slot; full slots refuse', () => {
 });
 
 test('items expire after ITEM_LIFETIME_MS', () => {
-  const arena = makeArena({ rules: sniperOnly });
+  const arena = makeArena({ rules: shootbmOnly });
   const a = arena.join('a', {});
   arena.teleport(a.id, { x: 10, z: 31 });
   arena.openChest(a.id, 0, 0);
@@ -152,7 +154,7 @@ test('items expire after ITEM_LIFETIME_MS', () => {
   assert.deepEqual(msgs(drain(arena), 'item-'), [{ t: 'item-', id: item.id }]);
 });
 
-test('chest weapons follow chestChance: Gun about 15 in 100, deterministic for a seed', () => {
+test('chest weapons follow the card numbers as weights (they add up to 46.3, not 100), deterministic for a seed', () => {
   const pickMany = seed => {
     const A = createState({ island: testIsland(), random: createRandom(seed) });
     const counts = {};
@@ -161,10 +163,14 @@ test('chest weapons follow chestChance: Gun about 15 in 100, deterministic for a
   };
   const counts = pickMany(5);
   assert.deepEqual(pickMany(5), counts, 'same seed, same picks');
+  let total = 0;
+  for (const w of Object.values(RULES.WEAPONS)) total += w.chestChance;
+  assert.ok(Math.abs(total - 46.3) < 1e-9);
   for (const [id, w] of Object.entries(RULES.WEAPONS)) {
-    const share = (counts[id] || 0) / 20000 * 100;
-    assert.ok(Math.abs(share - w.chestChance) < 1.2, `${id}: ${share.toFixed(2)}% vs ${w.chestChance}%`);
+    const share = (counts[id] || 0) / 20000, want = w.chestChance / total; // Gun: 15 / 46.3 = about 32 in 100
+    assert.ok(Math.abs(share - want) < 0.012, `${id}: ${share.toFixed(3)} vs ${want.toFixed(3)}`);
   }
+  assert.ok(counts.supersword > 0, 'the Supersword can come out (0.3 / 46.3)');
 });
 
 test('chest chances are weights: they are normalized, and 0 never comes out', () => {

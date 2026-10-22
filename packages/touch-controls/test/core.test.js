@@ -72,14 +72,14 @@ test('tap buttons queue actions, any extra name works', () => {
   assert.deepEqual(s.take().ev, []);
 });
 
-test('keys: WASD, diagonal normalised, shift walks', () => {
+test('keys: WASD, diagonal normalised, shift does not slow you down any more', () => {
   const s = createInputState();
   s.key('w', true);
   assert.deepEqual(s.move, { x: 0, y: 1 });
   s.key('D', true);
   close(s.move.x, Math.SQRT1_2); close(s.move.y, Math.SQRT1_2);
   s.key('Shift', true);
-  close(Math.hypot(s.move.x, s.move.y), 0.6);
+  close(Math.hypot(s.move.x, s.move.y), 1);
   s.key('Shift', false); s.key('w', false); s.key('d', false);
   assert.deepEqual(s.move, { x: 0, y: 0 });
   s.key('ArrowLeft', true); s.key('a', true);
@@ -91,16 +91,16 @@ test('keys: WASD, diagonal normalised, shift walks', () => {
 test('keys: actions, repeat ignored, slots 1-5', () => {
   const s = createInputState();
   s.key(' ', true); s.key(' ', true, true); s.key(' ', false);
-  s.key('c', true); s.key('Control', true); s.key('e', true); s.key('q', true); s.key('f', true);
+  s.key('c', true); s.key('Control', true); s.key('e', true); s.key('g', true); s.key('q', true); s.key('f', true);
   for (const n of ['1', '2', '3', '4', '5']) s.key(n, true);
   s.key('6', true);
-  assert.deepEqual(s.take().ev, ['jump', 'crouch', 'crouch', 'open', 'bandage', 'medkit',
+  assert.deepEqual(s.take().ev, ['jump', 'crouch', 'crouch', 'open', 'drop', 'bandage', 'medkit',
     'slot:0', 'slot:1', 'slot:2', 'slot:3', 'slot:4']);
 });
 
 test('keys: bindings are configurable', () => {
   const s = createInputState({
-    moveKeys: { forward: ['z'], left: ['q'] },
+    moveKeys: { forward: ['z'], left: ['q'], walk: ['shift'] },
     actionKeys: { x: 'reload' },
     walkSpeed: 0.5,
   });
@@ -138,7 +138,7 @@ test('disabled state ignores input but still lets go', () => {
   s.stickStart(30, 0); s.lookStart(1, 0, 0); s.lookMove(1, 50, 50);
   s.button('fire', true); s.button('jump', true); s.mouseButton(0, true);
   s.mouseMove(5, 5); s.wheel(1); s.key('w', true); s.key(' ', true);
-  assert.deepEqual(s.take(), { ev: [], actions: [], look: { x: 0, y: 0 }, move: { x: 0, y: 0 }, fire: false });
+  assert.deepEqual(s.take(), { ev: [], actions: [], look: { x: 0, y: 0 }, move: { x: 0, y: 0 }, fire: false, shield: false, holds: { shield: false } });
 
   s.enabled = true;
   s.key('w', true); s.button('fire', true);
@@ -154,7 +154,7 @@ test('reset clears everything and calls listeners', () => {
   const off = s.onReset(() => calls++);
   s.stickStart(40, 0); s.button('fire', true); s.key('e', true); s.mouseMove(3, 3);
   s.reset();
-  assert.deepEqual(s.take(), { ev: [], actions: [], look: { x: 0, y: 0 }, move: { x: 0, y: 0 }, fire: false });
+  assert.deepEqual(s.take(), { ev: [], actions: [], look: { x: 0, y: 0 }, move: { x: 0, y: 0 }, fire: false, shield: false, holds: { shield: false } });
   assert.equal(calls, 1);
   off(); s.reset();
   assert.equal(calls, 1);
@@ -178,4 +178,44 @@ test('same event sequence gives the same result', () => {
     return out;
   };
   assert.deepEqual(run(), run());
+});
+
+test('shield: hold Shift or the shield button; held while any of them is down', () => {
+  const s = createInputState();
+  assert.equal(s.shield, false);
+  s.key('Shift', true);
+  assert.equal(s.shield, true);
+  assert.equal(s.held('shield'), true);
+  let t = s.take();
+  assert.equal(t.shield, true);
+  assert.deepEqual(t.holds, { shield: true });
+  assert.deepEqual(t.ev, [], 'holding is not an action');
+  s.button('shield', true);   // phone button too
+  s.key('shift', false);
+  assert.equal(s.shield, true, 'the button is still held');
+  s.button('shield', false);
+  assert.equal(s.take().shield, false);
+  // disabled: new presses are ignored, releases still work
+  s.key('Shift', true);
+  s.enabled = false;
+  s.button('shield', true);
+  s.key('Shift', false);
+  assert.equal(s.shield, false);
+  s.enabled = true;
+  s.key('Shift', true);
+  s.blur();
+  assert.equal(s.shield, false, 'blur lets go');
+  s.button('shield', true);
+  s.reset();
+  assert.equal(s.shield, false, 'reset lets go');
+});
+
+test('held actions are configurable', () => {
+  const s = createInputState({ holdKeys: { block: ['b'] }, holdButtons: ['guard'] });
+  s.key('Shift', true);
+  assert.equal(s.shield, false);
+  s.key('b', true);
+  assert.equal(s.held('block'), true);
+  s.button('guard', true);
+  assert.deepEqual(s.take().holds, { block: true, guard: true });
 });

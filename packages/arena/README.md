@@ -3,8 +3,8 @@
 ## What it does
 
 The fight itself as a simulation with no sockets, no clock and no `Math.random`: players join and leave,
-move (with an anti-teleport check), fire weapons (melee, guns, thrown grenades, rockets, mines), open chests
-and the golden chest, pick up and drop loot, get hurt and knocked out. The server calls the methods and
+move (with an anti-teleport check), fire weapons (melee and guns), raise shields, get shocked or frozen, open
+chests and the golden chest, pick up and drop loot, get hurt and knocked out. The server calls the methods and
 `tick(now)`, then sends whatever `drain()` returns. Depends on `@pvp/game-rules`, `@pvp/collision` and `@pvp/world-gen`.
 
 ## How to use
@@ -18,24 +18,26 @@ import { RULES } from '@pvp/game-rules';
 const arena = createArena({ island: generateIsland(), rules: RULES, random: createRandom(1234), now: Date.now() });
 // optional: tuning: { snapshotRadius: 200, ... } (see src/tuning.js), snapshots: false
 
-const r = arena.join('alice', { name: 'Alice', skin, loadout: ['rocket', 'pistol'], coins: 120 }, Date.now());
+const r = arena.join('alice', { name: 'Alice', skin, loadout: ['icesword', 'shootbm', 'shield'], coins: 120 }, Date.now());
 // The player gets the rules' STARTING_WEAPON (the Gun) free in slot 1, then the loadout in its order
-// (copies of the same weapon too, each with its own durability).
-// { ok: true, id, weapons: ['rocket', 'pistol'] (taken from the loadout: remove them from the backpack;
-//   loadout weapons that do not fit in MAX_SLOTS are not taken),
+// (copies of the same weapon too, each with its own durability). The first shield goes on the left arm.
+// { ok: true, id, weapons: ['icesword', 'shootbm', 'shield'] (taken from the loadout: remove them from the
+//   backpack; loadout weapons that do not fit in MAX_SLOTS, and extra shields, are not taken),
 //   replaced: null | { id, weapons } (same key was already in: that player left alive) }
 // or { ok: false, reason: 'full' } (send 'full' yourself)
 
 arena.setState(id, { x, y, z, ry, pitch, f }, now); // false + a 'pos' correction if it moved too far
 arena.fire(id, [dx, dy, dz], now);                  // or { x, y, z }
 arena.selectSlot(id, i);
+arena.dropWeapon(id, now);                          // drop the weapon in hand (#34): exact durability, returns the item id
+arena.setShield(id, true, now);                     // raise the shield (Shift / shield button), false lowers it
 arena.openChest(id, 3, now);                        // chest index, or 'golden'
 arena.heal(id, 'bandage', now);
 arena.setCoins(id, account.coins);                  // the account's coins changed (shop): queues an 'inv'
 const back = arena.leave(id, { alive: true });      // weapons to put back in the backpack ([] if not alive)
 
 setInterval(() => {
-  arena.tick(Date.now());                           // chests, golden chest, items, projectiles, mines, snaps
+  arena.tick(Date.now());                           // chests, golden chest, items, shock damage, snaps
   for (const ev of arena.drain()) {
     if (ev.to === 'server') handle(ev);             // { kind: 'coins', playerId, playerKey, amount, total }
                                                     // { kind: 'knockedOut', playerId, playerKey, weapons, by, byId }
@@ -49,14 +51,32 @@ setInterval(() => {
 - `now` is optional on every method; it defaults to the latest time seen. The clock never goes backwards.
 - `'all'` means everyone in the arena when you drain, so drain after every call (or at least every tick).
 - Also: `snapshotFor(id)`, `welcomeFor(id)` (join already queues 'welcome' + 'inv' + 'pjoin'), `playerCount()`,
-  `playerIds()`, `hasPlayer(id)`, `idOf(key)`, `teleport(id, { x, y, z, ry })` (no checks), and read-only copies:
-  `getPlayer(id)`, `chests()`, `golden()`, `nextGoldenAt()`, `items()`, `projectiles()`, `mines()`, `now()`.
-- Weapons behave only by their `type` (`melee`, `gun`, `throw`, `rocket`, `mine`) and numbers in the rules
-  (`dmg`, `range`, `rate`, `spread`, `pellets`, `knock`, `speed`, `radius`, `fuse`, `maxActive`), never by id:
-  a new weapon only needs a new entry in `@pvp/game-rules`.
+  `playerIds()`, `hasPlayer(id)`, `idOf(key)`, `teleport(id, { x, y, z, ry })` (no checks), `isFrozen(id)`,
+  `isShocked(id)`, and read-only copies: `getPlayer(id)`, `chests()`, `golden()`, `nextGoldenAt()`, `items()`, `now()`.
+- Weapons behave only by their `type` (`melee`, `gun`, `shield`) and data in the rules (`dmg`, `range`, `rate`,
+  `spread`, `pellets`, `knock`, `shock`, `freezeMs`, `knockout`, `shieldWear`, `reflect`), never by id:
+  a new weapon only needs a new entry in `@pvp/game-rules`. (Explosives were removed in #26.)
+- **Shields** (`src/effects.js`): worn on the left arm (`getPlayer(id).shield = { id, dur }`), never in a slot;
+  `inv` carries `shield`. `setShield(id, up)` raises/lowers it (not while frozen). While raised the player cannot
+  fire, and hits from the **front half** (tuning `shieldFrontDot`, 0) do 0 damage and no effects: the shield loses
+  the weapon's `shieldWear` (default 1, Supersword 5), everyone gets `block`, the attacker a `hitmark` with
+  `blocked: true`; a shield with `reflect` (Mega Shield 0.25) hurts the attacker by that part of the weapon's
+  `dmg` (credited to the holder, weapon = the shield id). At 0 the shield is gone (`shieldbroke`, then `inv`).
+  **One shield at a time:** walking over a shield picks it up if you wear none, or if it is rarer than yours
+  (then yours drops at your feet with its durability); otherwise it stays on the ground. Leaving alive returns
+  it with the weapons; a knockout drops it like a weapon (same half-durability rule).
+- **Shock** (`shock: { dmg, everyMs, forMs }`): after a hit that lands, `dmg` every `everyMs` until `forMs`
+  (Electric Sword: 1 HP at +5 s, +10 s, +15 s), applied in `tick(now)`; a new hit starts it over; the attacker
+  is credited (also after leaving). **Freeze** (`freezeMs`): the target cannot move (a `pos` puts it back), turn,
+  fire, switch slots or raise its shield, and a raised shield drops. **Knockout** (`knockout: true`): the hit
+  takes all HP that is left. The snapshot shows the shield id and status bits (1 shield up, 2 shocked, 4 frozen).
 - **Durability** (from the rules' `durability` / `wearPerUse`, see `@pvp/game-rules`): each player weapon has
   uses left (`getPlayer(id).dur`, parallel to `weapons`; `null` = never breaks). Every fire that passes the rate
-  check (swing, shot, throw, rocket, mine) costs `wearPerUse` and queues an `inv` (with `dur`) for that player.
+  check costs `wearPerUse` and queues an `inv` (with `dur`) for that player: every shot, but a melee swing only
+  when it hits a player or a raised shield (a swing at the air is free, #34; it still waits `rate`).
+- **Drop (#34):** `dropWeapon(id)` puts the weapon in hand on the ground with exactly its durability (the half rule
+  is only for knockouts). The dropper picks it up again only after stepping out of pickup range once; a dropped
+  free starting Gun stays free (never goes into a backpack). Not while frozen.
   At 0 the weapon is removed, the player gets `{ t: 'broke', slot, weapon }` then an `inv`, and the hand stays
   on the same slot number (or the last slot if that one is gone). Its last use still fires.
   The starting Gun breaks like any weapon; a player may then have no weapons at all (firing does nothing,
@@ -64,11 +84,12 @@ setInterval(() => {
 - **Copies:** a player may carry the same weapon more than once (e.g. 2 Guns in 2 slots), each copy with its
   own durability. Picking up a weapon only needs a free slot. On leave only the free starting Gun stays behind
   (`getPlayer(id).free` marks it per slot); every other copy goes back.
-- **Knockout:** every weapon is dropped (the Gun too) with the heals. **Dropped weapons rule:** a dropped weapon
+- **Knockout:** every weapon is dropped (the Gun and the shield too) with the heals. **Dropped weapons rule:** a dropped weapon
   with more than half its durability keeps it; half or less is set to half, rounded up (`droppedDurability` in
   `@pvp/game-rules`). Ground items carry `dur` and whoever picks one up gets exactly that.
-- **Chests:** a normal chest gives `CHEST_COINS` (3) coins and exactly one weapon, picked with each weapon's
-  `chestChance` as its weight (one draw from the seeded loot stream). Heals from normal chests are a separate
+- **Chests:** a normal chest gives `CHEST_COINS` (3) coins and exactly one weapon (shields included), picked with
+  each weapon's `chestChance` as its weight: chance = weight / sum of weights, so the card numbers (they add up
+  to 46.3) do not have to make 100 (one draw from the seeded loot stream). Heals from normal chests are a separate
   tuning value `chestHealChance` (0 = off for now). The golden chest gives `GOLDEN_CHEST_COINS` (10) coins and
   one weapon, with the weights of Epic, Legendary and Megalegend weapons doubled (`GOLDEN_CHEST_BOOST`).
   `chestWeights(rules, { golden })` and `rollChestWeapon(A, { golden })` live in `src/loot.js`.
@@ -83,11 +104,12 @@ setInterval(() => {
   `{ kind: 'coins' }` server event, add the coins to the account and, if its new total differs from `ev.total`,
   call `setCoins` with the account's total so both stay equal.
 
-Files: `src/state.js`, `src/players.js`, `src/chests.js`, `src/loot.js`, `src/combat.js`, `src/projectiles.js`,
-`src/mines.js`, `src/snapshot.js`, `src/tuning.js`, all wired in `src/index.js`.
+Files: `src/state.js`, `src/players.js`, `src/chests.js`, `src/loot.js`, `src/combat.js`, `src/effects.js`
+(shields, shock, freeze), `src/snapshot.js`, `src/tuning.js`, all wired in `src/index.js`.
 
 ## Determinism
 
 Fully deterministic. Time is passed in, and all randomness comes from the seeded `random` you give it
 (split with `fork` into its own streams for spawns, loot, the golden chest and gun spread). No `Math.random`,
-no `Date.now`, no timers. The same seed and the same calls give exactly the same outbox (there is a replay test).
+no `Date.now`, no timers: shock ticks and freeze end at times computed from the `now` you pass in. The same
+seed and the same calls give exactly the same outbox (there are replay tests, with shields, shock and freeze).

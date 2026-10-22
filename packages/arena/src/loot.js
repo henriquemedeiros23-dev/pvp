@@ -2,8 +2,9 @@
 
 import { circleHitsBox } from '@pvp/collision';
 import { chestChance } from '@pvp/game-rules';
-import { send, weaponDef, maxDurability } from './state.js';
+import { send, weaponDef, maxDurability, isShieldId, rankOf } from './state.js';
 import { HEAL_SLOTS, inventoryMsg } from './players.js';
+import { equipShield } from './effects.js';
 
 export const itemMsg = it => {
   const msg = { id: it.id, kind: it.kind, weapon: it.weapon, x: it.x, y: it.y, z: it.z };
@@ -43,8 +44,8 @@ export function chestWeights(rules, { golden = false } = {}) {
 }
 
 /**
- * Pick a chest weapon by the weights from chestWeights: a weapon with chestChance 15 comes out
- * 15 times in 100 when they add up to 100 (they are normalized if they don't).
+ * Pick a chest weapon by the weights from chestWeights: chance = weight / sum of all weights,
+ * so the numbers do not have to add up to 100 (shields are in the same draw).
  * One random draw. Returns a weapon id, or null if no weapon has a chance.
  */
 export function rollChestWeapon(A, { golden = false } = {}, r = A.rnd.loot) {
@@ -73,13 +74,25 @@ export function rollLoot(A, x, z) {
   }
 }
 
-/** Try to put an item into a player's inventory. Returns the picked name, or null if no room. */
+/**
+ * Try to put an item into a player's inventory. Returns the picked name, or null if no room.
+ * Shields go on the arm, never in a slot: picked up if you wear none, or if this one is rarer than
+ * yours (Mega Shield over Shield): then yours drops where you stand, keeping its durability.
+ * Otherwise it stays on the ground.
+ */
 function take(A, p, it) {
+  if (it.kind === 'weapon' && isShieldId(A, it.weapon)) {
+    const old = p.shield;
+    if (old && rankOf(A, it.weapon) <= rankOf(A, old.id)) return null;
+    equipShield(A, p, it.weapon, it.dur === undefined ? maxDurability(A, it.weapon) : it.dur);
+    if (old) dropItem(A, 'weapon', old.id, p.x, p.z, 0, old.dur);
+    return weaponDef(A, it.weapon)?.name ?? it.weapon;
+  }
   if (it.kind === 'weapon') {
     if (p.weapons.length >= A.rules.MAX_SLOTS) return null; // a copy of a weapon you have is fine
     p.weapons.push(it.weapon);
     p.dur.push(it.dur === undefined ? maxDurability(A, it.weapon) : it.dur); // what the ground item had
-    p.free.push(false);
+    p.free.push(!!it.free); // a dropped free starting Gun stays free (never goes into a backpack)
     return weaponDef(A, it.weapon)?.name ?? it.weapon;
   }
   const slot = HEAL_SLOTS[it.kind];
@@ -93,7 +106,9 @@ export function tickItems(A, now) {
   for (const it of A.items.values()) {
     if (now > it.expires) { A.items.delete(it.id); send(A, 'all', { t: 'item-', id: it.id }); continue; }
     for (const p of A.players.values()) {
-      if (Math.hypot(p.x - it.x, p.z - it.z) > T.pickupRadius || Math.abs(p.y - it.y) > T.pickupHeight) continue;
+      const near = Math.hypot(p.x - it.x, p.z - it.z) <= T.pickupRadius && Math.abs(p.y - it.y) <= T.pickupHeight;
+      if (it.ignore === p.id) { if (!near) delete it.ignore; continue; } // you dropped it: step away first
+      if (!near) continue;
       const picked = take(A, p, it);
       if (picked === null) continue;
       A.items.delete(it.id);
