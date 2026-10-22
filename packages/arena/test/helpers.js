@@ -39,7 +39,9 @@ export function drain(arena) {
   return out;
 }
 
-export const msgs = (out, t, to) => out.filter(e => e.msg && e.msg.t === t && (to === undefined || e.to === to)).map(e => e.msg);
+// `to` matches an event for that player id, 'all', or a list of player ids that includes it (sendNear).
+const sentTo = (e, to) => to === undefined || e.to === to || (Array.isArray(e.to) && e.to.includes(to));
+export const msgs = (out, t, to) => out.filter(e => e.msg && e.msg.t === t && sentTo(e, to)).map(e => e.msg);
 export const serverEvents = (out, kind) => out.filter(e => e.to === 'server' && e.kind === kind);
 
 /** Aim from a player's muzzle (standing) to a point at height 1 on another player. */

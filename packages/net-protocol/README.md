@@ -44,6 +44,10 @@ Shields and status effects (#26, protocol version 2): the client message `shield
 messages `block` (a raised shield blocked a hit), `shieldbroke`, and `hitmark.blocked`. The explosive messages
 (`proj`, `boom`, `mine+` ...) are gone with the explosives.
 
+Damage numbers (#33, protocol version 3): the server message `dmg` (`{ id, amount, ko?, blocked?, shock? }`) goes to
+every player near the one who got hurt (within the snapshot radius, the hurt player too), so everyone can show
+"-15" above that head; `blocked` = a raised shield took it (`amount` 0), `shock` = a shock tick, `ko` = knocked out.
+
 Weapon durability: `inv.dur` (uses left per slot, `null` = never breaks), `dur` on ground items (`item+`, `welcome.items`)
 and the `broke` message (`{ t: 'broke', slot, weapon }`). The `dur` fields are optional, so older messages stay valid.
 

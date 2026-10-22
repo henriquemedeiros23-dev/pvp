@@ -2,7 +2,7 @@
 
 ## What it does
 
-Pure functions that turn the player's inventory (the server's `inv` message) and health into what the in-game HUD shows (the boss's drawing, #24): a big **Durability** bar for the weapon you are holding, the **H.P** bar with its percent, always all weapon slots (empty ones too), which slot a key picks, the small **Shield** pill for the shield on your other arm (#26), the "Your Shootbm broke!" text, and the **Healing Potion button** with its count and drinking progress ring (#28). The game only draws the result. Plain ES module, works in Node and directly in the browser (with an import map for `@pvp/game-rules`).
+Pure functions that turn the player's inventory (the server's `inv` message) and health into what the in-game HUD shows (the boss's drawing, #24): a big **Durability** bar for the weapon you are holding, the **H.P** bar with its percent, always all weapon slots (empty ones too), which slot a key picks, the small **Shield** pill for the shield on your other arm (#26), the "Your Shootbm broke!" text, and the **Healing Potion button** with its count and drinking progress ring (#28), the **"Charging 1.4s"** text after a shot (#35) and the **damage numbers** above heads (#33). The game only draws the result. Plain ES module, works in Node and directly in the browser (with an import map for `@pvp/game-rules`).
 
 ## How to use
 
@@ -49,6 +49,26 @@ potionView({ potions: 2, hp: 40 });
 potionView(inv, { drink, now: performance.now(), hp: myHp, key: 'tap' });
 // while drinking: drinking: true, progress 0..1 (fill the ring), secondsLeft 2.5, text 'Drinking… 2.5 s'
 button.innerHTML = POTION_ICON_SVG;                 // the flask from the boss's drawing (cork, neck, cone, red liquid)
+```
+
+**Charging text and damage numbers** (`src/feedback.js`, #35 and #33): time is passed in too.
+
+```js
+import { RULES } from '@pvp/game-rules';
+import { chargeView, damageNumber, damageFloat } from '@pvp/hud-model';
+
+// after you shoot or swing: the held weapon's `rate` (seconds between uses), from the moment of the last shot
+chargeView(RULES.WEAPONS.gun, lastFireAt, performance.now());
+// 0.6 s after a Gun shot: { visible: true, charging: true, ready: false, progress: 0.3, percent: 30, secondsLeft: 1.4, text: 'Charging 1.4s' }
+// right when it is ready, for READY_FLASH_MS (0.5 s): { visible: true, ready: true, progress: 1, text: 'Ready!', ... }
+// after that, never shot, or no weapon: { visible: false, text: '', ... }
+
+// the server's 'dmg' message -> what floats above that player's head
+damageNumber({ t: 'dmg', id: 3, amount: 15 });               // { id: 3, text: '-15', badge: '', kind: 'hit', color: '#ff4d4d' }
+damageNumber({ t: 'dmg', id: 3, amount: 1, shock: true });   // text '-1', kind 'shock' (yellow)
+damageNumber({ t: 'dmg', id: 3, amount: 40, ko: true });     // text '-40', badge 'KO!', kind 'ko' (gold)
+damageNumber({ t: 'dmg', id: 3, amount: 0, blocked: true }); // text 'Blocked', kind 'blocked' (blue)
+damageFloat(msSinceItAppeared); // { rise (meters up), opacity, scale, done }: floats up and fades in DAMAGE_NUMBER_MS (2 s)
 ```
 
 - Durability `ratio` = uses left / the weapon's `durability` in `@pvp/game-rules`. `level` is `'good'` above 50 %, `'low'` from 20 % to 50 %, `'critical'` below 20 % (`DURABILITY_LEVELS`). Weapons with `durability: null` get `durability: null`. A missing `dur` value counts as full.
