@@ -24,6 +24,7 @@ accounts.addCoins(acc, 25);                 // from a chest; never below 0, NaN 
 accounts.buy(acc, 'hat', 'crown');          // kind: 'weapon' or a skin slot; returns publicView
 accounts.buy(acc, 'weapon', 'icesword');    // weapons stack in the stash: { icesword: 1 }
 accounts.buy(acc, 'potion', 'potion');      // Healing Potions (10 coins) stack too: account.potions
+accounts.buy(acc, 'bomb', 'legendarybomb'); // bombs (#32): one pack (Bomb 1 for 3 coins, Legendary Bomb 3 for 60): account.bombs
 accounts.equip(acc, 'hat', 'crown');        // must own it
 
 const weapons = accounts.takeLoadout(acc);  // most expensive stashed weapons first, copies too
@@ -36,6 +37,9 @@ accounts.returnLoadout(acc, weapons);       // left the arena alive: back into t
 const potions = accounts.takePotions(acc);  // up to MAX_POTIONS (3) Healing Potions leave the backpack
 accounts.returnPotions(acc, 2);             // left alive: unused potions go back (knocked out: they are lost)
 
+const bombs = accounts.takeBombs(acc);      // { bomb: 5, legendarybomb: 3 } at most (each bomb's maxCarry) leave the backpack
+accounts.returnBombs(acc, { bomb: 2 });     // left alive: unused bombs go back
+
 accounts.rename(acc, 'New_Name');        // same name rules; tokens stay logged in
 accounts.logout(token);
 await accounts.flush();                     // on shutdown
@@ -45,7 +49,8 @@ Every weapon can be bought (the starting Gun too: it goes into the backpack like
 that is no longer in the rules (like the old wooden sword, or the Pistol, Rocket and the other weapons removed in #26)
 is dropped when the accounts are loaded, so old saved accounts still load.
 The backpack also counts Healing Potions (`potions`, any number; only 3 go into the arena). Older saved
-accounts without it load with 0 potions.
+accounts without it load with 0 potions. Bombs are counted the same way (`bombs: { bomb, legendarybomb }`, any number;
+older accounts load with 0).
 
 Error codes: `BAD_NAME`, `BAD_PASSWORD`, `NAME_TAKEN`, `WRONG_LOGIN`, `UNKNOWN_ITEM`, `ALREADY_OWNED`, `NOT_ENOUGH_COINS`, `NOT_OWNED` (all `AccountError`). Passing an account object that didn't come from this service throws a `TypeError`.
 

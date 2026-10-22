@@ -57,6 +57,18 @@ button.innerHTML = POTION_ICON_SVG;                 // the flask from the boss's
 - Shields are never held: a shield id in `weapons` counts as an empty slot. The shield pill uses the same levels as the Durability bar.
 - `slotBar`, `durabilityView` and `heldDurabilityView` take an optional last `rules` argument (default `RULES`), so tests or mods can use other rules.
 
+**Bomb buttons** (`src/bombs.js`, #32): one per bomb in the rules, shown next to the shield pill.
+
+```js
+import { bombView, bombIconSvg, BOMB_KEYS } from '@pvp/hud-model';
+
+bombView({ bombs: [{ id: 'bomb', n: 4 }] });
+// [{ id: 'bomb', name: 'Bomb', count: 4, max: 5, label: '4', empty: false, full: false, key: 'B', rarity: 'common',
+//    color, icon: '<svg…>', title: 'Bomb (B): 3 damage in 2x2 m, up to 7 m away (it hurts you too!) · 4/5' },
+//  { id: 'legendarybomb', …, count: 0, empty: true, key: 'N' }]
+bombIconSvg('#ffc531');   // the round bomb with a fuse and a spark (the Legendary Bomb is gold)
+```
+
 ## Determinism
 
 Fully deterministic: pure functions of their inputs. No randomness, no clock, no DOM, no I/O.

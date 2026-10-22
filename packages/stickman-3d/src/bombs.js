@@ -58,7 +58,7 @@ export function buildBomb(id = 'bomb', { bombs = BOMBS, castShadow = true, color
 export function buildBombArea(side = 2) {
   const s = Number.isFinite(side) && side > 0 ? side : 2;
   const g = new THREE.Group();
-  const line = Math.max(0.08, s * 0.035);
+  const line = Math.max(0.14, s * 0.05);
   const red = new THREE.MeshBasicMaterial({ color: '#ff1a1a', transparent: true, opacity: 0.95, depthWrite: false, toneMapped: false, side: THREE.DoubleSide });
   const fill = new THREE.MeshBasicMaterial({ color: '#ff2020', transparent: true, opacity: 0.18, depthWrite: false, toneMapped: false, side: THREE.DoubleSide });
   const flat = (w, d, mat, x, z, y) => {

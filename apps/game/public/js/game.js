@@ -271,6 +271,7 @@ export class Game {
       // bombs thrown that have not exploded yet, and how many explosions this page has seen (#32)
       bombs: [...this.bombs.values()].map(b => ({ id: b.id, b: b.b, landed: b.landed, area: b.areaSide, ...pos(b.mesh.position) })),
       booms: this.booms,
+      effects: this.effects.length, // shots, puffs and explosions still fading out
       shieldUp: this.shieldUp,
       frozen: this.frozen,
       // potion drinking: null, or how far it is (0..1) as the HUD shows it

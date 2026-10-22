@@ -11,7 +11,7 @@ import { shopTabs, shopItems, backpackSummary, swatchBackground, OUTFIT_ICONS } 
 
 shopTabs();
 // [{ id: 'color', label: 'Colors', hint: '…' }, { id: 'hat', … }, … { id: 'weapon', label: 'Weapons', … },
-//  { id: 'potion', label: 'Potions', … }]
+//  { id: 'potion', label: 'Potions', … }, { id: 'bomb', label: 'Bombs', … }]
 
 shopItems('hat', account);
 // [{ kind: 'hat', id: 'none', name: 'No Hat', price: 0, owned: true, equipped: true,
@@ -24,6 +24,11 @@ shopItems('weapon', account);
 //    stashCount: 0, owned: false, equipped: false, canAfford: true, action: 'buy' }, …]
 // rarity colors come from RARITY_COLORS in @pvp/game-rules (Megalegend's background is blue + black)
 
+shopItems('bomb', account);   // (also bombCards(account)) the Bomb and the Legendary Bomb (#32):
+// [{ kind: 'bomb', id: 'bomb', name: 'Bomb', price: 3, pack: 1, rarity: 'common', stashCount: 4 (in the backpack), action: 'buy',
+//    dmg: 3, area: 2, maxThrow: 7, fuseSeconds: 3, hurtsThrower: true, chestChance: 10, maxCarry: 5, … },
+//  { … id: 'legendarybomb', price: 60, pack: 3 (a pack of 3), … }]
+
 shopItems('potion', account);
 // the Healing Potion card (the only heal): [{ kind: 'potion', id: 'potion', name: 'Healing Potion', price: 10,
 //   rarity: 'common', rarityName: 'Common', rarityColor: '#3cc24a', stashCount: 2 (in the backpack), action: 'buy',
@@ -33,7 +38,7 @@ backpackSummary(account);   // 'Backpack: 2× Shootbm, 1× Supersword, 2× Heali
 swatchBackground(card);     // CSS background for a color card (gradients for patterns)
 ```
 
-- `account` is the server's account: `{ coins, owned: ['color:black', …], skin: { color, hat, … }, stash: { weaponId: count }, potions }`.
+- `account` is the server's account: `{ coins, owned: ['color:black', …], skin: { color, hat, … }, stash: { weaponId: count }, potions, bombs: { bombId: count } }`.
 - `action` is `'equipped'` (wearing it), `'equip'` (owned, not worn) or `'buy'`. Weapons and potions are always `'buy'`: you can buy more than one.
 - Every function takes an optional last `rules` argument (defaults to `RULES` from `@pvp/game-rules`), so tests or mods can use other rules.
 

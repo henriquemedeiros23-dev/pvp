@@ -22,8 +22,10 @@ Decided by the boss through 22 questions.
   | **Electric Sword** | sword | 15 | 2 s | 50 hits | 5 | 30 | Epic | **Shock:** the hit player loses 1 H.P every 5 s for 15 s |
   | **Ice Sword** | sword | 10 | 3 s | 50 hits | 4 | 35 | Epic | **Freeze:** the hit player is completely stuck for 2 s |
   | **Shield** | shield | – | – | 60 blocks | 6 | 25 | Epic | blocks hits from the front |
-  | **Mega Shield** | shield | – | – | 70 blocks | 1 | 75 | Legendary | blocks, and sends 25% of the blocked damage back |
-  | **Supersword** | sword | knockout | 1.5 s | 40 hits | 0.3 | 150 | Megalegend | any hit knocks out at once; costs a raised shield 5 blocks |
+  | **DM Gun** | long gun, 1 bullet | 15 | 3 s | 30 shots | 7 | 20 | Epic | – (#32) |
+  | **Supergun** | revolver, 1 bullet | 25 | 2 s | 30 shots | 1.5 | 70 | Legendary | – (#32) |
+  | **Mega Shield** | shield | – | – | 70 blocks | 1 | 100 | Legendary | blocks, and sends 25% of the blocked damage back |
+  | **Supersword** | sword | knockout | 1.5 s | 40 hits | 0.3 | 250 | Megalegend | any hit knocks out at once; costs a raised shield 5 blocks |
 
 - Everyone starts with **the Gun**, finds better weapons in chests, or buys them in the shop.
 - **Shock (Electric Sword):** after the hit, 1 H.P is lost at 5 s, 10 s and 15 s (3 more). A new hit starts it over.
@@ -42,9 +44,9 @@ Decided by the boss through 22 questions.
   15% chance to come out of a chest. You get one free every time you join (slot 1), then your backpack weapons.
   A bought Gun goes into the backpack like any other weapon and comes with you in slot 2.
 - **Rarities** (weakest to strongest), each with its own color everywhere in the game (shop, HUD slots, rings on the ground):
-  - 🟩 **Common** = green (Gun, Shootbm)
-  - 🟪 **Epic** = purple (Electric Sword, Ice Sword, Shield)
-  - 🟨 **Legendary** = yellow (Mega Shield)
+  - 🟩 **Common** = green (Gun, Shootbm, Bomb)
+  - 🟪 **Epic** = purple (DM Gun, Electric Sword, Ice Sword, Shield)
+  - 🟨 **Legendary** = yellow (Supergun, Mega Shield, Legendary Bomb)
   - 🟦⬛ **Megalegend** = blue + black (Supersword)
 - **Copies:** you can carry the same weapon more than once (for example 2 Guns, or 2 Ice Swords), each copy in its
   own slot with its own durability. When you join you get the free Gun in slot 1, then your backpack weapons,
@@ -64,6 +66,21 @@ Decided by the boss through 22 questions.
   - Shop: **10 coins**, Common (green). Bought potions wait in the backpack and come into the arena with you (up to 3);
     leave alive and the unused ones go back. Knocked out: your potions drop on the ground.
 
+- **Bombs (#32)** are thrown, not held: like potions they are a **counter** (not a weapon slot), shown as small
+  bomb buttons with their count next to the shield pill. **B** throws a Bomb, **N** a Legendary Bomb (phone: tap the bomb button).
+  The bomb lands where you aim (at most its max throw away). As soon as it lands a **red square** shows the area on the
+  ground, and **3 s after the throw** it explodes: everyone inside the square gets its damage. A raised shield does **not** block it.
+
+  | Bomb | Damage | Area | Max throw | Hurts the thrower? | Carry max | Chest | Price | Rarity |
+  |---|---|---|---|---|---|---|---|---|
+  | **Bomb** (round, black) | 3 | 2×2 m | 7 m | yes | 5 | 10 | 3 coins for 1 | Common |
+  | **Legendary Bomb** (round, gold) | 10 | 5×5 m | 15 m | no | 3 | 2 | 60 coins for a pack of 3 | Legendary |
+
+  Bought bombs wait in the backpack and come into the arena like potions (up to the max); leave alive and the rest go back.
+  The chest number of a bomb is a **percent**: next to its weapon, every chest also drops a Bomb 10% of the time and a pack of
+  3 Legendary Bombs 2% of the time (like the extra potion). You pick up as many as fit; the rest of a pack stays on the ground.
+  Knocked out: your bombs drop too.
+
 ## When you get knocked out
 - You drop every weapon you carry, **including bought ones, the Gun and your shield**. Anyone can pick them up.
 - **Dropped weapons rule:** a picked-up weapon with **more than half** of its uses left keeps them.
@@ -79,9 +96,9 @@ Decided by the boss through 22 questions.
 - **Which weapon?** Every weapon card has a **chest number** (the "%" on the card). A chest always gives
   **exactly one** weapon (shields count as weapons here). The numbers are like tickets in a hat: a weapon with
   15 has 15 tickets, one with 1 has 1 ticket, and the chest pulls one ticket. The numbers do **not** have to
-  add up to 100. Today: Gun 15, Shootbm 15, Shield 6, Electric Sword 5, Ice Sword 4, Mega Shield 1,
-  Supersword 0.3 (together 46.3). So the real chance of a Gun is 15 ÷ 46.3 ≈ 32 out of 100 chests,
-  and of the Supersword 0.3 ÷ 46.3 ≈ 6 out of 1000 chests.
+  add up to 100. Today: Gun 15, Shootbm 15, DM Gun 7, Shield 6, Electric Sword 5, Ice Sword 4, Supergun 1.5, Mega Shield 1,
+  Supersword 0.3 (together 54.8). So the real chance of a Gun is 15 ÷ 54.8 ≈ 27 out of 100 chests,
+  and of the Supersword 0.3 ÷ 54.8 ≈ 5 out of 1000 chests.
   (Formula: chance of a weapon = its number ÷ the sum of all numbers.)
 - ⭐ **Golden chest:** every few minutes a golden chest appears and everyone races to it.
   It gives **10 coins** and **one weapon**, picked like a normal chest but the numbers of

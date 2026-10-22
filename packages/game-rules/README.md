@@ -13,6 +13,7 @@ import {
   WEAPONS, STARTING_WEAPON, RARITIES, RARITY_COLORS, MAX_HP, DEFAULT_SKIN, RULES, CHEST_COINS, GOLDEN_CHEST_COINS,
   weaponPrice, skinPrice, isBuyable, weaponsByRarity, weaponDurability, weaponWear,
   chestChance, droppedDurability, rarityStyle, isShield, rarityRank, validateRules, POTION, MAX_POTIONS, potionHeal, itemPrice,
+  BOMBS, isBomb, bombPrice, bombMaxCarry, bombCounts, inBombArea,
 } from '@pvp/game-rules';
 // In the browser without a bundler: import from '/path/to/packages/game-rules/src/index.js'
 
@@ -20,7 +21,7 @@ STARTING_WEAPON;                // 'gun': everyone gets it on join (a normal wea
 weaponPrice('gun');             // 3 (undefined for an unknown id)
 skinPrice('hat', 'crown');      // 300 (slot: 'color' | 'hat' | 'face' | 'back' | 'shirt')
 isBuyable('weapon', 'megashield'); // true ('weapon' or a skin slot)
-weaponsByRarity('epic');        // ['electricsword', 'icesword', 'shield']
+weaponsByRarity('epic');        // ['electricsword', 'icesword', 'shield', 'dmgun']
 weaponDurability('shootbm');    // 20 uses before it breaks (null = never breaks; a shield: blocked hits)
 weaponWear('shootbm');          // 1 = durability one use costs (the weapon's wearPerUse, default 1)
 chestChance('gun');             // 15 (the Gun's chest number, a weight: see below)
@@ -34,6 +35,12 @@ POTION;                         // { id: 'potion', name: 'Healing Potion', healP
 MAX_POTIONS;                    // 3 potions carried at most (a counter, not weapon slots)
 potionHeal(20, 100);            // 100: a potion gives full H.P
 itemPrice('potion', 'potion');  // 10 (the shop kind and id are both 'potion')
+BOMBS.bomb;                     // { name: 'Bomb', dmg: 3, area: 2, maxThrow: 7, fuseMs: 3000, hurtsThrower: true,
+                                //   maxCarry: 5, pack: 1, price: 3, chestChance: 10, rarity: 'common', color }
+itemPrice('bomb', 'legendarybomb'); // 60: one pack of 3 Legendary Bombs
+bombMaxCarry('bomb');           // 5
+bombCounts({ bomb: 9 }, { cap: true }); // { bomb: 5, legendarybomb: 0 } (a clean counter, capped at maxCarry)
+inBombArea('bomb', 10, 10, 11, 9); // true: inside the 2x2 m square around (10, 10) (the edge counts)
 
 validateRules(RULES);           // [] — empty means valid
 validateRules({ ...RULES, STARTING_WEAPON: 'laser' });
@@ -44,7 +51,8 @@ validateRules({ ...RULES, STARTING_WEAPON: 'laser' });
 (blue + black, `twoColors: true`). `RARITY_COLORS[rarity] = { name, color, color2, twoColors? }`; use these
 everywhere a rarity is shown. `LOOT_TABLE` lists the weapon ids of each rarity.
 
-**The weapons (#26)** are exactly the boss's cards: `gun`, `shootbm` (guns), `electricsword`, `icesword`,
+**The weapons (#26, #32)** are exactly the boss's cards: `gun`, `shootbm`, `dmgun` (DM Gun: 15 damage, 3 s, 30 shots,
+chest 7, 20 coins, Epic), `supergun` (Supergun: 25 damage, 2 s, 30 shots, chest 1.5, 70 coins, Legendary) (guns, 1 bullet each), `electricsword`, `icesword`,
 `supersword` (melee), `shield`, `megashield` (type `shield`). `WEAPON_TYPES` is `['melee', 'gun', 'shield']`.
 Specials are plain data the arena reads: `shock: { dmg, everyMs, forMs }` (Electric Sword: 1 HP every 5 s for
 15 s), `freezeMs` (Ice Sword: 2000), `knockout: true` (Supersword: any hit knocks out), `shieldWear` (what a
@@ -53,8 +61,8 @@ Shield: 0.25 of the blocked damage goes back). A shield has no `dmg`/`rate`; its
 
 **Chest chances:** every weapon has `chestChance`, the number from its card ("15%"). A chest always gives
 exactly one weapon, picked with these numbers as **weights**, so they do not have to add up to 100:
-chance = number / sum of all numbers. Today: gun 15, shootbm 15, shield 6, electricsword 5, icesword 4,
-megashield 1, supersword 0.3 (sum 46.3, so a Gun comes out of about 32 in 100 chests). The golden chest
+chance = number / sum of all numbers. Today: gun 15, shootbm 15, dmgun 7, shield 6, electricsword 5, icesword 4,
+supergun 1.5, megashield 1, supersword 0.3 (sum 54.8, so a Gun comes out of about 27 in 100 chests). The golden chest
 multiplies them by `GOLDEN_CHEST_BOOST` (Epic, Legendary and Megalegend x2, Common stays).
 
 **Durability:** every weapon has `durability` = how many uses (swing or shot; for a shield: blocked hits) it
@@ -73,10 +81,18 @@ above 0), bad specials (`shock`, `freezeMs`, `knockout`, `shieldWear`, `reflect`
 unknown rarity, bad rarity colors, a `STARTING_WEAPON` that is not a weapon (or is a shield), and a bad `POTION` /
 `MAX_POTIONS`.
 
-`validateRules` reports a missing or bad `durability` / `wearPerUse` / `chestChance`, chest chances that do not
-add up to 100, an unknown rarity, bad rarity colors, a `STARTING_WEAPON` that is not a weapon, and a bad `POTION` / `MAX_POTIONS`.
+**Bombs** (`src/bombs.js`, the boss's cards in #32): thrown, never held. Like potions they are a **counter** per bomb
+(not a weapon slot). `dmg` hits everyone inside a square of `area` × `area` m around where it lands (a raised shield does not
+block it), `maxThrow` is the farthest it lands (meters, flat), it explodes `fuseMs` after the throw, `hurtsThrower` says if
+the thrower is hurt too, `maxCarry` is how many you carry in the arena, `pack` how many one shop buy (or one chest drop) gives,
+`price` the coins for one pack. A bomb's `chestChance` is a **percent**: every chest also drops one pack that often, next to its
+weapon (like the extra potion). Bomb 3 damage, 2x2 m, 7 m, hurts you too, max 5, 3 coins, chest 10 %, Common (black).
+Legendary Bomb 10 damage, 5x5 m, 15 m, never hurts you, max 3, pack of 3 for 60 coins, chest 2 %, Legendary (gold).
+`validateRules` also checks `BOMBS` (optional in a rules object).
 
-Files: `src/player.js` (limits, timers, movement), `src/weapons.js` (weapons, loot), `src/potion.js` (the Healing Potion), `src/skins.js` (colors, outfits, default skin), `src/validate.js`, all re-exported from `src/index.js`.
+Prices (#32, the boss's change): Mega Shield 100 coins, Supersword 250 coins.
+
+Files: `src/player.js` (limits, timers, movement), `src/weapons.js` (weapons, loot), `src/potion.js` (the Healing Potion), `src/bombs.js` (the bombs), `src/skins.js` (colors, outfits, default skin), `src/validate.js`, all re-exported from `src/index.js`.
 
 ## Determinism
 

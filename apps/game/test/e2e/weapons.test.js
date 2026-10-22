@@ -22,7 +22,7 @@ const PAGE = `<!doctype html><html><head><meta charset="utf-8">
 html,body{margin:0;background:#dfe6ee;font-family:system-ui,sans-serif}
 canvas{display:block}
 #labels{position:fixed;inset:0;pointer-events:none}
-.label{position:absolute;transform:translateX(-50%);text-align:center;font-weight:800;font-size:22px;color:#1b1f2a}
+.label{position:absolute;transform:translateX(-50%);text-align:center;font-weight:800;font-size:19px;color:#1b1f2a}
 .label small{display:inline-block;margin-top:4px;padding:2px 10px;border-radius:10px;font-size:13px;color:#fff;letter-spacing:0.5px}
 </style>
 <script type="importmap">{ "imports": {
@@ -37,10 +37,10 @@ canvas{display:block}
 } }</script></head><body><canvas id="c"></canvas><div id="labels"></div>
 <script type="module">
 import * as THREE from 'three';
-import { WEAPONS, rarityStyle } from '@pvp/game-rules';
+import { WEAPONS, BOMBS, rarityStyle } from '@pvp/game-rules';
 import { generateIsland } from '@pvp/world-gen';
 import { createIslandScene } from '@pvp/island-scene';
-import { Stickman, buildWeapon } from '@pvp/stickman-3d';
+import { Stickman, buildWeapon, buildBomb } from '@pvp/stickman-3d';
 
 const canvas = document.getElementById('c');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: true });
@@ -51,18 +51,19 @@ renderer.toneMappingExposure = 1.05;
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
-// ---- every weapon side by side (two rows: guns and shields on top, swords below)
-const ROWS = [['gun', 'shootbm', 'shield', 'megashield'], ['electricsword', 'icesword', 'supersword']];
+// ---- every weapon side by side (two rows: guns and shields on top, swords and bombs below)
+const ROWS = [['gun', 'shootbm', 'dmgun', 'supergun', 'shield', 'megashield'], ['electricsword', 'icesword', 'supersword', 'bomb', 'legendarybomb']];
+const DEFS = { ...WEAPONS, ...BOMBS };
 function stage(id) {
   const s = new THREE.Scene();
   s.add(new THREE.HemisphereLight('#ffffff', '#8a8f99', 1.6));
   const sun = new THREE.DirectionalLight('#ffffff', 2.2);
   sun.position.set(2, 3, 4);
   s.add(sun);
-  const model = buildWeapon(id, { castShadow: false });
+  const model = BOMBS[id] ? buildBomb(id, { castShadow: false }) : buildWeapon(id, { castShadow: false });
   const holder = new THREE.Group();
   holder.add(model);
-  const type = WEAPONS[id].type;
+  const type = BOMBS[id] ? 'bomb' : WEAPONS[id].type;
   if (type === 'gun') {         // barrel to the right, like the drawings
     model.rotation.x = -Math.PI / 2;
     holder.rotation.y = Math.PI / 2 - 0.25;
@@ -70,6 +71,8 @@ function stage(id) {
     model.rotation.z = Math.PI / 2;
     holder.rotation.y = Math.PI / 2;
     holder.rotation.x = 0.25;
+  } else if (type === 'bomb') {  // bombs: the fuse to the right
+    holder.rotation.y = 0.4;
   } else {                       // shields: the P.V.P side to us, turned a little
     holder.rotation.y = -0.3;
   }
@@ -98,12 +101,12 @@ window.weaponsShot = () => {
     renderer.setScissor(c.x, y, c.w, c.h - 70);
     renderer.setClearColor(c.y === 0 ? '#e4eaf1' : '#d9e1ea');
     renderer.render(c.s, cam);
-    const look = rarityStyle(WEAPONS[c.id].rarity);
+    const look = rarityStyle(DEFS[c.id].rarity);
     const el = document.createElement('div');
     el.className = 'label';
     el.style.left = (c.x + c.w / 2) + 'px';
     el.style.top = (c.y + c.h - 66) + 'px';
-    el.innerHTML = WEAPONS[c.id].name + '<br><small style="background:' + look.background + '">' + look.name.toUpperCase() + '</small>';
+    el.innerHTML = DEFS[c.id].name + '<br><small style="background:' + look.background + '">' + look.name.toUpperCase() + '</small>';
     labels.append(el);
   }
   renderer.setScissorTest(false);
@@ -207,9 +210,9 @@ const save = async name => {
 test('every weapon from the boss\'s cards draws, side by side with its name', { skip: SKIP, timeout: 120000 }, async () => {
   const r = await page.evaluate(() => window.weaponsShot());
   await save('weapons.png');
-  assert.equal(r.cells, 7);
-  assert.equal(r.shown, 7, 'every model shows in its box');
-  assert.equal(await page.locator('.label').count(), 7);
+  assert.equal(r.cells, 11);
+  assert.equal(r.shown, 11, 'every model shows in its box');
+  assert.equal(await page.locator('.label').count(), 11);
   assert.deepEqual(errors, []);
 });
 
