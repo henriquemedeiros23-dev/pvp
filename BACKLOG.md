@@ -66,10 +66,10 @@ The live list is on GitHub Issues: https://github.com/henriquemedeiros23-dev/pvp
 | 29 | 🔲 | **Coins look like the boss's drawing** | Square-ish yellow coin with sparkle everywhere coins are shown (docs/design/coin.jpg). |
 | 30 | ✅ | **Practice mode you can open from a link** | One HTML page runs the whole game alone in the browser; published as a link. |
 | 31 | 🔲 | **Rename the game to PvP Island** | The game is called PvP Island everywhere players see it. |
-| 32 | 🔨 | **More weapons from the boss's cards (batch 2)** | Bomb and the next cards become real items. |
-| 33 | 🔨 | **Damage numbers above the head** | '-15' floats above a hurt player's head for 2 s, visible to everyone. |
+| 32 | 🔲 | **More weapons from the boss's cards (batch 2)** | Bomb and the next cards become real items. |
+| 33 | 🔲 | **Damage numbers above the head** | '-15' floats above a hurt player's head for 2 s, visible to everyone. |
 | 34 | ✅ | **Sword misses keep durability + drop weapon button** | Missing with a melee weapon costs nothing; a button drops the weapon in your hand. |
-| 35 | 🔨 | **Show 'Charging' with the time left** | After shooting, 'Charging 1.4s' counts down near the crosshair. |
+| 35 | 🔲 | **Show 'Charging' with the time left** | After shooting, 'Charging 1.4s' counts down near the crosshair. |
 | 36 | ✅ | **Chests come back after 2 minutes** | An opened chest refills after 2 min instead of 15 s. |
 
 ## Later ideas
