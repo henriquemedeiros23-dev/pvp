@@ -69,6 +69,7 @@ The live list is on GitHub Issues: https://github.com/henriquemedeiros23-dev/pvp
 | 32 | 🔲 | **More weapons from the boss's cards (batch 2)** | Bomb and the next cards become real items. |
 | 33 | 🔲 | **Damage numbers above the head** | '-15' floats above a hurt player's head for 2 s, visible to everyone. |
 | 34 | 🔨 | **Sword misses keep durability + drop weapon button** | Missing with a melee weapon costs nothing; a button drops the weapon in your hand. |
+| 35 | 🔲 | **Show 'Charging' with the time left** | After shooting, 'Charging 1.4s' counts down near the crosshair. |
 
 ## Later ideas
 - Sounds and music
