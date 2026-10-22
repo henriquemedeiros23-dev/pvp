@@ -23,9 +23,11 @@ Set `PORT` to use another port (default 3000). Run every test with `npm test`.
 
 `npm run build:practice` makes `dist/practice/pvp-island.html`: the whole game in ONE html file that runs
 without the game server (`@pvp/local-server` runs the arena, accounts and a few bots inside the page; coins and
-shop are saved in the browser). Only three.js is loaded, from cdnjs. It also refreshes
+shop are saved in the browser). Only three.js is loaded, from jsdelivr (`three@0.170.0/build/three.module.min.js`). It also refreshes
 `apps/game/public/practice.html` (made from `index.html`; try it at `http://localhost:3000/practice.html`).
 Page options: `?seed=abc`, `?bots=0` to `?bots=5`.
+It also makes `dist/practice/pvp-island.artifact.html`, the same game for publishing as a Claude artifact
+(no doctype/html/head/body of its own, because the artifact viewer adds those).
 
 ### Browser tests
 

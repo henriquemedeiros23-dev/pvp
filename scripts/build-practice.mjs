@@ -1,11 +1,12 @@
 #!/usr/bin/env node
 // Builds practice mode (issue #30): the whole game in ONE html file that needs no game server.
 //   npm run build:practice   ->  dist/practice/pvp-island.html
+//                                dist/practice/pvp-island.artifact.html (for a Claude artifact: no doctype/html/head/body)
 //
 // 1. apps/game/public/practice.html is made from index.html (so the two never drift apart):
 //    same page, but it starts js/practice.js (a game server inside the page, @pvp/local-server).
 // 2. esbuild bundles js/practice.js with every @pvp package (three.js stays outside).
-// 3. The stylesheet, the icon and the bundle are put inside the html. three.js comes from cdnjs
+// 3. The stylesheet, the icon and the bundle are put inside the html. three.js comes from jsdelivr (an exact npm mirror)
 //    with an exact version, through an import map. No other outside requests.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -16,7 +17,7 @@ const PUBLIC = path.join(ROOT, 'apps', 'game', 'public');
 const OUT_DIR = path.join(ROOT, 'dist', 'practice');
 export const OUT_FILE = path.join(OUT_DIR, 'pvp-island.html');
 export const THREE_VERSION = '0.170.0'; // must match apps/game/package.json
-export const THREE_CDN = `https://cdnjs.cloudflare.com/ajax/libs/three.js/${THREE_VERSION}/three.module.min.js`;
+export const THREE_CDN = `https://cdn.jsdelivr.net/npm/three@${THREE_VERSION}/build/three.module.min.js`;
 const MAX_BYTES = 5 * 1024 * 1024;
 export const PRACTICE_TITLE = 'PvP Island (Practice)'; // the boss named the game PvP Island
 
@@ -82,6 +83,51 @@ export function singleFile(practiceHtml, js, { css, icon }) {
   return html;
 }
 
+export const ARTIFACT_FILE = path.join(OUT_DIR, 'pvp-island.artifact.html');
+export const ARTIFACT_TITLE = 'PvP Island';
+
+// Extra CSS for the artifact viewer: it pads the page by the safe areas and puts our markup in its own body,
+// so the HUD's top offsets add the top inset too, and the page keeps full height with its own background.
+const ARTIFACT_CSS = `
+:root { --safe-t: env(safe-area-inset-top, 0px); }
+html, body { height: 100%; }
+body { margin: 0; background: #16131f; }
+.topbar, #menu .topbar { padding-top: calc(12px + var(--safe-t)); }
+.hud-top { top: calc(10px + var(--safe-t)); }
+.feed { top: calc(52px + var(--safe-t)); }
+.banner { top: calc(56px + var(--safe-t)); }
+.compass { top: calc(96px + var(--safe-t)); }
+.keys { bottom: calc(6px + var(--safe-b)); left: calc(12px + var(--safe-l)); }
+@media (max-height: 430px) { #menu .topbar { padding-top: calc(8px + var(--safe-t)); } }
+`;
+
+/**
+ * The single file -> a fragment for a Claude artifact, which wraps it in its own doctype/html/head/body:
+ * title, the viewport-fit meta, the import map, the styles, the game script, then the page markup.
+ */
+export function artifactFile(html) {
+  const map = IMPORT_MAP_RE.exec(html);
+  if (!map) throw new Error('build-practice: no import map');
+  const bodyStart = html.indexOf('<body>');
+  const scriptStart = html.indexOf('<script type="module">', bodyStart);
+  const scriptEnd = html.lastIndexOf('</script>');
+  if (bodyStart < 0 || scriptStart < 0 || scriptEnd < scriptStart) throw new Error('build-practice: page layout not as expected');
+  const head = html.slice(0, bodyStart);
+  const styles = [...head.matchAll(/<style>[\s\S]*?<\/style>/g)].map(m => m[0]);
+  const markup = html.slice(bodyStart + '<body>'.length, scriptStart).trim();
+  const script = html.slice(scriptStart, scriptEnd + '</script>'.length);
+  return [
+    `<title>${ARTIFACT_TITLE}</title>`,
+    '<meta name="claude:viewport-fit-sides" content="cover">',
+    map[0],
+    ...styles,
+    `<style>${ARTIFACT_CSS}</style>`,
+    script,
+    markup,
+    '',
+  ].join('\n');
+}
+
 async function checkCdn() {
   try {
     const res = await fetch(THREE_CDN, { method: 'HEAD', signal: AbortSignal.timeout(5000) });
@@ -109,8 +155,12 @@ export async function build({ check = true } = {}) {
   fs.mkdirSync(OUT_DIR, { recursive: true });
   fs.writeFileSync(OUT_FILE, html);
   console.log(`Practice page: ${path.relative(ROOT, OUT_FILE)} (${(bytes / 1024).toFixed(0)} KB)`);
+  const artifact = artifactFile(html);
+  fs.writeFileSync(ARTIFACT_FILE, artifact);
+  const artifactBytes = Buffer.byteLength(artifact);
+  console.log(`Artifact version: ${path.relative(ROOT, ARTIFACT_FILE)} (${(artifactBytes / 1024).toFixed(0)} KB)`);
   if (check) await checkCdn();
-  return { file: OUT_FILE, bytes };
+  return { file: OUT_FILE, bytes, artifact: ARTIFACT_FILE, artifactBytes };
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
