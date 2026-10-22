@@ -1,30 +1,33 @@
 // Items on the ground: dropping, rolling chest loot, expiring and auto pick up.
 
 import { circleHitsBox } from '@pvp/collision';
-import { chestChance } from '@pvp/game-rules';
-import { send, weaponDef, maxDurability, isShieldId, rankOf } from './state.js';
+import { chestChance, bombMaxCarry } from '@pvp/game-rules';
+import { send, weaponDef, maxDurability, isShieldId, rankOf, bombTable } from './state.js';
 import { inventoryMsg, maxPotions } from './players.js';
 import { equipShield } from './effects.js';
 
 export const itemMsg = it => {
   const msg = { id: it.id, kind: it.kind, weapon: it.weapon, x: it.x, y: it.y, z: it.z };
   if (it.kind === 'weapon') msg.dur = it.dur;
+  if (it.kind === 'bomb') msg.n = it.n;
   return msg;
 };
 
 /**
- * Drop an item near (x, z). kind: 'weapon' (with a weapon id) or 'potion' (a Healing Potion).
+ * Drop an item near (x, z). kind: 'weapon' (with a weapon id), 'potion' (a Healing Potion) or 'bomb'
+ * (weapon = the bomb id, n = how many: a pack).
  * dur (weapons): uses left; left out = full (new chest loot).
  */
-export function dropItem(A, kind, weapon, x, z, spread = A.tune.dropSpread, dur) {
+export function dropItem(A, kind, weapon, x, z, spread = A.tune.dropSpread, dur, n = 1) {
   const r = A.rnd.loot, grid = A.island.grid;
   const a = r.next() * Math.PI * 2, d = r.next() * spread;
   let ix = x + Math.cos(a) * d, iz = z + Math.sin(a) * d;
   if (grid.near(ix, iz, 1).some(b => b.h > 0.5 && circleHitsBox(ix, iz, 0.3, b))) { ix = x; iz = z; }
   let y = 0;
   for (const b of grid.near(ix, iz, 0.5)) if (circleHitsBox(ix, iz, 0.2, b) && b.h <= 1.4) y = Math.max(y, b.y + b.h);
-  const it = { id: A.newId(), kind, weapon: kind === 'weapon' ? weapon : null, x: ix, y, z: iz, expires: A.now + A.rules.ITEM_LIFETIME_MS };
+  const it = { id: A.newId(), kind, weapon: kind === 'weapon' || kind === 'bomb' ? weapon : null, x: ix, y, z: iz, expires: A.now + A.rules.ITEM_LIFETIME_MS };
   if (kind === 'weapon') it.dur = dur === undefined ? maxDurability(A, weapon) : dur;
+  if (kind === 'bomb') it.n = Number.isInteger(n) && n > 0 ? n : 1;
   A.items.set(it.id, it);
   send(A, 'all', { t: 'item+', ...itemMsg(it) });
   return it;
@@ -63,8 +66,10 @@ export function rollChestWeapon(A, { golden = false } = {}, r = A.rnd.loot) {
 
 /**
  * Loot from a chest: exactly one weapon (full durability), picked by chestChance (golden: boosted),
- * and POTION.chestChance % of the time an extra Healing Potion next to it.
- * Draws from the seeded loot stream in a fixed order: weapon, weapon spot, potion chance, potion spot.
+ * POTION.chestChance % of the time an extra Healing Potion next to it, and for every bomb in the rules'
+ * BOMBS (in order) its chestChance % of the time one pack of it (#32: a Bomb, or 3 Legendary Bombs).
+ * Draws from the seeded loot stream in a fixed order: weapon, weapon spot, potion chance, potion spot,
+ * then per bomb: its chance (and its spot when it drops).
  */
 export function rollLoot(A, x, z, { golden = false } = {}) {
   const r = A.rnd.loot;
@@ -72,6 +77,9 @@ export function rollLoot(A, x, z, { golden = false } = {}) {
   if (w) dropItem(A, 'weapon', w, x, z);
   const P = A.rules.POTION;
   if (P && P.chestChance > 0 && r.next() * 100 < P.chestChance) dropItem(A, 'potion', null, x, z);
+  for (const [id, b] of Object.entries(bombTable(A))) {
+    if (b.chestChance > 0 && r.next() * 100 < b.chestChance) dropItem(A, 'bomb', id, x, z, A.tune.dropSpread, undefined, b.pack);
+  }
 }
 
 /**
@@ -94,6 +102,19 @@ function take(A, p, it) {
     p.dur.push(it.dur === undefined ? maxDurability(A, it.weapon) : it.dur); // what the ground item had
     p.free.push(!!it.free); // a dropped free starting Gun stays free (never goes into a backpack)
     return weaponDef(A, it.weapon)?.name ?? it.weapon;
+  }
+  if (it.kind === 'bomb') {
+    // bombs: as many as fit under the bomb's maxCarry; the rest of a pack stays on the ground
+    const room = bombMaxCarry(it.weapon, bombTable(A)) - (p.bombs?.[it.weapon] ?? 0);
+    if (room <= 0) return null;
+    const got = Math.min(room, it.n);
+    p.bombs[it.weapon] += got;
+    if (got < it.n) {
+      const rest = dropItem(A, 'bomb', it.weapon, it.x, it.z, 0, undefined, it.n - got);
+      rest.ignore = p.id; // not picked straight back up
+    }
+    const name = bombTable(A)[it.weapon]?.name ?? it.weapon;
+    return got > 1 ? `${got}× ${name}` : name;
   }
   if (it.kind !== 'potion' || p.potions >= maxPotions(A)) return null; // only with fewer than MAX_POTIONS
   p.potions++;

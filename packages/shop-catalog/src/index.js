@@ -16,6 +16,10 @@ const TABS = Object.freeze([
     id: 'potion', label: 'Potions',
     hint: 'A Healing Potion gives you full H.P in 5 seconds. Take up to 3 into the arena. Switch weapons while drinking and it is wasted!',
   }),
+  Object.freeze({
+    id: 'bomb', label: 'Bombs',
+    hint: 'Throw a bomb (B or N, or the bomb buttons): a red square shows where it lands, and 3 seconds after the throw it explodes. A Bomb hurts you too!',
+  }),
 ]);
 
 /** Simple emoji for outfit items (weapons have their own icons in the game). */
@@ -74,6 +78,7 @@ export function shopItems(tab, account, rules = RULES) {
     });
   }
   if (tab === 'potion') return rules.POTION ? [potionCard(account, rules)] : [];
+  if (tab === 'bomb') return bombCards(account, rules);
   const table = tab === 'color' ? rules.COLORS : (rules.OUTFITS && Object.hasOwn(rules.OUTFITS, tab) ? rules.OUTFITS[tab] : null);
   if (!table) return [];
   return Object.keys(table).map(id => {
@@ -115,6 +120,35 @@ export function potionCard(account, rules = RULES) {
   };
 }
 
+const bombCount = (account, id) => {
+  const n = account && account.bombs ? account.bombs[id] : 0;
+  return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
+};
+
+/**
+ * The bomb cards (#32), in rules order: { kind: 'bomb', id, name, price (for one pack), pack (how many one buy
+ * gives: Legendary Bomb 3), rarity, rarityName, rarityColor, rarityBackground, stashCount (bombs in the backpack),
+ * owned, equipped: false, canAfford, action: 'buy', dmg, area, maxThrow, fuseSeconds, hurtsThrower, chestChance,
+ * maxCarry }. Buy one pack with api.buy('bomb', id).
+ */
+export function bombCards(account, rules = RULES) {
+  const coins = coinsOf(account);
+  return Object.entries(rules.BOMBS ?? {}).map(([id, b]) => {
+    const look = rarityStyle(b.rarity, rules.RARITY_COLORS);
+    const n = bombCount(account, id);
+    return {
+      kind: 'bomb', id, name: b.name, price: b.price, pack: b.pack,
+      owned: n > 0, equipped: false, canAfford: coins >= b.price, action: 'buy',
+      rarity: b.rarity, stashCount: n,
+      rarityName: look ? look.name : String(b.rarity ?? ''),
+      rarityColor: look ? look.color : '#888888',
+      rarityBackground: look ? look.background : '#888888',
+      dmg: b.dmg, area: b.area, maxThrow: b.maxThrow, fuseSeconds: b.fuseMs / 1000, hurtsThrower: b.hurtsThrower,
+      chestChance: b.chestChance, maxCarry: b.maxCarry,
+    };
+  });
+}
+
 /** CSS background for a color swatch (patterns get a simple gradient). */
 export function swatchBackground(card) {
   if (card.pattern === 'rainbow') return 'linear-gradient(135deg, #ff3b3b, #ffb13b, #f6ff3b, #3bff6a, #3bb4ff, #9b3bff)';
@@ -124,7 +158,7 @@ export function swatchBackground(card) {
 }
 
 /**
- * One line of text about the weapons (then Healing Potions) in the backpack, e.g.
+ * One line of text about the weapons (then Healing Potions, then bombs) in the backpack, e.g.
  * "Backpack: 2× Shootbm, 1× Supersword" or "Backpack is empty. Buy weapons in the shop!"
  * Weapons are listed in shop order.
  */
@@ -134,5 +168,6 @@ export function backpackSummary(account, rules = RULES) {
     .map(id => `${stashOf(account, id)}× ${rules.WEAPONS[id].name}`);
   const potions = account && Number.isFinite(account.potions) && account.potions > 0 ? Math.floor(account.potions) : 0;
   if (potions && rules.POTION) parts.push(`${potions}× ${rules.POTION.name}`);
+  for (const [id, b] of Object.entries(rules.BOMBS ?? {})) if (bombCount(account, id)) parts.push(`${bombCount(account, id)}× ${b.name}`);
   return parts.length ? `Backpack: ${parts.join(', ')}` : 'Backpack is empty. Buy weapons in the shop!';
 }

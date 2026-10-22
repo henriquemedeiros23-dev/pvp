@@ -31,7 +31,7 @@ test('arena full refuses, and joining again replaces the old player', () => {
   assert.deepEqual(arena.join('c', {}), { ok: false, reason: 'full' });
   const again = arena.join('a', {});
   assert.equal(again.ok, true);
-  assert.deepEqual(again.replaced, { id: a.id, weapons: ['shootbm'], potions: 2 }, 'unused potions go back too');
+  assert.deepEqual(again.replaced, { id: a.id, weapons: ['shootbm'], potions: 2, bombs: { bomb: 0, legendarybomb: 0 } }, 'unused potions (and bombs) go back too');
   assert.equal(arena.playerCount(), 2);
   assert.equal(arena.idOf('a'), again.id);
 });

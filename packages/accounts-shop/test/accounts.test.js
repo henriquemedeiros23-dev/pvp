@@ -28,7 +28,7 @@ test('signup gives a token and a fresh account with free items and the default s
   assert.deepEqual(view, {
     name: 'Stick_Kid', coins: 0,
     owned: ['color:black', 'hat:none', 'face:none', 'back:none', 'shirt:none'],
-    skin: { ...DEFAULT_SKIN }, stash: {}, potions: 0,
+    skin: { ...DEFAULT_SKIN }, stash: {}, potions: 0, bombs: { bomb: 0, legendarybomb: 0 },
   });
   for (const secret of ['hash', 'salt', 'tokens']) assert.ok(!(secret in view));
   assert.notEqual(account.hash, 'pass');
@@ -310,4 +310,39 @@ test('old saved accounts without potions still load (0 potions); bad potion coun
   const odd = again.login('Odd_Kid', 'secret').account;
   assert.equal(again.publicView(odd).potions, 0);
   assert.equal(again.takePotions(odd), 0);
+});
+
+test('bombs (#32): a Bomb for 3 coins, a pack of 3 Legendary Bombs for 60; take up to the max into the arena, return the rest', () => {
+  const { accounts } = setup();
+  const { account } = accounts.signup('Boomer', 'secret');
+  rejects(() => accounts.buy(account, 'bomb', 'bomb'), 'NOT_ENOUGH_COINS');
+  accounts.addCoins(account, 3 * 7 + 60 * 2 + 1);
+  for (let i = 0; i < 7; i++) accounts.buy(account, 'bomb', 'bomb');
+  accounts.buy(account, 'bomb', 'legendarybomb');
+  const view = accounts.buy(account, 'bomb', 'legendarybomb');
+  assert.deepEqual(view.bombs, { bomb: 7, legendarybomb: 6 }, 'a Legendary Bomb pack is 3');
+  assert.equal(view.coins, 1);
+  assert.deepEqual(view.stash, {}, 'bombs are not weapons');
+  rejects(() => accounts.buy(account, 'bomb', 'rocket'), 'UNKNOWN_ITEM');
+  rejects(() => accounts.buy(account, 'weapon', 'bomb'), 'UNKNOWN_ITEM');
+  assert.deepEqual(accounts.takeBombs(account), { bomb: 5, legendarybomb: 3 }, 'carry max 5 Bombs and 3 Legendary Bombs');
+  assert.deepEqual(accounts.publicView(account).bombs, { bomb: 2, legendarybomb: 3 });
+  assert.deepEqual(accounts.returnBombs(account, { bomb: 4, legendarybomb: 1, rocket: 9 }).bombs, { bomb: 6, legendarybomb: 4 });
+  accounts.returnBombs(account, { bomb: -2, legendarybomb: 'x' });
+  accounts.returnBombs(account, null);
+  assert.deepEqual(accounts.publicView(account).bombs, { bomb: 6, legendarybomb: 4 }, 'bad counts are ignored');
+});
+
+test('old saved accounts without bombs still load (0 bombs); bad bomb counts become 0', () => {
+  const store = createMemoryStore();
+  const { accounts } = setup({ store });
+  accounts.signup('Old_Kid', 'secret');
+  accounts.signup('Odd_Kid', 'secret');
+  const data = store.load();
+  delete data.old_kid.bombs;
+  data.odd_kid.bombs = { bomb: -1, legendarybomb: 2.5, rocket: 4 };
+  const again = createAccounts({ store: createMemoryStore(data), now: fakeClock(), randomBytes: fakeRandom() });
+  assert.deepEqual(again.publicView(again.login('Old_Kid', 'secret').account).bombs, { bomb: 0, legendarybomb: 0 });
+  const odd = again.login('Odd_Kid', 'secret').account;
+  assert.deepEqual(again.takeBombs(odd), { bomb: 0, legendarybomb: 0 });
 });

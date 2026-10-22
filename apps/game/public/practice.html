@@ -84,6 +84,7 @@
       <button data-tab="shirt">Clothes</button>
       <button data-tab="weapon">Weapons</button>
       <button data-tab="potion">Potions</button>
+      <button data-tab="bomb">Bombs</button>
     </nav>
     <p id="shopHint" class="hint"></p>
     <div id="shopGrid" class="grid"></div>
@@ -116,6 +117,8 @@
           <div id="shieldPill" class="shield-pill hidden" role="progressbar" aria-label="Shield" aria-valuemin="0" aria-valuemax="100">
             <span id="shieldIcon" class="sicon">🛡️</span><span class="sbar"><i id="shieldFill"></i></span><b id="shieldText">0</b>
           </div>
+          <!-- bombs you carry (#32): one button per bomb with its count (hidden when you have none); tap or B / N throws one -->
+          <div id="bombBtns" class="bombbtns"></div>
         </div>
         <div class="meters">
           <div id="durMeter" class="meter dur">
@@ -149,7 +152,7 @@
       <button id="btnCrouch" class="tbtn crouch">⤓</button>
       <button id="btnShield" class="tbtn shieldbtn hidden" aria-label="Hold to raise your shield">🛡️</button>
     </div>
-    <p id="keysHelp" class="keys hidden">WASD move · hold Shift shield · Space jump · C crouch/slide · Click shoot · E open · G drop weapon · 1-5 weapons · Q drink potion · Esc free mouse</p>
+    <p id="keysHelp" class="keys hidden">WASD move · hold Shift shield · Space jump · C crouch/slide · Click shoot · E open · G drop weapon · 1-5 weapons · Q drink potion · B / N throw bomb · Esc free mouse</p>
   </section>
 
   <!-- Knocked out -->

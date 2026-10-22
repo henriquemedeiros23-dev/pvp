@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { RULES, COLORS, OUTFITS, RARITY_COLORS } from '@pvp/game-rules';
-import { shopTabs, shopItems, shopWeaponIds, backpackSummary, swatchBackground, OUTFIT_ICONS, potionCard } from '../src/index.js';
+import { shopTabs, shopItems, shopWeaponIds, backpackSummary, swatchBackground, OUTFIT_ICONS, potionCard, bombCards } from '../src/index.js';
 
 const fresh = () => ({
   name: 'Bob', coins: 0,
@@ -10,10 +10,10 @@ const fresh = () => ({
   stash: {},
 });
 
-test('shopTabs lists the seven tabs in order, and returns copies', () => {
+test('shopTabs lists the eight tabs in order, and returns copies', () => {
   const tabs = shopTabs();
-  assert.deepEqual(tabs.map(t => t.id), ['color', 'hat', 'face', 'back', 'shirt', 'weapon', 'potion']);
-  assert.deepEqual(tabs.map(t => t.label), ['Colors', 'Hats', 'Masks', 'Back', 'Clothes', 'Weapons', 'Potions']);
+  assert.deepEqual(tabs.map(t => t.id), ['color', 'hat', 'face', 'back', 'shirt', 'weapon', 'potion', 'bomb']);
+  assert.deepEqual(tabs.map(t => t.label), ['Colors', 'Hats', 'Masks', 'Back', 'Clothes', 'Weapons', 'Potions', 'Bombs']);
   assert.ok(tabs.every(t => typeof t.hint === 'string' && t.hint));
   tabs[0].label = 'changed';
   assert.equal(shopTabs()[0].label, 'Colors');
@@ -50,7 +50,7 @@ test('outfit cards have icons and follow rules order', () => {
 test('weapons are sorted by rarity then price, include the starting Gun, and show the stash', () => {
   const acc = { ...fresh(), coins: 100, stash: { shootbm: 2, supersword: 1, icesword: 0 } };
   const cards = shopItems('weapon', acc);
-  assert.deepEqual(cards.map(c => c.id), ['gun', 'shootbm', 'shield', 'electricsword', 'icesword', 'megashield', 'supersword']);
+  assert.deepEqual(cards.map(c => c.id), ['gun', 'shootbm', 'dmgun', 'shield', 'electricsword', 'icesword', 'supergun', 'megashield', 'supersword']);
   assert.ok(!cards.some(c => c.id === 'woodsword' || c.id === 'pistol'), 'only the boss\'s weapons');
   assert.equal(cards[0].price, 3);
   const shootbm = cards.find(c => c.id === 'shootbm');
@@ -92,6 +92,8 @@ test('backpackSummary text', () => {
   assert.equal(backpackSummary(undefined), 'Backpack is empty. Buy weapons in the shop!');
   assert.equal(backpackSummary({ stash: { shootbm: 1 }, potions: 2 }), 'Backpack: 1× Shootbm, 2× Healing Potion');
   assert.equal(backpackSummary({ stash: {}, potions: 1 }), 'Backpack: 1× Healing Potion');
+  assert.equal(backpackSummary({ stash: { dmgun: 1 }, potions: 1, bombs: { bomb: 4, legendarybomb: 0 } }), 'Backpack: 1× DM Gun, 1× Healing Potion, 4× Bomb');
+  assert.equal(backpackSummary({ bombs: { legendarybomb: 3 } }), 'Backpack: 3× Legendary Bomb');
 });
 
 test('swatchBackground gives a CSS value for every color', () => {
@@ -120,4 +122,21 @@ test('the Healing Potion card (the boss\'s card): 10 coins, Common (green), full
   assert.equal(shopItems('potion', fresh())[0].stashCount, 0, 'old accounts without potions: 0');
   assert.deepEqual(potionCard({ coins: 10 }), shopItems('potion', { coins: 10 })[0]);
   assert.deepEqual(shopItems('potion', fresh(), { ...RULES, POTION: undefined }), []);
+});
+
+test('bomb cards (#32): a Bomb for 3 coins, a pack of 3 Legendary Bombs for 60 coins', () => {
+  const cards = shopItems('bomb', { coins: 10, bombs: { bomb: 2 } });
+  assert.deepEqual(cards.map(c => [c.id, c.name, c.price, c.pack, c.rarityName, c.stashCount, c.canAfford]), [
+    ['bomb', 'Bomb', 3, 1, 'Common', 2, true],
+    ['legendarybomb', 'Legendary Bomb', 60, 3, 'Legendary', 0, false],
+  ]);
+  const [bomb, legend] = cards;
+  assert.equal(bomb.kind, 'bomb');
+  assert.equal(bomb.action, 'buy');
+  assert.equal(bomb.rarityColor, RARITY_COLORS.common.color);
+  assert.deepEqual([bomb.dmg, bomb.area, bomb.maxThrow, bomb.fuseSeconds, bomb.hurtsThrower, bomb.maxCarry, bomb.chestChance], [3, 2, 7, 3, true, 5, 10]);
+  assert.deepEqual([legend.dmg, legend.area, legend.maxThrow, legend.fuseSeconds, legend.hurtsThrower, legend.maxCarry, legend.chestChance], [10, 5, 15, 3, false, 3, 2]);
+  assert.deepEqual(bombCards({ coins: 10, bombs: { bomb: 2 } }), cards);
+  assert.equal(shopTabs().at(-1).id, 'bomb');
+  assert.deepEqual(shopItems('bomb', null).map(c => c.stashCount), [0, 0]);
 });

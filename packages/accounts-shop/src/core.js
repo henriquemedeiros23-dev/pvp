@@ -54,6 +54,9 @@ export function createAccounts({
   const { STARTING_WEAPON, WEAPONS, MAX_SLOTS, DEFAULT_SKIN, COLORS, OUTFITS, SKIN_SLOTS } = rules;
   const MAX_POTIONS = Number.isInteger(rules.MAX_POTIONS) ? rules.MAX_POTIONS : 0;
   const itemPrice = rules.itemPrice ?? gameRules.itemPrice;
+  // Bombs (#32): { bombId: { pack, maxCarry, ... } } ({} for rules without bombs)
+  const BOMBS = rules.BOMBS && typeof rules.BOMBS === 'object' ? rules.BOMBS : {};
+  const bombCounts = (value, opts) => gameRules.bombCounts(value, opts, BOMBS);
 
   // Records keyed by lower-case name. No prototype, so a name like "__proto__" is just a name.
   const records = Object.assign(Object.create(null), store.load());
@@ -69,6 +72,8 @@ export function createAccounts({
     rec.stash ??= {};
     // Healing Potions in the backpack (older accounts have none: 0).
     rec.potions = safeCount(rec.potions);
+    // Bombs in the backpack, one count per bomb (older accounts have none: 0 each).
+    rec.bombs = bombCounts(rec.bombs);
     // Weapons that are no longer in the game (e.g. the old wooden sword, or the Pistol and the others removed
     // in #26) are dropped from the backpack.
     for (const id of Object.keys(rec.stash)) if (!Object.hasOwn(WEAPONS, id)) delete rec.stash[id];
@@ -124,6 +129,7 @@ export function createAccounts({
       skin: { ...DEFAULT_SKIN },
       stash: {},
       potions: 0,
+      bombs: bombCounts(null),
       tokens: [],
       createdAt: now(),
     };
@@ -168,6 +174,7 @@ export function createAccounts({
       skin: { ...a.skin },
       stash: { ...a.stash },
       potions: a.potions,
+      bombs: { ...a.bombs },
     };
   }
 
@@ -184,12 +191,13 @@ export function createAccounts({
     const a = own(account);
     const price = typeof kind === 'string' && typeof id === 'string' ? itemPrice(kind, id) : undefined;
     if (price === undefined) fail('UNKNOWN_ITEM', 'That item is not in the shop');
-    const stackable = kind === 'weapon' || kind === 'potion'; // can be bought again and again
+    const stackable = kind === 'weapon' || kind === 'potion' || kind === 'bomb'; // can be bought again and again
     if (!stackable && a.owned.includes(`${kind}:${id}`)) fail('ALREADY_OWNED', 'You already have that');
     if (a.coins < price) fail('NOT_ENOUGH_COINS', 'Not enough coins');
     a.coins = safeCoins(a.coins - price);
     if (kind === 'weapon') a.stash[id] = (a.stash[id] || 0) + 1;
     else if (kind === 'potion') a.potions++;
+    else if (kind === 'bomb') a.bombs[id] = (a.bombs[id] || 0) + (BOMBS[id]?.pack || 1); // one pack (Legendary Bomb: 3)
     else a.owned.push(`${kind}:${id}`);
     save();
     return publicView(a);
@@ -274,9 +282,30 @@ export function createAccounts({
     return publicView(a);
   }
 
+  /**
+   * Bombs to carry into the arena (#32): of every bomb, as many as the backpack has, at most its maxCarry
+   * (Bomb 5, Legendary Bomb 3). They leave the backpack. Returns { bombId: count }.
+   */
+  function takeBombs(account) {
+    const a = own(account);
+    const out = bombCounts(a.bombs, { cap: true });
+    for (const id of Object.keys(out)) a.bombs[id] -= out[id];
+    save();
+    return out;
+  }
+
+  /** Left the arena alive (or the arena did not take them): unused bombs go back. Bad counts and ids are ignored. */
+  function returnBombs(account, bombs) {
+    const a = own(account);
+    const back = bombCounts(bombs);
+    for (const id of Object.keys(back)) a.bombs[id] = (a.bombs[id] || 0) + back[id];
+    save();
+    return publicView(a);
+  }
+
   return {
     signup, login, logout, byToken, publicView, addCoins, buy, equip, rename, takeLoadout, returnLoadout,
-    takePotions, returnPotions,
+    takePotions, returnPotions, takeBombs, returnBombs,
     /** Write any pending changes now (tests, shutdown). */
     flush: () => store.flush(),
   };

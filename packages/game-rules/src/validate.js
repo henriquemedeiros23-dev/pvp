@@ -112,6 +112,29 @@ export function validateRules(rules) {
     if (!Number.isInteger(rules.MAX_POTIONS) || rules.MAX_POTIONS < 0) problems.push('MAX_POTIONS must be a whole number >= 0');
   }
 
+  // Bombs (#32, optional in a rules object; the real rules have them)
+  if (rules.BOMBS !== undefined) {
+    if (!isObject(rules.BOMBS)) problems.push('BOMBS must be an object');
+    else {
+      for (const [id, b] of Object.entries(rules.BOMBS)) {
+        if (!isObject(b)) { problems.push(`bomb ${id}: must be an object`); continue; }
+        if (b.name === undefined) problems.push(`bomb ${id}: missing name`);
+        if (isObject(WEAPONS) && Object.hasOwn(WEAPONS, id)) problems.push(`bomb ${id}: the id is also a weapon`);
+        if (!isPosNum(b.dmg)) problems.push(`bomb ${id}: dmg must be a number > 0`);
+        if (!isPosNum(b.area)) problems.push(`bomb ${id}: area must be a number > 0 (side of the square, meters)`);
+        if (!isPosNum(b.maxThrow)) problems.push(`bomb ${id}: maxThrow must be a number > 0 (meters)`);
+        if (!isPosInt(b.fuseMs)) problems.push(`bomb ${id}: fuseMs must be a whole number > 0`);
+        if (typeof b.hurtsThrower !== 'boolean') problems.push(`bomb ${id}: hurtsThrower must be true or false`);
+        if (!isPosInt(b.maxCarry)) problems.push(`bomb ${id}: maxCarry must be a whole number > 0`);
+        if (!isPosInt(b.pack)) problems.push(`bomb ${id}: pack must be a whole number > 0`);
+        else if (isPosInt(b.maxCarry) && b.pack > b.maxCarry) problems.push(`bomb ${id}: pack must not be more than maxCarry`);
+        if (!isPrice(b.price)) problems.push(`bomb ${id}: price must be a number >= 0`);
+        if (!isPercent(b.chestChance)) problems.push(`bomb ${id}: chestChance must be a number from 0 to 100`);
+        if (!rarities.includes(b.rarity)) problems.push(`bomb ${id}: unknown rarity "${b.rarity}"`);
+      }
+    }
+  }
+
   // Colors
   if (!isObject(COLORS)) {
     problems.push('COLORS must be an object');

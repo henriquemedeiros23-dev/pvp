@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as rules from '../src/index.js';
 import {
+  BOMBS, isBomb, bombPrice, bombMaxCarry, bombCounts, inBombArea,
   RULES, WEAPONS, COLORS, OUTFITS, DEFAULT_SKIN, LOOT_TABLE, POTION, MAX_POTIONS, potionPrice, potionHeal, STARTING_WEAPON, RARITIES, RARITY_COLORS,
   CHEST_COINS, GOLDEN_CHEST_COINS, GOLDEN_CHEST_BOOST, WEAPON_TYPES, isShield, rarityRank, rarityStyle, droppedDurability, chestChance, validateRules, weaponPrice, weaponDurability, weaponWear, skinPrice, isBuyable, itemPrice, weaponsByRarity,
 } from '../src/index.js';
@@ -67,8 +68,8 @@ test('rarities and their colors', () => {
   ]);
 });
 
-test('the weapon list is exactly the boss\'s cards (#26), nothing else', () => {
-  assert.deepEqual(Object.keys(WEAPONS), ['gun', 'shootbm', 'electricsword', 'icesword', 'shield', 'megashield', 'supersword']);
+test('the weapon list is exactly the boss\'s cards (#26, #32), nothing else', () => {
+  assert.deepEqual(Object.keys(WEAPONS), ['gun', 'shootbm', 'electricsword', 'icesword', 'shield', 'megashield', 'supersword', 'dmgun', 'supergun']);
   assert.deepEqual(WEAPON_TYPES, ['melee', 'gun', 'shield']);
   for (const old of ['sword', 'bat', 'spear', 'axe', 'pistol', 'shotgun', 'rifle', 'sniper', 'grenade', 'rocket', 'mine']) {
     assert.ok(!Object.hasOwn(WEAPONS, old), `${old} is gone`);
@@ -82,10 +83,15 @@ test('the weapon list is exactly the boss\'s cards (#26), nothing else', () => {
   assert.deepEqual(card('icesword'), ['Ice Sword', 'melee', 10, 3, 50, 4, 35, 'epic']);
   assert.equal(WEAPONS.icesword.freezeMs, 2000);
   assert.deepEqual(card('shield'), ['Shield', 'shield', undefined, undefined, 60, 6, 25, 'epic']);
-  assert.deepEqual(card('megashield'), ['Mega Shield', 'shield', undefined, undefined, 70, 1, 75, 'legendary']);
+  assert.deepEqual(card('megashield'), ['Mega Shield', 'shield', undefined, undefined, 70, 1, 100, 'legendary']);
   assert.equal(WEAPONS.megashield.reflect, 0.25);
   assert.equal(WEAPONS.shield.reflect, undefined);
-  assert.deepEqual(card('supersword'), ['Supersword', 'melee', 100, 1.5, 40, 0.3, 150, 'megalegend']);
+  assert.deepEqual(card('supersword'), ['Supersword', 'melee', 100, 1.5, 40, 0.3, 250, 'megalegend']);
+  // #32: the boss's numbers from the issue, not the ones written on the cards
+  assert.deepEqual(card('dmgun'), ['DM Gun', 'gun', 15, 3, 30, 7, 20, 'epic']);
+  assert.deepEqual(card('supergun'), ['Supergun', 'gun', 25, 2, 30, 1.5, 70, 'legendary']);
+  assert.equal(WEAPONS.dmgun.pellets, 1, 'one bullet');
+  assert.equal(WEAPONS.supergun.pellets, 1, 'one bullet');
   assert.equal(WEAPONS.supersword.knockout, true);
   assert.equal(WEAPONS.supersword.shieldWear, 5);
   assert.equal(isShield('shield'), true);
@@ -99,7 +105,7 @@ test('the weapon list is exactly the boss\'s cards (#26), nothing else', () => {
 
 test('chest chances are weights from the cards: they do not have to add up to 100', () => {
   const nums = Object.fromEntries(Object.keys(WEAPONS).map(id => [id, chestChance(id)]));
-  assert.deepEqual(nums, { gun: 15, shootbm: 15, electricsword: 5, icesword: 4, shield: 6, megashield: 1, supersword: 0.3 });
+  assert.deepEqual(nums, { gun: 15, shootbm: 15, electricsword: 5, icesword: 4, shield: 6, megashield: 1, supersword: 0.3, dmgun: 7, supergun: 1.5 });
   assert.equal(chestChance('laser'), 0);
   assert.equal(CHEST_COINS, 3);
   assert.equal(GOLDEN_CHEST_COINS, 10);
@@ -227,9 +233,9 @@ test('validateRules does not throw on garbage', () => {
 });
 
 test('weaponPrice', () => {
-  assert.equal(weaponPrice('supersword'), 150);
+  assert.equal(weaponPrice('supersword'), 250);
   assert.equal(weaponPrice('shootbm'), 7);
-  assert.equal(weaponPrice('megashield'), 75);
+  assert.equal(weaponPrice('megashield'), 100);
   assert.equal(weaponPrice(STARTING_WEAPON), 3);
   assert.equal(weaponPrice('laser'), undefined);
   assert.equal(weaponPrice('toString'), undefined);
@@ -262,8 +268,8 @@ test('isBuyable and itemPrice', () => {
 test('weaponsByRarity', () => {
   assert.deepEqual(weaponsByRarity('basic'), []);
   assert.deepEqual(weaponsByRarity('common'), ['gun', 'shootbm']);
-  assert.deepEqual(weaponsByRarity('epic'), ['electricsword', 'icesword', 'shield']);
-  assert.deepEqual(weaponsByRarity('legendary'), ['megashield']);
+  assert.deepEqual(weaponsByRarity('epic'), ['electricsword', 'icesword', 'shield', 'dmgun']);
+  assert.deepEqual(weaponsByRarity('legendary'), ['megashield', 'supergun']);
   assert.deepEqual(weaponsByRarity('megalegend'), ['supersword']);
   assert.deepEqual(weaponsByRarity('mythic'), []);
   assert.deepEqual(weaponsByRarity('epic'), LOOT_TABLE.epic);
@@ -314,4 +320,53 @@ test('validateRules checks the potion', () => {
   delete r.POTION;
   r.MAX_POTIONS = 3;
   assert.deepEqual(validateRules(r), [], 'rules without a potion are fine');
+});
+
+test('bombs from the boss\'s cards (#32): thrown counters, not weapon slots', () => {
+  assert.deepEqual(Object.keys(BOMBS), ['bomb', 'legendarybomb']);
+  const card = id => { const b = BOMBS[id]; return [b.name, b.dmg, b.area, b.maxThrow, b.fuseMs, b.hurtsThrower, b.maxCarry, b.pack, b.price, b.chestChance, b.rarity]; };
+  assert.deepEqual(card('bomb'), ['Bomb', 3, 2, 7, 3000, true, 5, 1, 3, 10, 'common']);
+  assert.deepEqual(card('legendarybomb'), ['Legendary Bomb', 10, 5, 15, 3000, false, 3, 3, 60, 2, 'legendary']);
+  assert.equal(RULES.BOMBS, BOMBS);
+  assert.ok(Object.isFrozen(BOMBS.bomb));
+  assert.equal(isBomb('bomb'), true);
+  assert.equal(isBomb('gun'), false);
+  assert.equal(isBomb('toString'), false);
+  assert.equal(bombPrice('legendarybomb'), 60, 'a pack of 3 for 60 coins');
+  assert.equal(itemPrice('bomb', 'bomb'), 3);
+  assert.equal(isBuyable('bomb', 'legendarybomb'), true);
+  assert.equal(isBuyable('bomb', 'gun'), false);
+  assert.equal(isBuyable('weapon', 'bomb'), false, 'bombs are not weapons');
+  assert.equal(bombMaxCarry('bomb'), 5);
+  assert.equal(bombMaxCarry('legendarybomb'), 3);
+  assert.equal(bombMaxCarry('nope'), 0);
+  assert.deepEqual(bombCounts(undefined), { bomb: 0, legendarybomb: 0 });
+  assert.deepEqual(bombCounts({ bomb: 9, legendarybomb: -1, rocket: 2 }), { bomb: 9, legendarybomb: 0 });
+  assert.deepEqual(bombCounts({ bomb: 9, legendarybomb: 7 }, { cap: true }), { bomb: 5, legendarybomb: 3 });
+  assert.deepEqual(bombCounts({ bomb: 1.5 }), { bomb: 0, legendarybomb: 0 });
+});
+
+test('the bomb area is a square centred where it lands (edges count)', () => {
+  assert.equal(inBombArea('bomb', 10, 10, 11, 9), true);   // 2x2: 1 m each way
+  assert.equal(inBombArea('bomb', 10, 10, 11.01, 10), false);
+  assert.equal(inBombArea('legendarybomb', 0, 0, 2.5, -2.5), true); // 5x5
+  assert.equal(inBombArea('legendarybomb', 0, 0, 0, 2.6), false);
+  assert.equal(inBombArea('nope', 0, 0, 0, 0), false);
+});
+
+test('bad bombs are reported', () => {
+  const r = copy();
+  r.BOMBS.bomb.dmg = 0;
+  r.BOMBS.bomb.hurtsThrower = 'yes';
+  r.BOMBS.legendarybomb.pack = 4;
+  r.BOMBS.legendarybomb.rarity = 'mythic';
+  r.BOMBS.gun = { ...r.BOMBS.bomb, dmg: 3, hurtsThrower: true };
+  assert.deepEqual(validateRules(r), [
+    'bomb bomb: dmg must be a number > 0',
+    'bomb bomb: hurtsThrower must be true or false',
+    'bomb legendarybomb: pack must not be more than maxCarry',
+    'bomb legendarybomb: unknown rarity "mythic"',
+    'bomb gun: the id is also a weapon',
+  ]);
+  assert.deepEqual(validateRules({ ...RULES, BOMBS: 5 }).filter(p => p.startsWith('BOMBS')), ['BOMBS must be an object']);
 });

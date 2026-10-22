@@ -3,6 +3,7 @@
 import { itemMsg } from './loot.js';
 import { playerInfo } from './players.js';
 import { isFrozen } from './effects.js';
+import { bombMsg } from './bombs.js';
 
 const round2 = v => +v.toFixed(2);
 
@@ -16,6 +17,8 @@ export function welcomeFor(A, id) {
     chests: A.chests.filter(c => c.openUntil > A.now).map(c => c.id),
     golden: A.golden ? { ...A.golden } : null,
     items: [...A.items.values()].map(itemMsg),
+    // bombs in the air or on the ground that have not exploded yet (#32), same fields as the 'bomb' message
+    bombs: [...A.bombs.values()].map(b => { const { t, ...m } = bombMsg(A, b); return m; }),
   };
 }
 

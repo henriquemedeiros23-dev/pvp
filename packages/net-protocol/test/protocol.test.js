@@ -21,6 +21,7 @@ const CLIENT_EXAMPLES = {
   drink: { t: 'drink' },
   shield: { t: 'shield', up: true },
   drop: { t: 'drop' },
+  throw: { t: 'throw', b: 'bomb', d: [0, -0.3, 0.95] },
 };
 
 // One valid example per server message, shaped exactly like apps/game/server.js sends them.
@@ -35,7 +36,8 @@ const SERVER_EXAMPLES = {
   full: {},
   left: {},
   snap: { p: [[3, 1.5, 0, -2.25, 0.5, -0.1, 5, 'shootbm', 100, 1, 'shield', 5]], n: 4 },
-  inv: { weapons: ['fists', 'shootbm'], dur: [null, 12], slot: 0, potions: 2, coins: 120, hp: 100, shield: { id: 'megashield', dur: 64 } },
+  inv: { weapons: ['fists', 'shootbm'], dur: [null, 12], slot: 0, potions: 2, coins: 120, hp: 100, shield: { id: 'megashield', dur: 64 },
+    bombs: [{ id: 'bomb', n: 4 }, { id: 'legendarybomb', n: 0 }] },
   broke: { slot: 1, weapon: 'shootbm' },
   drink: { state: 'start', ms: 5000, hp: 40 },
   pjoin: { id: 3, name: 'Bob', skin: SKIN },
@@ -54,6 +56,8 @@ const SERVER_EXAMPLES = {
   hurt: { hp: 75, kx: 0, kz: 0, from: [3, 4] },
   ko: { id: 3, x: 1, y: 0, z: 2, victim: 'Bob', by: 'Ann', weapon: 'supersword' },
   dead: { by: null, weapon: 'electricsword' },
+  bomb: { id: 12, by: 3, b: 'bomb', from: [1, 1.5, 2], to: [4, 0, 7], fly: 700, ms: 3000, area: 2 },
+  boom: { id: 12, b: 'bomb', x: 4, y: 0, z: 7, area: 2 },
 };
 
 const rejected = (raw) => {
@@ -65,12 +69,12 @@ const rejected = (raw) => {
 };
 
 test('constants', () => {
-  assert.equal(PROTOCOL_VERSION, 2);
+  assert.equal(PROTOCOL_VERSION, 3);
   assert.equal(MAX_MESSAGE_SIZE, 4096);
   assert.deepEqual([FLAG_CROUCH, FLAG_SLIDE, FLAG_MOVING, FLAG_AIR], [1, 2, 4, 8]);
   assert.equal(SNAP_LENGTH, 12);
   assert.deepEqual([STATUS_SHIELD_UP, STATUS_SHOCKED, STATUS_FROZEN], [1, 2, 4]);
-  for (const gone of ['proj', 'proj-', 'boom', 'mine+', 'mine-']) assert.ok(!(gone in SERVER_MESSAGES), `${gone} is gone (no explosives)`);
+  for (const gone of ['proj', 'proj-', 'mine+', 'mine-']) assert.ok(!(gone in SERVER_MESSAGES), `${gone} is gone (old explosives)`);
   assert.deepEqual(Object.keys(CLIENT_MESSAGES).sort(), Object.keys(CLIENT_EXAMPLES).sort());
   assert.deepEqual(Object.keys(SERVER_MESSAGES).sort(), Object.keys(SERVER_EXAMPLES).sort());
 });
@@ -294,4 +298,23 @@ test('same input gives the same result every time', () => {
   const raw = J({ ...CLIENT_EXAMPLES.state, extra: 1 });
   assert.deepEqual(parseClientMessage(raw), parseClientMessage(raw));
   assert.deepEqual(parseClientMessage('{bad'), parseClientMessage('{bad'));
+});
+
+test('bombs (#32): throw, bomb, boom, bomb items and the bombs counter', () => {
+  assert.deepEqual(parseClientMessage(J({ t: 'throw', b: 'legendarybomb', d: [0, 0, 1], x: 5 })).msg, { t: 'throw', b: 'legendarybomb', d: [0, 0, 1] });
+  rejected(J({ t: 'throw', d: [0, 0, 1] }));             // which bomb?
+  rejected(J({ t: 'throw', b: 'bomb' }));                 // no aim
+  rejected(J({ t: 'throw', b: 'bomb', d: [0, 0] }));
+  rejected(J({ t: 'throw', b: 'x'.repeat(100), d: [0, 0, 1] }));
+  const item = { id: 3, kind: 'bomb', weapon: 'legendarybomb', x: 1, y: 0, z: 2, n: 3 };
+  assert.deepEqual(decodeServerMessage(encode('item+', item)).msg, { t: 'item+', ...item });
+  assert.equal(decodeServerMessage(J({ t: 'item+', ...item, n: -1 })).ok, false);
+  const live = { ...SERVER_EXAMPLES.bomb };
+  assert.deepEqual(decodeServerMessage(encode('welcome', { ...SERVER_EXAMPLES.welcome, bombs: [live] })).msg.bombs, [live]);
+  assert.ok(decodeServerMessage(encode('welcome', SERVER_EXAMPLES.welcome)).ok, 'bombs in welcome are optional');
+  const { bombs, ...oldInv } = SERVER_EXAMPLES.inv;
+  assert.ok(decodeServerMessage(encode('inv', oldInv)).ok, 'bombs in inv are optional');
+  assert.equal(decodeServerMessage(J({ t: 'inv', ...oldInv, bombs: [{ id: 'bomb', n: 1.5 }] })).ok, false);
+  assert.throws(() => encode('boom', { id: 1, b: 'bomb', x: 0, y: 0, z: 0 }), /area/);
+  assert.throws(() => encode('bomb', { ...SERVER_EXAMPLES.bomb, fly: -5 }));
 });

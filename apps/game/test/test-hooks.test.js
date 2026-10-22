@@ -107,3 +107,18 @@ test('with PVP_TEST_HOOKS=1 a debugTeleport moves the player; bad ones are dropp
     c.ws.close();
   });
 });
+
+test('debugCoins (a browser test buys bombs with it) works only with PVP_TEST_HOOKS=1', async () => {
+  assert.equal(Object.hasOwn(CLIENT_MESSAGES, 'debugCoins'), false);
+  for (const flag of ['', '1']) {
+    await withServer({ PVP_TEST_HOOKS: flag }, async port => {
+      const c = await joinArena(port);
+      c.ws.send(JSON.stringify({ t: 'debugCoins', n: -5 }));
+      c.ws.send(JSON.stringify({ t: 'debugCoins', n: 70 }));
+      await wait(300);
+      const coins = c.seen.filter(m => m.t === 'inv').at(-1).coins;
+      assert.equal(coins, flag === '1' ? 70 : 0, `flag "${flag}"`);
+      c.ws.close();
+    });
+  }
+});

@@ -74,6 +74,7 @@ test('accounts survive a reload from disk', async t => {
     skin: { color: 'black', hat: 'cap', face: 'none', back: 'none', shirt: 'none' },
     stash: { electricsword: 1 },
     potions: 1,
+    bombs: { bomb: 0, legendarybomb: 0 },
   });
   assert.equal(again.login('BOB', 'pass').account, back);
 });

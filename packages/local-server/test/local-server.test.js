@@ -198,3 +198,29 @@ test('fake socket: close before open never opens; listeners work', async () => {
   await settle();
   assert.deepEqual(seen, ['close event']);
 });
+
+test('bombs (#32): bought bombs come along, "throw" throws one, it explodes after 3 s; leaving returns the rest', async () => {
+  const { server, run } = setup();
+  const api = server.createApi();
+  const { token } = await api.signup('Bomber_1', 'secret');
+  server.accounts.addCoins(server.accounts.byToken(token), 3 * 6 + 60);
+  for (let i = 0; i < 6; i++) await api.buy('bomb', 'bomb');
+  const bought = await api.buy('bomb', 'legendarybomb');
+  assert.deepEqual(bought.account.bombs, { bomb: 6, legendarybomb: 3 });
+  const c = await open(server, token);
+  c.send('join');
+  await settle();
+  assert.deepEqual(c.of('inv')[0].bombs, [{ id: 'bomb', n: 5 }, { id: 'legendarybomb', n: 3 }], 'carry max 5 Bombs');
+  assert.deepEqual((await api.me()).account.bombs, { bomb: 1, legendarybomb: 0 }, 'one Bomb stays in the backpack');
+  await run(3200); // spawn protection over
+  c.send('throw', { b: 'bomb', d: [0, -0.3, 1] });
+  await settle();
+  const [thrown] = c.of('bomb');
+  assert.ok(thrown, 'the bomb flies');
+  assert.equal(c.of('inv').at(-1).bombs[0].n, 4);
+  await run(3000);
+  assert.deepEqual(c.of('boom').map(m => m.id), [thrown.id]);
+  c.send('leave');
+  await settle();
+  assert.deepEqual((await api.me()).account.bombs, { bomb: 5, legendarybomb: 3 }, 'unused bombs go back');
+});

@@ -32,6 +32,8 @@ const TEST_HOOKS = process.env.PVP_TEST_HOOKS === '1';
 const TEST_MESSAGES = {
   // Put me somewhere on the island (skips the anti-teleport check). The server answers with 'pos'.
   debugTeleport: { obj: { x: { type: 'number', min: -1000, max: 1000 }, z: { type: 'number', min: -1000, max: 1000 } } },
+  // Give my account some coins (to buy things in the shop during a browser test). The arena gets the new total.
+  debugCoins: { obj: { n: { type: 'uint', min: 1, max: 10000 } } },
 };
 // The monorepo's packages/ folder (read-only: the browser loads package src files from here).
 const PACKAGES_DIR = path.resolve(ROOT, '..', '..', 'packages');
@@ -157,12 +159,13 @@ function pump() {
   }
 }
 
-// Leave the arena alive (no connection needed): carried weapons and unused Healing Potions go back into the backpack.
+// Leave the arena alive (no connection needed): carried weapons and unused Healing Potions and bombs go back into the backpack.
 function leaveArenaAlive(acc, id) {
   if (!arena.hasPlayer(id)) return;
-  const potions = arena.getPlayer(id).potions;
+  const { potions, bombs } = arena.getPlayer(id);
   accounts.returnLoadout(acc, arena.leave(id, { alive: true }));
   if (potions) accounts.returnPotions(acc, potions);
+  accounts.returnBombs(acc, bombs);
 }
 
 function leaveAlive(conn) {
@@ -186,10 +189,12 @@ function join(conn, now) {
 
   const loadout = accounts.takeLoadout(acc);
   const potions = accounts.takePotions(acc); // up to 3 Healing Potions come along
-  const r = arena.join(playerKey(acc), { name: acc.name, skin: { ...acc.skin }, loadout, coins: acc.coins, potions }, now);
+  const bombs = accounts.takeBombs(acc);     // bombs too, up to each bomb's max (#32)
+  const r = arena.join(playerKey(acc), { name: acc.name, skin: { ...acc.skin }, loadout, coins: acc.coins, potions, bombs }, now);
   if (!r.ok) {
     accounts.returnLoadout(acc, loadout);
     accounts.returnPotions(acc, potions);
+    accounts.returnBombs(acc, bombs);
     sendRaw(conn, encode('full'));
     return;
   }
@@ -198,11 +203,13 @@ function join(conn, now) {
   for (const w of r.weapons) { const i = rest.indexOf(w); if (i >= 0) rest.splice(i, 1); }
   if (rest.length) accounts.returnLoadout(acc, rest);
   if (r.potions < potions) accounts.returnPotions(acc, potions - r.potions);
+  accounts.returnBombs(acc, Object.fromEntries(Object.keys(bombs).map(b => [b, bombs[b] - (r.bombs[b] ?? 0)])));
   if (r.replaced) {
     const old = conns.get(r.replaced.id);
     if (old) { old.playerId = null; conns.delete(r.replaced.id); }
     accounts.returnLoadout(acc, r.replaced.weapons);
     if (r.replaced.potions) accounts.returnPotions(acc, r.replaced.potions);
+    accounts.returnBombs(acc, r.replaced.bombs);
   }
   conn.playerId = r.id;
   conns.set(r.id, conn);
@@ -221,6 +228,7 @@ function onMessage(conn, m) {
     case 'drink': if (id != null) arena.drink(id, now); break;
     case 'shield': if (id != null) arena.setShield(id, m.up, now); break;
     case 'drop': if (id != null) arena.dropWeapon(id, now); break;
+    case 'throw': if (id != null) arena.throwBomb(id, m.b, m.d, now); break;
   }
   pump();
 }
@@ -235,6 +243,7 @@ function parseTestMessage(raw) {
 }
 
 function onTestMessage(conn, m) {
+  if (m.t === 'debugCoins') { accounts.addCoins(conn.acc, m.n); syncCoins(conn.acc); return; }
   const id = conn.playerId != null && arena.hasPlayer(conn.playerId) ? conn.playerId : null;
   if (id == null) return;
   if (m.t === 'debugTeleport' && arena.teleport(id, { x: m.x, y: 0, z: m.z })) {

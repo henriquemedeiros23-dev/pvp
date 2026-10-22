@@ -35,7 +35,8 @@ export function createState({ island, rules = defaultRules, random, now = 0, tun
     chests: island.chests.map(c => ({ id: c.id, x: c.x, z: c.z, openUntil: 0 })),
     golden: null,           // { x, z } while a golden chest is waiting
     nextGolden: now + tune.firstGoldenMs,
-    items: new Map(),       // id -> { id, kind, weapon, x, y, z, expires, dur? (weapons: uses left or null) }
+    items: new Map(),       // id -> { id, kind, weapon, x, y, z, expires, dur? (weapons: uses left or null), n? (bombs: how many) }
+    bombs: new Map(),       // id -> live bomb { id, b, by, byName, from, to, throwAt, landAt, explodeAt } (#32)
     out: [],
     newId: () => nextId++,
   };
@@ -75,3 +76,8 @@ export const isShieldId = (A, id) => weaponDef(A, id)?.type === 'shield';
 /** Rarity rank of a weapon (higher = rarer), -1 if unknown. */
 export const rankOf = (A, id) => (A.rules.RARITIES ?? RARITIES).indexOf(weaponDef(A, id)?.rarity);
 export const heightOf = (A, p) => ((p.flags & 1) ? A.rules.CROUCH_HEIGHT : A.rules.PLAYER_HEIGHT);
+
+/** The rules' bomb table (#32), {} when the rules have no bombs. */
+export const bombTable = A => (A.rules.BOMBS && typeof A.rules.BOMBS === 'object' ? A.rules.BOMBS : {});
+/** One bomb's rules, or undefined for an unknown id. */
+export const bombDef = (A, id) => (typeof id === 'string' && Object.hasOwn(bombTable(A), id) ? bombTable(A)[id] : undefined);

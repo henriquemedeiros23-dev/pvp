@@ -4,12 +4,12 @@ import * as THREE from 'three';
 import * as C from '@pvp/game-rules';
 import { generateIsland } from '@pvp/world-gen';
 import { movePlayer, rayBoxes, rayCylinder } from '@pvp/collision';
-import { Stickman, buildWeapon, buildPotion, holdPotion } from '@pvp/stickman-3d';
+import { Stickman, buildWeapon, buildPotion, holdPotion, buildBomb, buildBombArea } from '@pvp/stickman-3d';
 import { createIslandScene } from '@pvp/island-scene';
 import { createInputState, attachTouchControls, attachDesktopControls, isTouchDevice } from '@pvp/touch-controls';
 import { decodeServerMessage, encodeClient, unpackSnapshotPlayer, makeFlags, readFlags } from '@pvp/net-protocol';
 import { slotBar, heldDurabilityView, healthView, pickSlot, brokeMessage, shieldView, WEAPON_ICONS } from '@pvp/hud-model';
-import { potionView, drinkState, drinkMessage, POTION_ICON_SVG } from '@pvp/hud-model';
+import { potionView, drinkState, drinkMessage, POTION_ICON_SVG, bombView } from '@pvp/hud-model';
 
 const $ = id => document.getElementById(id);
 const JOIN_TIMEOUT_MS = 8000;  // give up joining if 'welcome' does not come
@@ -19,6 +19,7 @@ const MENU_PREVIEW_SHIFT_Y = 0.2;  // ... or below the middle (portrait)
 
 const HIT_RADIUS = C.PLAYER_RADIUS + 0.1; // a bit wider than the body, like the server
 const v3 = (x, y, z) => ({ x, y, z });
+const BOMB_ARC = 0.18; // a thrown bomb flies this high per meter (plus 0.6 m)
 
 // Distance along a unit ray to the first wall or the ground, at most maxDist.
 function rayWorld(world, ox, oy, oz, dx, dy, dz, maxDist) {
@@ -66,6 +67,7 @@ export class Game {
       gravity: C.GRAVITY, boundsRadius: this.world.playRadius,
     };
     this.mobile = isTouchDevice(window);
+    this.buildBombButtons();
     this.setupControls(canvas);
     this.buildSlots();
     $('potionIcon').innerHTML = POTION_ICON_SVG; // the flask from the boss's drawing (@pvp/hud-model)
@@ -92,6 +94,8 @@ export class Game {
     this.remotes = new Map();   // id -> remote player
     this.infos = new Map();     // id -> { name, skin }
     this.items = new Map();
+    this.bombs = new Map();     // id -> a thrown bomb that has not exploded yet (#32)
+    this.booms = 0;             // explosions seen (for tests)
     this.effects = [];
     this.shieldUp = false; // my shield is raised (Shift / the shield button)
     this.frozen = false;   // I am frozen (Ice Sword): no moving, turning, shooting or switching
@@ -122,6 +126,7 @@ export class Game {
         buttons: {
           fire: $('btnFire'), jump: $('btnJump'), crouch: $('btnCrouch'), open: $('btnOpen'),
           potion: $('btnPotion'), shield: $('btnShield'),
+          ...Object.fromEntries(this.bombEls.map(e => [e.dataset.action, e])), // 'throw:bomb' ...
         },
       });
     } else {
@@ -129,6 +134,7 @@ export class Game {
       const tap = name => { this.input.button(name, true); this.input.button(name, false); };
       $('btnOpen').addEventListener('click', () => tap('open'));
       $('btnPotion').addEventListener('pointerdown', e => { e.preventDefault(); tap('potion'); });
+      for (const b of this.bombEls) b.addEventListener('pointerdown', e => { e.preventDefault(); tap(b.dataset.action); });
     }
   }
 
@@ -261,7 +267,10 @@ export class Game {
       openChests: this.chests.meshes.flatMap((m, id) => (m.userData.open ? [{ id, lid: +m.userData.lid.rotation.x.toFixed(3) }] : [])),
       nearChest: play ? this.nearChest ?? null : null,
       items: [...this.items.values()].map(it => ({ id: it.id, kind: it.kind, weapon: it.weapon, x: it.x, y: it.y, z: it.z })),
-      inv: this.inv ? { weapons: [...this.inv.weapons], potions: this.inv.potions, coins: this.inv.coins, shield: this.inv.shield ?? null } : null,
+      inv: this.inv ? { weapons: [...this.inv.weapons], potions: this.inv.potions, coins: this.inv.coins, shield: this.inv.shield ?? null, bombs: this.inv.bombs ?? [] } : null,
+      // bombs thrown that have not exploded yet, and how many explosions this page has seen (#32)
+      bombs: [...this.bombs.values()].map(b => ({ id: b.id, b: b.b, landed: b.landed, area: b.areaSide, ...pos(b.mesh.position) })),
+      booms: this.booms,
       shieldUp: this.shieldUp,
       frozen: this.frozen,
       // potion drinking: null, or how far it is (0..1) as the HUD shows it
@@ -292,6 +301,8 @@ export class Game {
       case 'drink': return this.onDrink(m);
       case 'broke': this.flashSlot(m.slot); return this.toast(brokeMessage(m.weapon)); // an 'inv' follows
       case 'ko': return this.onKO(m);
+      case 'bomb': return this.addBomb(m);
+      case 'boom': return this.onBoom(m);
       case 'dead': this.endPlay(); return this.ui.onDead(m.by, m.weapon);
       case 'left':
         this.settleLeave();
@@ -319,6 +330,7 @@ export class Game {
     for (const id of m.chests) this.chests.setOpen(id, true);
     this.onGolden({ golden: m.golden, quiet: true });
     for (const it of m.items) this.addItem(it);
+    for (const b of m.bombs ?? []) this.addBomb(b);
     this.shieldUp = false;
     this.frozen = false;
     if (this.preview) this.preview.root.visible = false;
@@ -350,6 +362,7 @@ export class Game {
     for (const id of [...this.remotes.keys()]) this.removeRemote(id);
     for (const it of this.items.values()) this.scene.remove(it.mesh);
     this.items.clear();
+    for (const id of [...this.bombs.keys()]) this.removeBomb(id);
     this.island.golden.hide(); this.golden = null;
     $('compass').classList.add('hidden');
   }
@@ -411,6 +424,7 @@ export class Game {
     if (this.me) this.me.sm.setShield(m.shield ? m.shield.id : null);
     if (!m.shield) this.shieldUp = false;
     this.renderPotion();
+    this.renderBombs();
     this.renderSlots();
     this.renderShield();
     if (m.picked) this.toast(`Picked up ${m.picked}`);
@@ -485,6 +499,105 @@ export class Game {
     $('drinkText').textContent = v.text;
   }
 
+  // ------------------------------------------------------------ bombs (#32)
+  // One button per bomb in the rules (made once): the round bomb icon, its key on a computer and the count.
+  buildBombButtons() {
+    this.bombEls = bombView(null).map(v => {
+      const b = document.createElement('button');
+      b.className = `bombbtn ${v.rarity} hidden`;
+      b.id = 'btnBomb_' + v.id;
+      b.dataset.bomb = v.id;
+      b.dataset.action = 'throw:' + v.id;
+      b.innerHTML = `<span class="bicon">${v.icon}</span><span class="bkey">${v.key}</span><b class="bcount">0</b>`;
+      return b;
+    });
+    $('bombBtns').replaceChildren(...this.bombEls);
+  }
+
+  renderBombs() {
+    bombView(this.inv).forEach((v, i) => {
+      const b = this.bombEls[i];
+      b.classList.toggle('hidden', v.empty); // only the bombs you carry
+      b.querySelector('.bcount').textContent = v.label;
+      b.title = v.title;
+      b.setAttribute('aria-label', `Throw a ${v.name}: ${v.count} left`);
+    });
+  }
+
+  // Someone threw a bomb (or it was already lying there when we joined): it flies along an arc to `to`,
+  // then lies there with a RED square showing the area, its fuse blinking, until 'boom'.
+  addBomb(m) {
+    this.removeBomb(m.id);
+    const now = performance.now();
+    const mesh = buildBomb(m.b);
+    const area = buildBombArea(m.area);
+    area.position.set(m.to[0], m.to[1], m.to[2]);
+    area.visible = m.fly <= 0;
+    this.scene.add(mesh, area);
+    const from = m.from, to = m.to;
+    const b = {
+      id: m.id, b: m.b, from, to, mesh, area, areaSide: m.area,
+      start: now, fly: m.fly, landed: m.fly <= 0, explodeAt: now + m.ms,
+      arc: 0.6 + BOMB_ARC * Math.hypot(to[0] - from[0], to[2] - from[2]),
+    };
+    // the thrower's arm swings
+    if (m.by === this.myId && this.me) this.me.sm.swing = 1;
+    else { const r = this.remotes.get(m.by); if (r) r.sm.swing = 1; }
+    this.placeBomb(b, now);
+    this.bombs.set(m.id, b);
+  }
+
+  placeBomb(b, now) {
+    const t = b.fly > 0 ? Math.min(1, (now - b.start) / b.fly) : 1;
+    const [fx, fy, fz] = b.from, [tx, ty, tz] = b.to;
+    b.mesh.position.set(fx + (tx - fx) * t, fy + (ty - fy) * t + b.arc * 4 * t * (1 - t) - (t < 1 ? 0.2 : 0), fz + (tz - fz) * t);
+    b.mesh.rotation.z = t < 1 ? -t * 8 : 0; // tumbles while flying
+    b.landed = t >= 1;
+    b.area.visible = b.landed; // the red square shows as soon as it lands
+  }
+
+  removeBomb(id) {
+    const b = this.bombs.get(id);
+    if (!b) return;
+    for (const o of [b.mesh, b.area]) {
+      this.scene.remove(o);
+      o.traverse(x => { x.geometry?.dispose(); x.material?.dispose(); });
+    }
+    this.bombs.delete(id);
+  }
+
+  // Boom: a fireball the size of the area, a bright core and some smoke; the screen shakes if you are close.
+  onBoom(m) {
+    this.removeBomb(m.id);
+    this.booms++;
+    const size = m.area / 2;
+    const add = (obj, e) => { this.scene.add(obj); this.effects.push({ obj, ...e }); };
+    const ball = (color, r, opacity) => {
+      const s = new THREE.Mesh(new THREE.SphereGeometry(r, 18, 12), new THREE.MeshBasicMaterial({ color, transparent: true, opacity, depthWrite: false, toneMapped: false }));
+      s.position.set(m.x, m.y + r * 0.6, m.z);
+      return s;
+    };
+    add(ball('#ff7a1a', size * 0.7, 0.85), { life: 0.55, max: 0.55, fade: true, grow: 1.2 });
+    add(ball('#fff1a0', size * 0.4, 0.95), { life: 0.3, max: 0.3, fade: true, grow: 1.5 });
+    for (let i = 0; i < 8; i++) {
+      const s = ball(i % 2 ? '#3a3a3a' : '#777777', 0.25 + Math.random() * 0.25, 0.7);
+      s.position.x += (Math.random() - 0.5) * size;
+      s.position.z += (Math.random() - 0.5) * size;
+      add(s, { life: 1, max: 1, fade: true, grow: 2, rise: 1.5, drift: [(Math.random() - 0.5) * 2, (Math.random() - 0.5) * 2] });
+    }
+    if (this.me) {
+      const d = Math.hypot(this.me.x - m.x, this.me.z - m.z);
+      if (d < m.area * 3) this.shake = Math.max(this.shake, d < m.area ? 0.5 : 0.25);
+    }
+  }
+
+  // Throw a bomb at what is under the crosshair (the server caps how far it goes).
+  throwBomb(id, aim) {
+    const v = bombView(this.inv).find(x => x.id === id);
+    if (!v || v.empty || this.shieldUp) return;
+    this.send('throw', { b: id, d: aim });
+  }
+
   // The big Durability bar: the weapon in your hand (full with ∞ if it never breaks, '–' if the hand is empty).
   renderDurability() {
     const d = heldDurabilityView(this.inv);
@@ -547,7 +660,7 @@ export class Game {
     this.puff(m.x, m.y + 1, m.z);
     const feed = $('feed');
     const d = document.createElement('div');
-    const w = C.WEAPONS[m.weapon];
+    const w = C.WEAPONS[m.weapon] ?? C.BOMBS?.[m.weapon]; // a weapon, or a bomb (#32)
     d.innerHTML = m.by ? `<b>${esc(m.by)}</b> ${WEAPON_ICONS[m.weapon] || ''} knocked out <b>${esc(m.victim)}</b>` : `<b>${esc(m.victim)}</b> was knocked out`;
     d.title = w ? w.name : '';
     feed.prepend(d);
@@ -577,6 +690,13 @@ export class Game {
       g.add(w);
       it = { ...it, model: w };
       color = C.RARITY_COLORS[def.rarity]?.color ?? '#d6dde8'; // ring in the rarity's color
+    } else if (it.kind === 'bomb') {
+      const b = buildBomb(it.weapon); // a bomb (or a pack of Legendary Bombs) to pick up
+      b.position.y = -0.25;
+      b.scale.setScalar(1.3);
+      g.add(b);
+      it = { ...it, model: b };
+      color = C.RARITY_COLORS[C.BOMBS?.[it.weapon]?.rarity]?.color ?? '#3cc24a';
     } else if (it.kind === 'potion') {
       const p = buildPotion(); // the Healing Potion flask (@pvp/stickman-3d)
       p.position.y = -0.2;
@@ -710,6 +830,7 @@ export class Game {
     this.yaw = Math.atan2(Math.sin(this.yaw), Math.cos(this.yaw));
     this.pitch = Math.max(-1.2, Math.min(1.1, this.pitch - look.y));
 
+    const throws = []; // bombs to throw this frame (aimed below, once the camera is placed)
     for (const e of ev) {
       if (e === 'jump' && me.onGround) { me.vy = C.JUMP_SPEED; me.crouch = false; me.slide = 0; }
       if (e === 'crouch') {
@@ -721,6 +842,7 @@ export class Game {
       if (e === 'open' && this.nearChest != null) this.send('open', { id: this.nearChest });
       if (e === 'drop') this.send('drop');
       if (e === 'potion') this.send('drink');
+      if (e.startsWith('throw:')) throws.push(e.slice(6));
       if (e.startsWith('slot:')) {
         const i = pickSlot(this.inv, e.slice(5));
         if (i != null) this.send('slot', { i });
@@ -770,6 +892,16 @@ export class Game {
     this.shake = Math.max(0, this.shake - dt * 2);
     this.camera.position.set(pivotX - dirX * dist + shake, Math.max(0.3, eyeY - dirY * dist) + shake, pivotZ - dirZ * dist);
     this.camera.lookAt(pivotX + dirX * 10, eyeY + dirY * 10, pivotZ + dirZ * 10);
+
+    // bombs: aimed at the point under the crosshair, like a gun (the server caps the distance)
+    for (const id of throws) {
+      const cam = this.camera.position;
+      const t = rayWorld(this.world, cam.x, cam.y, cam.z, dirX, dirY, dirZ, 40 + dist);
+      const oy = me.y + height - 0.3;
+      const ax = cam.x + dirX * t - me.x, ay = cam.y + dirY * t - oy, az = cam.z + dirZ * t - me.z;
+      const len = Math.hypot(ax, ay, az) || 1;
+      this.throwBomb(id, [ax / len, ay / len, az / len]);
+    }
 
     // shooting
     const w = this.inv && this.inv.weapons[this.inv.slot];
@@ -855,6 +987,13 @@ export class Game {
     }
     // glowing / moving parts of weapons lying on the ground (lightning, snowflakes, Mega Shield dots)
     for (const it of this.items.values()) it.model?.userData.update?.(t);
+    // thrown bombs: fly, land, the fuse blinks and the red square pulses (faster in the last second)
+    const nowMs = performance.now();
+    for (const b of this.bombs.values()) {
+      this.placeBomb(b, nowMs);
+      b.mesh.userData.update?.(t);
+      b.area.userData.update?.(nowMs > b.explodeAt - 1000 ? t * 2 : t);
+    }
     // effects
     for (let i = this.effects.length - 1; i >= 0; i--) {
       const e = this.effects[i];

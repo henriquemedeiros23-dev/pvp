@@ -26,4 +26,11 @@ export const ARENA_DEFAULTS = Object.freeze({
   fallExtra: 3,
   minStateDtS: 0.03,
   movingEndsProtectMs: 300,    // moving ends spawn protection this soon
+  // Bombs (#32): the numbers of each bomb (damage, area, max throw, fuse) are in @pvp/game-rules BOMBS.
+  bombThrowCooldownMs: 500,    // a player may throw one bomb every this many ms
+  bombFlyMs: 350,              // flight time of a bomb: this ...
+  bombFlyMsPerM: 45,           // ... plus this per meter thrown (never longer than the fuse)
+  bombWallBack: 0.4,           // a bomb aimed at a wall lands this far in front of it (m)
+  bombHitHeight: 2.5,          // players more than this above or below the bomb are not hurt (m)
+  bombKnock: 4,                // how hard an explosion pushes players away from its middle
 });

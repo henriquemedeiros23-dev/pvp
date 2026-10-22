@@ -28,6 +28,8 @@ export const DEFAULT_CONFIG = Object.freeze({
     e: 'open',
     g: 'drop',
     q: 'potion',               // drink a Healing Potion
+    b: 'throw:bomb',           // throw a Bomb (#32)
+    n: 'throw:legendarybomb',  // throw a Legendary Bomb
     1: 'slot:0',
     2: 'slot:1',
     3: 'slot:2',

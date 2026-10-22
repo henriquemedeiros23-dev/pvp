@@ -2,8 +2,8 @@
 // The real work lives in packages: @pvp/api-client (server calls), @pvp/shop-catalog (what the shop shows).
 import { createApiClient } from '@pvp/api-client';
 import { shopTabs, shopItems, backpackSummary, swatchBackground } from '@pvp/shop-catalog';
-import { WEAPONS } from '@pvp/game-rules';
-import { WEAPON_ICONS, POTION_ICON_SVG } from '@pvp/hud-model';
+import { WEAPONS, BOMBS } from '@pvp/game-rules';
+import { WEAPON_ICONS, POTION_ICON_SVG, bombIconSvg } from '@pvp/hud-model';
 import { Game } from './game.js';
 
 const $ = id => document.getElementById(id);
@@ -35,7 +35,8 @@ try {
   game = new Game($('view'), {
     onPlaying() { show(null); loading(false); },
     onDead(by, weapon) {
-      const w = weapon && WEAPONS[weapon] ? ` with ${WEAPON_ICONS[weapon] || ''} ${WEAPONS[weapon].name}`.replace('  ', ' ') : '';
+      const def = weapon && (WEAPONS[weapon] ?? BOMBS[weapon]); // a weapon or a bomb (#32)
+      const w = def ? ` with ${WEAPON_ICONS[weapon] || ''} ${def.name}`.replace('  ', ' ') : '';
       $('deadBy').textContent = by ? `Knocked out by ${by}${w}` : 'Knocked out';
       show('dead');
     },
@@ -181,12 +182,19 @@ function cardElement(c) {
     const icon = el('div', 'icon potion-icon');
     icon.innerHTML = POTION_ICON_SVG; // the flask from the boss's drawing (@pvp/hud-model)
     card.append(icon);
+  } else if (c.kind === 'bomb') {
+    const icon = el('div', 'icon potion-icon');
+    icon.innerHTML = bombIconSvg(BOMBS[c.id]?.color); // the round bomb from the boss's card
+    card.append(icon);
   } else {
     card.append(el('div', 'icon', c.kind === 'weapon' ? (WEAPON_ICONS[c.id] || '❔') : (c.icon || '❔')));
   }
-  card.append(el('div', 'name', c.name));
+  card.append(el('div', 'name', c.kind === 'bomb' && c.pack > 1 ? `${c.name} ×${c.pack}` : c.name));
   if (c.kind === 'potion') card.append(el('div', 'tag', `Full H.P · drink ${c.drinkSeconds} s · max ${c.maxCarry}`));
-  if (c.kind === 'weapon' || c.kind === 'potion') {
+  if (c.kind === 'bomb') {
+    card.append(el('div', 'tag', `${c.dmg} damage · ${c.area}x${c.area} m · throw ${c.maxThrow} m · max ${c.maxCarry}${c.hurtsThrower ? ' · hurts you too!' : ''}`));
+  }
+  if (c.kind === 'weapon' || c.kind === 'potion' || c.kind === 'bomb') {
     const tag = el('div', 'tag');
     const rar = el('span', 'rar rar-' + c.rarity, c.rarityName);
     rar.style.color = c.rarityColor; // colors from RARITY_COLORS in @pvp/game-rules

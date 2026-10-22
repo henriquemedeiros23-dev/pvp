@@ -182,6 +182,63 @@ function buildShootbm({ g, mesh, box }) {
   box(0.012, 0.012, 0.035, steel, 0, -0.085, 0.035).rotation.x = -0.3;
 }
 
+// DM Gun (#32, Epic): a long gun like the drawing: an angled stock at the back, a body, a long straight
+// barrel and a round trigger guard. Gun frame: forward is -y, up is +z; the hand is at the grip.
+function buildDmGun({ g, mesh, box }) {
+  const body = std('#2f3340', { metalness: 0.55, roughness: 0.4 });
+  const dark = std('#15171c', { roughness: 0.7 });
+  const steel = std('#c3c9d1', { metalness: 0.85, roughness: 0.2 });
+  const purple = std('#a24ff0', { metalness: 0.3, roughness: 0.35, emissive: '#5e1fa0', emissiveIntensity: 0.35 });
+  g.scale.setScalar(1.2);
+  box(0.07, 0.36, 0.1, body, 0, -0.1, 0.09);                                   // body over the hand
+  box(0.072, 0.3, 0.014, purple, 0, -0.1, 0.146);                              // purple strip on top
+  mesh(new THREE.CylinderGeometry(0.022, 0.022, 0.62, 16), steel, 0, -0.58, 0.105); // long straight barrel (along -y)
+  mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.05, 16), dark, 0, -0.9, 0.105);  // muzzle
+  mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.052, 10), std('#050507'), 0, -0.903, 0.105);
+  box(0.05, 0.22, 0.03, dark, 0, -0.36, 0.06);                                // rail under the barrel
+  // angled stock: goes back and down from the body, like the slanted rectangle of the drawing
+  const stock = new THREE.Group();
+  stock.position.set(0, 0.08, 0.08);
+  stock.rotation.x = -0.45;
+  g.add(stock);
+  const sp = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.36, 0.09), body);
+  sp.position.set(0, 0.18, 0);
+  stock.add(sp);
+  const butt = new THREE.Mesh(new THREE.BoxGeometry(0.064, 0.025, 0.11), dark);
+  butt.position.set(0, 0.36, 0);
+  stock.add(butt);
+  // grip and the big round trigger guard
+  box(0.05, 0.07, 0.15, dark, 0, 0.02, -0.03).rotation.x = 0.25;
+  const guard = mesh(new THREE.TorusGeometry(0.05, 0.009, 8, 24), dark, 0, -0.1, 0.02);
+  guard.rotation.y = Math.PI / 2;
+  box(0.012, 0.012, 0.04, steel, 0, -0.095, 0.03).rotation.x = -0.3;
+}
+
+// Supergun (#32, Legendary): like a revolver in the drawing: a stepped grip at the back, a round drum and a
+// long straight barrel, with gold parts. Gun frame: forward is -y, up is +z; the hand is at the grip.
+function buildSupergun({ g, mesh, box }) {
+  const body = std('#3a3e47', { metalness: 0.6, roughness: 0.35 });
+  const dark = std('#15171c', { roughness: 0.7 });
+  const gold = std('#ffc531', { metalness: 0.8, roughness: 0.25, emissive: '#b8860b', emissiveIntensity: 0.25 });
+  g.scale.setScalar(1.25);
+  box(0.06, 0.2, 0.09, body, 0, -0.08, 0.1);                                  // frame
+  mesh(new THREE.CylinderGeometry(0.048, 0.048, 0.1, 18), gold, 0, -0.1, 0.1); // the round drum
+  for (let i = 0; i < 6; i++) {                                               // chambers on the drum's front
+    const a = (i / 6) * Math.PI * 2;
+    mesh(new THREE.CylinderGeometry(0.009, 0.009, 0.102, 8), dark, Math.cos(a) * 0.028, -0.1, 0.1 + Math.sin(a) * 0.028);
+  }
+  box(0.045, 0.62, 0.05, body, 0, -0.48, 0.125);                              // long straight barrel
+  box(0.047, 0.5, 0.012, gold, 0, -0.52, 0.153);                               // gold line on top
+  box(0.012, 0.02, 0.03, gold, 0, -0.77, 0.165);                               // front sight
+  mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.03, 10), std('#050507'), 0, -0.79, 0.125); // muzzle hole
+  box(0.03, 0.03, 0.03, body, 0, 0.03, 0.14);                                  // hammer
+  // stepped grip at the back: three steps going down and back, like the stairs in the drawing
+  for (const [y, z] of [[0.04, 0.05], [0.08, -0.005], [0.12, -0.06]]) box(0.058, 0.07, 0.07, dark, 0, y, z);
+  box(0.06, 0.03, 0.03, gold, 0, 0.14, -0.1);                                  // gold butt
+  const guard = mesh(new THREE.TorusGeometry(0.035, 0.008, 8, 20), dark, 0, -0.03, 0.03);
+  guard.rotation.y = Math.PI / 2;
+}
+
 // A long straight blade along +z with a pointed tip. Returns the blade group.
 function blade(g, { len, width, thick = 0.016, mat, from = 0.14 }) {
   const b = new THREE.Mesh(new THREE.BoxGeometry(width, thick, len), mat);
@@ -309,6 +366,8 @@ export function buildShieldModel({ g, mesh, box }, def = {}, { mega = false } = 
 const SPECIAL = {
   gun: { type: 'gun', build: buildGun },
   shootbm: { type: 'gun', build: buildShootbm },
+  dmgun: { type: 'gun', build: buildDmGun },
+  supergun: { type: 'gun', build: buildSupergun },
   electricsword: { type: 'melee', build: buildElectricSword },
   icesword: { type: 'melee', build: buildIceSword },
   supersword: { type: 'melee', build: buildSupersword },

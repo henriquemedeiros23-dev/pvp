@@ -1,7 +1,7 @@
 // Players: join, leave, movement updates (with anti-teleport), slot switch, drinking a Healing Potion.
 
 import { findSpawn } from '@pvp/world-gen';
-import { potionHeal } from '@pvp/game-rules';
+import { potionHeal, bombCounts } from '@pvp/game-rules';
 import { at, send, weaponDef, maxDurability, isShieldId } from './state.js';
 import { welcomeFor } from './snapshot.js';
 import { equipShield, isFrozen } from './effects.js';
@@ -11,13 +11,15 @@ export function inventoryMsg(p, picked) {
     t: 'inv', weapons: [...p.weapons], dur: [...p.dur], slot: p.slot, potions: p.potions, coins: p.coins, hp: p.hp,
     shield: p.shield ? { id: p.shield.id, dur: p.shield.dur } : null,
   };
+  // bombs carried (#32), one entry per bomb id of the rules (rules without bombs: no field)
+  if (p.bombs && Object.keys(p.bombs).length) msg.bombs = Object.entries(p.bombs).map(([id, n]) => ({ id, n }));
   if (picked !== undefined) msg.picked = picked;
   return msg;
 }
 
 export const playerInfo = p => ({ id: p.id, name: p.name, skin: { ...p.skin } });
 
-export function join(A, key, { name, skin, loadout = [], coins = 0, potions = 0 } = {}, now) {
+export function join(A, key, { name, skin, loadout = [], coins = 0, potions = 0, bombs } = {}, now) {
   now = at(A, now);
   const R = A.rules;
   const oldId = A.byKey.get(key);
@@ -27,8 +29,10 @@ export function join(A, key, { name, skin, loadout = [], coins = 0, potions = 0 
   // Same account joins again: the old player leaves alive first.
   let replaced = null;
   if (oldId !== undefined) {
-    const potionsBack = A.players.get(oldId)?.potions ?? 0;
-    replaced = { id: oldId, weapons: leave(A, oldId, { alive: true }), potions: potionsBack };
+    const old = A.players.get(oldId);
+    const potionsBack = old?.potions ?? 0;
+    const bombsBack = { ...(old?.bombs ?? {}) };
+    replaced = { id: oldId, weapons: leave(A, oldId, { alive: true }), potions: potionsBack, bombs: bombsBack };
   }
 
   // The starting weapon (free, slot 1), then weapons from the loadout in its order (best first is the
@@ -57,6 +61,8 @@ export function join(A, key, { name, skin, loadout = [], coins = 0, potions = 0 
     hp: R.MAX_HP, weapons, dur: weapons.map(w => maxDurability(A, w)), slot: 0, lastFire: -Infinity,
     // Healing Potions carried (from the backpack, up to MAX_POTIONS) and the drinking in progress (or null)
     potions: Math.min(maxPotions(A), Number.isInteger(potions) && potions > 0 ? potions : 0), drink: null,
+    // bombs carried (#32): { bombId: count }, each at most its maxCarry (a counter, not weapon slots)
+    bombs: bombCounts(bombs, { cap: true }, A.rules.BOMBS ?? {}), lastThrow: -Infinity,
     protectUntil: now + R.SPAWN_PROTECT_MS, lastState: now,
     // free: per slot (parallel to weapons), true for the free starting weapon (not put in the backpack on leave)
     free: weapons.map((w, i) => freeStart && i === 0),
@@ -72,7 +78,7 @@ export function join(A, key, { name, skin, loadout = [], coins = 0, potions = 0 
   send(A, p.id, welcomeFor(A, p.id));
   send(A, p.id, inventoryMsg(p));
   send(A, 'all', { t: 'pjoin', ...playerInfo(p) }, p.id);
-  return { ok: true, id: p.id, weapons: taken, potions: p.potions, replaced };
+  return { ok: true, id: p.id, weapons: taken, potions: p.potions, bombs: { ...p.bombs }, replaced };
 }
 
 /**

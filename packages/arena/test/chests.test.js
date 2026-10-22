@@ -155,7 +155,7 @@ test('items expire after ITEM_LIFETIME_MS', () => {
   assert.deepEqual(msgs(drain(arena), 'item-'), [{ t: 'item-', id: item.id }]);
 });
 
-test('chest weapons follow the card numbers as weights (they add up to 46.3, not 100), deterministic for a seed', () => {
+test('chest weapons follow the card numbers as weights (they add up to 54.8, not 100), deterministic for a seed', () => {
   const pickMany = seed => {
     const A = createState({ island: testIsland(), random: createRandom(seed) });
     const counts = {};
@@ -166,12 +166,12 @@ test('chest weapons follow the card numbers as weights (they add up to 46.3, not
   assert.deepEqual(pickMany(5), counts, 'same seed, same picks');
   let total = 0;
   for (const w of Object.values(RULES.WEAPONS)) total += w.chestChance;
-  assert.ok(Math.abs(total - 46.3) < 1e-9);
+  assert.ok(Math.abs(total - 54.8) < 1e-9);
   for (const [id, w] of Object.entries(RULES.WEAPONS)) {
-    const share = (counts[id] || 0) / 20000, want = w.chestChance / total; // Gun: 15 / 46.3 = about 32 in 100
+    const share = (counts[id] || 0) / 20000, want = w.chestChance / total; // Gun: 15 / 54.8 = about 27 in 100
     assert.ok(Math.abs(share - want) < 0.012, `${id}: ${share.toFixed(3)} vs ${want.toFixed(3)}`);
   }
-  assert.ok(counts.supersword > 0, 'the Supersword can come out (0.3 / 46.3)');
+  assert.ok(counts.supersword > 0, 'the Supersword can come out (0.3 / 54.8)');
 });
 
 test('chest chances are weights: they are normalized, and 0 never comes out', () => {
@@ -232,7 +232,7 @@ test('fixed seed: the same chests give the same potions', () => {
   const one = run();
   assert.deepEqual(run(), one);
   assert.ok(one.includes('weapon+potion'), 'some chests give a potion');
-  assert.ok(one.every(k => k === 'weapon' || k === 'weapon+potion'), one.join());
+  assert.ok(one.every(k => /^weapon(\+potion)?(\+bomb)*$/.test(k)), one.join());
 });
 
 test('golden chest: same potion chance as normal chests', () => {

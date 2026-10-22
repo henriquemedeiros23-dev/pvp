@@ -4,7 +4,7 @@ import * as THREE from 'three';
 import { COLORS, OUTFITS, WEAPONS, WEAPON_TYPES, DEFAULT_SKIN } from '@pvp/game-rules';
 import {
   Stickman, buildWeapon, weaponModelKind, computePose, restPose, rainbowHue,
-  MODEL_TYPES, OUTFIT_MODELS, eyeColor, SHIELD_ARM, buildPotion, holdPotion,
+  MODEL_TYPES, OUTFIT_MODELS, eyeColor, SHIELD_ARM, buildPotion, holdPotion, buildBomb, buildBombArea,
 } from '../src/index.js';
 
 const meshCount = obj => { let n = 0; obj.traverse(o => { if (o.isMesh) n++; }); return n; };
@@ -330,4 +330,40 @@ test('the Healing Potion model: red liquid in a cone flask with a neck and a cor
   assert.equal(sm.potion, null);
   assert.equal(sm.weapon.visible, true);
   sm.dispose();
+});
+
+test('DM Gun and Supergun (#32) have their own long models', () => {
+  for (const id of ['dmgun', 'supergun']) {
+    const g = buildWeapon(id);
+    assert.equal(g.userData.model, 'special:' + id);
+    assert.ok(meshCount(g) >= 10, `${id}: ${meshCount(g)} parts`);
+    const size = new THREE.Box3().setFromObject(g).getSize(new THREE.Vector3());
+    assert.ok(size.y > 0.9, `${id} is long along the barrel (${size.y.toFixed(2)} m)`);
+  }
+});
+
+test('bombs (#32): a round bomb with a fuse and a blinking spark (black / gold), and the red square on the ground', () => {
+  const b = buildBomb('bomb');
+  assert.equal(b.userData.model, 'bomb');
+  const size = new THREE.Box3().setFromObject(b).getSize(new THREE.Vector3());
+  assert.ok(size.x > 0.35 && size.x < 0.5, `about 0.4 m round (${size.x})`);
+  const body = b.children[0];
+  assert.equal(body.geometry.type, 'SphereGeometry');
+  assert.equal(body.material.color.getHexString(), new THREE.Color('#1b1b1f').getHexString(), 'black');
+  const gold = buildBomb('legendarybomb').children[0];
+  assert.equal(gold.material.color.getHexString(), new THREE.Color('#ffc531').getHexString());
+  const spark = b.children.find(o => o.material?.isMeshBasicMaterial);
+  const seen = new Set();
+  for (let t = 0; t < 1; t += 0.01) { b.userData.update(t); seen.add(spark.visible); }
+  assert.deepEqual([...seen].sort(), [false, true], 'the spark blinks');
+
+  const area = buildBombArea(5);
+  const box = new THREE.Box3().setFromObject(area).getSize(new THREE.Vector3());
+  assert.ok(Math.abs(box.x - 5) < 1e-6 && Math.abs(box.z - 5) < 1e-6, 'a 5x5 m square');
+  assert.ok(box.y < 0.05, 'flat on the ground');
+  const reds = [];
+  area.traverse(o => { if (o.isMesh) reds.push(o.material.color.getHexString()); });
+  assert.ok(reds.length >= 5 && reds.every(c => c.startsWith('ff')), 'all red');
+  area.userData.update(0.3);
+  assert.equal(buildBombArea(-1).userData.side, 2);
 });

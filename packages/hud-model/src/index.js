@@ -5,10 +5,13 @@ import { RULES } from '@pvp/game-rules';
 
 // The Healing Potion button and its drinking progress ring (#28).
 export { POTION_ICON_SVG, drinkState, drinkMessage, potionView } from './potion.js';
+// The bomb buttons (#32).
+export { BOMB_KEYS, bombIconSvg, bombView } from './bombs.js';
 
-/** One emoji per weapon id, for slots, the kill feed and the shop. */
+/** One emoji per weapon id, for slots, the kill feed and the shop (bombs too: they can knock out). */
 export const WEAPON_ICONS = Object.freeze({
   gun: '🔫', shootbm: '🎯', electricsword: '⚡', icesword: '❄️', shield: '🛡️', megashield: '🛡️', supersword: '🗡️',
+  dmgun: '💥', supergun: '🌟', bomb: '💣', legendarybomb: '💣',
 });
 
 /** Durability bar colors: above `good` is 'good' (green), from `low` up to `good` is 'low' (yellow), below `low` is 'critical' (red). */

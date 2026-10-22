@@ -5,7 +5,7 @@
 import { deepFreeze } from './freeze.js';
 
 /** Bump when a message changes in a way old phones or servers would not understand. */
-export const PROTOCOL_VERSION = 2; // 2: shields and status effects (#26), explosives removed
+export const PROTOCOL_VERSION = 3; // 2: shields and status effects (#26), explosives removed; 3: bombs (#32)
 
 /** Longest raw message a client may send (bytes). Same as the server's WebSocket maxPayload. */
 export const MAX_CLIENT_MESSAGE_SIZE = 4096;
@@ -33,7 +33,7 @@ export const FLAG_MOVING = 4;
 export const FLAG_AIR = 8;
 export const FLAGS_MASK = FLAG_CROUCH | FLAG_SLIDE | FLAG_MOVING | FLAG_AIR;
 
-const ITEM_KINDS = ['weapon', 'potion'];
+const ITEM_KINDS = ['weapon', 'potion', 'bomb'];
 const DRINK_STATES = ['start', 'done', 'cancel'];
 const BIG_INT = { type: 'int', min: 0, max: 2 ** 31 - 1 };      // coins can grow past MAX_NUMBER
 const FLAGS = { type: 'int', min: 0, max: 255 };
@@ -46,7 +46,13 @@ const PLAYER_INFO = { obj: { id: 'uint', name: 'string', skin: SKIN } };
 const DUR = { nullable: 'uint' };                                 // uses left, null = never breaks
 const ITEM = { obj: {
   id: 'uint', kind: { enum: ITEM_KINDS }, weapon: { nullable: 'string' }, x: 'number', y: 'number', z: 'number',
-  dur: { optional: DUR },
+  dur: { optional: DUR }, n: 'uint?',
+} };
+// Bombs carried (#32): one entry per bomb id, e.g. [{ id: 'bomb', n: 4 }, { id: 'legendarybomb', n: 0 }].
+const BOMB_COUNTS = { list: { obj: { id: 'string', n: 'uint' } }, max: 16 };
+// A bomb in the air or on the ground, waiting to explode.
+const LIVE_BOMB = { obj: {
+  id: 'uint', by: 'uint', b: 'string', from: 'vec3', to: 'vec3', fly: 'uint', ms: 'uint', area: 'number',
 } };
 // The shield you wear: its weapon id and the blocked hits it has left.
 const SHIELD = { obj: { id: 'string', dur: 'uint' } };
@@ -93,6 +99,10 @@ export const CLIENT_MESSAGES = deepFreeze({
     up: ['bool', 'true = raise the shield, false = lower it'],
   }),
   drink: m('Start drinking a Healing Potion (takes a few seconds; switching weapon slots cancels it).'),
+  throw: m('Throw one bomb (#32). Where it lands follows the aim, at most the bomb\'s maxThrow meters away.', {
+    b: ['string', 'Bomb id, e.g. "bomb" or "legendarybomb"'],
+    d: ['vec3', 'Aim direction [x, y, z] (server normalizes it)'],
+  }),
 });
 
 /** Messages the server sends to phones. */
@@ -105,6 +115,7 @@ export const SERVER_MESSAGES = deepFreeze({
     chests: [{ list: 'uint', max: 10000 }, 'Indexes of chests that are open right now'],
     golden: [{ nullable: { obj: { x: 'number', z: 'number' } } }, 'Golden chest spot { x, z }, or null'],
     items: [{ list: ITEM, max: 10000 }, 'Items on the ground: { id, kind, weapon, x, y, z }'],
+    bombs: [{ optional: { list: LIVE_BOMB, max: 1000 } }, 'Bombs that have not exploded yet (same fields as "bomb")'],
   }),
   full: m('The arena is full, try again later.'),
   left: m('You left the fight (answer to "leave").'),
@@ -120,6 +131,7 @@ export const SERVER_MESSAGES = deepFreeze({
     coins: [BIG_INT, 'Your coins'],
     hp: ['int', 'Your health'],
     shield: [{ optional: { nullable: SHIELD } }, 'The shield on your arm { id, dur } (dur = blocked hits left), or null'],
+    bombs: [{ optional: BOMB_COUNTS }, 'Bombs carried: [{ id, n }] (max is each bomb\'s maxCarry in the rules)'],
     picked: ['string?', 'Name of what you just picked up, if anything'],
   }),
   pjoin: m('A player joined.', {
@@ -136,10 +148,26 @@ export const SERVER_MESSAGES = deepFreeze({
     by: ['string?', 'Name of who opened it (only when gone)'],
   }),
   'item+': m('An item dropped on the ground.', {
-    id: ['uint', 'Item id'], kind: [{ enum: ITEM_KINDS }, '"weapon" or "potion"'],
-    weapon: [{ nullable: 'string' }, 'Weapon id when kind is "weapon", else null'],
+    id: ['uint', 'Item id'], kind: [{ enum: ITEM_KINDS }, '"weapon", "potion" or "bomb"'],
+    weapon: [{ nullable: 'string' }, 'Weapon id when kind is "weapon", bomb id when kind is "bomb", else null'],
     x: ['number', 'X'], y: ['number', 'Height'], z: ['number', 'Z'],
     dur: [{ optional: DUR }, 'Weapon only: uses left (null = never breaks)'],
+    n: ['uint?', 'Bomb only: how many bombs (a Legendary Bomb pack is 3)'],
+  }),
+  bomb: m('Someone threw a bomb (to everyone): it flies along an arc to its landing spot, then the red area shows until it explodes.', {
+    id: ['uint', 'Bomb id (the "boom" has the same id)'],
+    by: ['uint', 'Thrower id'],
+    b: ['string', 'Bomb id in the rules, e.g. "bomb"'],
+    from: ['vec3', 'Where it leaves the hand'],
+    to: ['vec3', 'Where it lands'],
+    fly: ['uint', 'Flight time in ms (it lands, and the red outline shows, after this)'],
+    ms: ['uint', 'Time left until it explodes, in ms (the whole fuse when just thrown)'],
+    area: ['number', 'Side of the square area on the ground, in meters'],
+  }),
+  boom: m('A bomb exploded (to everyone). Hurt players get "hurt" as usual.', {
+    id: ['uint', 'Bomb id'], b: ['string', 'Bomb id in the rules'],
+    x: ['number', 'X'], y: ['number', 'Height'], z: ['number', 'Z'],
+    area: ['number', 'Side of the square area, in meters'],
   }),
   drink: m('Your potion drinking started, finished (full health) or was cancelled (potion wasted).', {
     state: [{ enum: DRINK_STATES }, '"start", "done" or "cancel"'],

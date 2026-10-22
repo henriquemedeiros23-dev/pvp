@@ -9,6 +9,7 @@ import { tickItems } from './loot.js';
 import { fire, dropWeapon } from './combat.js';
 import { setShield, tickEffects, isFrozen, isShocked } from './effects.js';
 import { snapshotFor, welcomeFor } from './snapshot.js';
+import { throwBomb, tickBombs } from './bombs.js';
 
 export { ARENA_DEFAULTS } from './tuning.js';
 
@@ -16,6 +17,7 @@ const copyPlayer = p => p && {
   id: p.id, key: p.key, name: p.name, skin: { ...p.skin }, coins: p.coins,
   x: p.x, y: p.y, z: p.z, ry: p.ry, pitch: p.pitch, flags: p.flags,
   hp: p.hp, weapons: [...p.weapons], dur: [...p.dur], free: [...p.free], slot: p.slot, potions: p.potions,
+  bombs: { ...p.bombs },
   drink: p.drink ? { ...p.drink } : null,
   protectUntil: p.protectUntil,
   shield: p.shield ? { ...p.shield } : null, shieldUp: p.shieldUp,
@@ -53,15 +55,18 @@ export function createArena(o = {}) {
     openChest: (id, chest, now) => openChest(A, id, chest, now),
     /** Start drinking a Healing Potion (full H.P after POTION.drinkMs). False if refused. */
     drink: (id, now) => players.startDrink(A, id, now),
+    /** Throw one bomb (#32) of kind bombId along dir ([x, y, z] or { x, y, z }). Returns the live bomb's id or null. */
+    throwBomb: (id, bombId, dir, now) => throwBomb(A, id, bombId, dir, now),
     teleport: (id, pos) => players.teleport(A, id, pos),
     /** Set a player's coins from the account (the real total). Queues an 'inv'. False if unknown id. */
     setCoins: (id, total) => players.setCoins(A, id, total),
 
-    /** Advance the world to nowMs: chests, golden chest, items, shock damage, snapshots. */
+    /** Advance the world to nowMs: potions, bombs, chests, golden chest, items, shock damage, snapshots. */
     tick(nowMs) {
       const now = at(A, nowMs);
       A.lastTick = now;
       players.tickDrinks(A, now);
+      tickBombs(A, now);
       tickChests(A, now);
       tickItems(A, now);
       tickEffects(A, now);
@@ -89,5 +94,7 @@ export function createArena(o = {}) {
     golden: () => (A.golden ? { ...A.golden } : null),
     nextGoldenAt: () => A.nextGolden,
     items: () => [...A.items.values()].map(({ ignore, ...it }) => ({ ...it })),
+    /** Bombs thrown that have not exploded yet: { id, b, by, from, to, throwAt, landAt, explodeAt }. */
+    bombs: () => [...A.bombs.values()].map(({ byName, ...b }) => ({ ...b, from: { ...b.from }, to: { ...b.to } })),
   };
 }

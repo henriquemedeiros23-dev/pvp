@@ -84,7 +84,7 @@ function messages(ws) {
 test('sign up, join the arena, bad messages are dropped, leave', async () => {
   const signup = await post('/api/signup', { name: NAME, password: 'secret1' });
   assert.equal(signup.status, 200);
-  assert.deepEqual(Object.keys(signup.body.account).sort(), ['coins', 'name', 'owned', 'potions', 'skin', 'stash']);
+  assert.deepEqual(Object.keys(signup.body.account).sort(), ['bombs', 'coins', 'name', 'owned', 'potions', 'skin', 'stash']);
 
   const taken = await post('/api/signup', { name: NAME, password: 'secret1' });
   assert.equal(taken.status, 400);

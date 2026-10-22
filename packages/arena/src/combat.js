@@ -26,7 +26,7 @@ export function damage(A, victim, amount, attacker, weapon, kx = 0, kz = 0, opts
 }
 
 /**
- * Knocked out: drop every weapon (the starting weapon too) and every Healing Potion, leave the arena.
+ * Knocked out: drop every weapon (the starting weapon too), every Healing Potion and every bomb, leave the arena.
  * A potion being drunk is gone (it was used up when the drinking started).
  * A dropped weapon with more than half its durability keeps it; half or less is set to half
  * (rounded up), see droppedDurability in @pvp/game-rules.
@@ -43,6 +43,8 @@ function knockOut(A, victim, attacker, weapon, byName) {
     dropItem(A, 'weapon', id, victim.x, victim.z, spread, droppedDurability(id, dur, A.rules.WEAPONS));
   }
   for (let i = 0; i < victim.potions; i++) dropItem(A, 'potion', null, victim.x, victim.z, spread);
+  // bombs (#32): one ground item per bomb kind carried, with all of them (anyone can pick them up)
+  for (const [id, n] of Object.entries(victim.bombs ?? {})) if (n > 0) dropItem(A, 'bomb', id, victim.x, victim.z, spread, undefined, n);
   victim.drink = null;
   removePlayer(A, victim);
   const by = attacker ? attacker.name : (byName ?? null);

@@ -54,9 +54,12 @@ export const WEAPONS = deepFreeze({
     shock: { dmg: 1, everyMs: 5000, forMs: 15000 } },
   icesword:     { name: 'Ice Sword',      type: 'melee', dmg: 10, range: 3, rate: 3, rarity: 'epic', price: 35, durability: 50, chestChance: 4, freezeMs: 2000 },
   shield:       { name: 'Shield',         type: 'shield', rarity: 'epic', price: 25, durability: 60, chestChance: 6 },
-  megashield:   { name: 'Mega Shield',    type: 'shield', rarity: 'legendary', price: 75, durability: 70, chestChance: 1, reflect: 0.25 },
-  supersword:   { name: 'Supersword',     type: 'melee', dmg: 100, range: 3.6, rate: 1.5, rarity: 'megalegend', price: 150, durability: 40, chestChance: 0.3,
+  megashield:   { name: 'Mega Shield',    type: 'shield', rarity: 'legendary', price: 100, durability: 70, chestChance: 1, reflect: 0.25 },
+  supersword:   { name: 'Supersword',     type: 'melee', dmg: 100, range: 3.6, rate: 1.5, rarity: 'megalegend', price: 250, durability: 40, chestChance: 0.3,
     knockout: true, shieldWear: 5 },
+  // Batch 2 (#32): the boss's numbers from the issue (the numbers written on these two cards are wrong).
+  dmgun:        { name: 'DM Gun',         type: 'gun', dmg: 15, range: 90, rate: 3, spread: 0.004, pellets: 1, rarity: 'epic', price: 20, durability: 30, chestChance: 7 },
+  supergun:     { name: 'Supergun',       type: 'gun', dmg: 25, range: 80, rate: 2, spread: 0.006, pellets: 1, rarity: 'legendary', price: 70, durability: 30, chestChance: 1.5 },
 });
 
 const own = (weapons, id) => (weapons && Object.hasOwn(weapons, id) ? weapons[id] : undefined);

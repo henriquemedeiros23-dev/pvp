@@ -204,6 +204,22 @@ input:focus { border-color: var(--gold); }
 .potion.empty .picon { opacity: 0.4; filter: grayscale(1); }
 .potion.empty .pcount { background: #555; color: #ddd; }
 .potion.drinking { box-shadow: 0 0 0 2px rgba(0,0,0,0.5), 0 0 14px rgba(255,77,94,0.8); }
+/* Bomb buttons (#32), next to the shield pill: the round bomb icon and how many you carry */
+.bombbtns { display: flex; gap: 6px; }
+.bombbtn {
+  pointer-events: auto; position: relative; width: 34px; height: 34px; border-radius: 50%; padding: 0; touch-action: none;
+  background: radial-gradient(circle at 50% 40%, rgba(60,194,74,0.5), rgba(10,8,16,0.85) 75%);
+  border: 2px solid rgba(60,194,74,0.85) !important; box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+}
+.bombbtn.legendary { background: radial-gradient(circle at 50% 40%, rgba(255,197,49,0.55), rgba(10,8,16,0.85) 75%); border-color: rgba(255,197,49,0.9) !important; }
+.bombbtn .bicon { position: absolute; inset: 12%; }
+.bombbtn .bcount {
+  position: absolute; right: -6px; bottom: -5px; min-width: 15px; height: 15px; padding: 0 3px; box-sizing: border-box; border-radius: 999px;
+  background: #ff4d3a; color: #fff; font-size: 10px; line-height: 15px; font-weight: 900; text-align: center; box-shadow: 0 0 0 2px rgba(0,0,0,0.55);
+}
+.bombbtn .bkey { position: absolute; left: -4px; top: -6px; font-size: 9px; font-weight: 900; color: rgba(255,255,255,0.8); text-shadow: 0 1px 2px #000; }
+body:not(.desktop) .bombbtn .bkey { display: none; }
+.bombbtn:active { transform: scale(0.92); }
 /* Big ring around the crosshair while drinking */
 .drinkring { position: absolute; left: 50%; top: 50%; width: 120px; height: 120px; margin: -60px 0 0 -60px; --p: 0; pointer-events: none; }
 .drinkring .dfill {
