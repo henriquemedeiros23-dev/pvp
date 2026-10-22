@@ -94,6 +94,10 @@
   <section id="hud" class="hidden">
     <div class="crosshair"><i></i><i></i><i></i><i></i></div>
     <div id="hitmark" class="hitmark">✕</div>
+    <!-- After a shot or swing: "Charging 1.4s" and a small ring just under the crosshair (#35) -->
+    <div id="charge" class="charge hidden" role="status"><span class="cring"></span><span id="chargeText" class="ctext"></span></div>
+    <!-- Damage numbers above heads (#33): a pool of labels moved by js/damage-numbers.js -->
+    <div id="dmgNums" class="dmgnums"></div>
     <!-- Drinking a Healing Potion: a big progress ring around the crosshair (#28) -->
     <div id="drinkRing" class="drinkring hidden" role="progressbar" aria-label="Drinking a Healing Potion" aria-valuemin="0" aria-valuemax="100">
       <div id="drinkFill" class="dfill"></div><span id="drinkIcon" class="dicon"></span><span id="drinkText" class="dtext"></span>

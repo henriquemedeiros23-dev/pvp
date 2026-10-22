@@ -44,6 +44,7 @@ setInterval(() => {
     if (ev.to === 'server') handle(ev);             // { kind: 'coins', playerId, playerKey, amount, total }
                                                     // { kind: 'knockedOut', playerId, playerKey, weapons, by, byId }
     else if (ev.to === 'all') for (const id of arena.playerIds()) { if (id !== ev.except) sendTo(id, ev.msg); }
+    else if (Array.isArray(ev.to)) for (const id of ev.to) sendTo(id, ev.msg); // players near someone ('dmg')
     else sendTo(ev.to, ev.msg);                     // also deliver to a player id that just got knocked out ('dead')
   }
 }, 50);
@@ -52,6 +53,12 @@ setInterval(() => {
 - Every `msg` is a server message of `@pvp/net-protocol` (`{ t, ...fields }`), checked in the tests with `serverMessage`.
 - `now` is optional on every method; it defaults to the latest time seen. The clock never goes backwards.
 - `'all'` means everyone in the arena when you drain, so drain after every call (or at least every tick).
+- A list in `to` (player ids) means "the players near someone": everyone within the snapshot radius
+  (tuning `snapshotRadius`) of that player, the player too. Used for the damage numbers (#33).
+- **Damage numbers (#33):** whenever a player loses health, everyone near them gets
+  `{ t: 'dmg', id, amount }` (the health really lost) with `ko: true` for a knockout and `shock: true` for a shock
+  tick; a hit a raised shield blocks gives `{ t: 'dmg', id, amount: 0, blocked: true }`. It is queued before the
+  knockout's `ko`, and the knocked-out player gets it too. No number when nothing was lost (spawn protection).
 - Also: `snapshotFor(id)`, `welcomeFor(id)` (join already queues 'welcome' + 'inv' + 'pjoin'), `playerCount()`,
   `playerIds()`, `hasPlayer(id)`, `idOf(key)`, `teleport(id, { x, y, z, ry })` (no checks), `isFrozen(id)`,
   `isShocked(id)`, and read-only copies: `getPlayer(id)`, `chests()`, `golden()`, `nextGoldenAt()`, `items()`, `now()`.

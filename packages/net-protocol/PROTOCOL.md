@@ -1,4 +1,4 @@
-# PvP network protocol (version 2)
+# PvP network protocol (version 3)
 
 Phone and server talk over a WebSocket (`/?token=<login token>`). Every message is **one JSON object**.
 The field `t` says what kind of message it is. A phone may send at most **4096 bytes** per message.
@@ -45,6 +45,7 @@ The exact rules live in `src/messages.js`.
 | `swing` | `id` | Melee swing. |
 | `block` | `id` defender, `by` attacker | A raised shield blocked a hit (draw a flash in front of `id`). |
 | `hitmark` | `dead` bool, `blocked?` bool | You hit someone (`dead` = you knocked them out, `blocked` = their shield stopped it). |
+| `dmg` | `id` player, `amount` uint, `ko?` bool, `blocked?` bool, `shock?` bool | A player near you (within the snapshot radius, you included) lost `amount` health: show it above their head (#33). `ko` = it knocked them out, `blocked` = a raised shield took it (`amount` 0), `shock` = a shock tick. |
 | `hurt` | `hp`, `kx, kz` knockback, `from` vec2 or null | You got hurt. |
 | `ko` | `id`, `x, y, z`, `victim` name, `by` name or null, `weapon` | Someone was knocked out. |
 | `dead` | `by` name or null, `weapon` | You were knocked out. |

@@ -198,3 +198,33 @@ test('fake socket: close before open never opens; listeners work', async () => {
   await settle();
   assert.deepEqual(seen, ['close event']);
 });
+
+test('damage numbers (#33): a hit sends "dmg" to the players near the victim, not to far ones', async () => {
+  const { server, run } = setup();
+  const api = server.createApi();
+  const clients = [];
+  for (const name of ['Shooter', 'Target', 'Faraway']) {
+    const { token } = await api.signup(name, 'secret');
+    const c = await open(server, token);
+    c.send('join');
+    clients.push({ c, token, id: null });
+  }
+  await settle();
+  for (const p of clients) p.id = p.c.of('welcome')[0].id;
+  await run(3200); // spawn protection is over
+  // an open place with nothing between the shooter and the target
+  const g = server.island.grid;
+  let spot = null;
+  for (let x = -60; x <= 60 && !spot; x += 4) for (let z = -60; z <= 60 && !spot; z += 4) if (g.near(x, z, 4).length === 0) spot = { x, z };
+  assert.ok(spot, 'an open place');
+  const [shooter, target, far] = clients;
+  assert.ok(server.teleport(shooter.token, spot.x, spot.z));
+  assert.ok(server.teleport(target.token, spot.x, spot.z + 2));
+  assert.ok(server.teleport(far.token, spot.x + 200, spot.z));
+  shooter.c.send('fire', { d: [0, -0.24, 0.97] });
+  await run(50);
+  const dmg = { t: 'dmg', id: target.id, amount: 2 }; // the Gun does 2
+  assert.deepEqual(shooter.c.of('dmg'), [dmg]);
+  assert.deepEqual(target.c.of('dmg'), [dmg]);
+  assert.deepEqual(far.c.of('dmg'), []);
+});

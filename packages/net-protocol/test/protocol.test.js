@@ -51,6 +51,7 @@ const SERVER_EXAMPLES = {
   block: { id: 3, by: 4 },
   shieldbroke: { weapon: 'shield' },
   hitmark: { dead: false, blocked: true },
+  dmg: { id: 3, amount: 15, ko: true },
   hurt: { hp: 75, kx: 0, kz: 0, from: [3, 4] },
   ko: { id: 3, x: 1, y: 0, z: 2, victim: 'Bob', by: 'Ann', weapon: 'supersword' },
   dead: { by: null, weapon: 'electricsword' },
@@ -65,7 +66,7 @@ const rejected = (raw) => {
 };
 
 test('constants', () => {
-  assert.equal(PROTOCOL_VERSION, 2);
+  assert.equal(PROTOCOL_VERSION, 3);
   assert.equal(MAX_MESSAGE_SIZE, 4096);
   assert.deepEqual([FLAG_CROUCH, FLAG_SLIDE, FLAG_MOVING, FLAG_AIR], [1, 2, 4, 8]);
   assert.equal(SNAP_LENGTH, 12);
@@ -294,4 +295,15 @@ test('same input gives the same result every time', () => {
   const raw = J({ ...CLIENT_EXAMPLES.state, extra: 1 });
   assert.deepEqual(parseClientMessage(raw), parseClientMessage(raw));
   assert.deepEqual(parseClientMessage('{bad'), parseClientMessage('{bad'));
+});
+
+test('dmg: damage numbers for everyone nearby (#33)', () => {
+  for (const f of [{ id: 3, amount: 15 }, { id: 3, amount: 1, shock: true }, { id: 3, amount: 40, ko: true }, { id: 3, amount: 0, blocked: true }]) {
+    const r = decodeServerMessage(encode('dmg', f));
+    assert.ok(r.ok, r.error);
+    assert.deepEqual(r.msg, { t: 'dmg', ...f });
+  }
+  assert.throws(() => encode('dmg', { id: 3, amount: -5 }));
+  assert.throws(() => encode('dmg', { id: 3 }));
+  assert.equal(decodeServerMessage('{"t":"dmg","id":3,"amount":1.5}').ok, false);
 });
