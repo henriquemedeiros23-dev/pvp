@@ -229,6 +229,37 @@ body:not(.desktop) .bombbtn .bkey { display: none; }
 }
 .drinkring .dicon { position: absolute; left: 50%; top: -44px; width: 36px; height: 36px; margin-left: -18px; filter: drop-shadow(0 2px 3px rgba(0,0,0,0.6)); }
 .drinkring .dtext { position: absolute; left: 50%; top: 128px; transform: translateX(-50%); white-space: nowrap; font-weight: 900; font-size: 18px; color: #fff; text-shadow: 0 2px 4px #000, 0 0 2px #000; }
+/* "Charging 1.4s" just under the crosshair after a shot or swing (#35). --p = 0..1, the small ring fills up. */
+.charge {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, 20px); --p: 0;
+  display: flex; align-items: center; gap: 5px; padding: 2px 8px 2px 3px; border-radius: 999px;
+  background: rgba(10, 8, 16, 0.45); white-space: nowrap; pointer-events: none;
+}
+.charge .cring {
+  width: 14px; height: 14px; border-radius: 50%; flex: none;
+  background: conic-gradient(#ffd34d calc(var(--p) * 360deg), rgba(255,255,255,0.25) 0);
+  -webkit-mask: radial-gradient(circle, transparent 3.5px, #000 4px); mask: radial-gradient(circle, transparent 3.5px, #000 4px);
+}
+.charge .ctext { font-size: 12px; font-weight: 800; color: #fff; text-shadow: 0 1px 2px #000; font-variant-numeric: tabular-nums; }
+.charge.ready .cring { background: #45e070; }
+.charge.ready .ctext { color: #8dffa8; }
+/* Damage numbers above heads (#33): "-15" floats up and fades (moved by js/damage-numbers.js) */
+.dmgnums { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+.dmgnum {
+  position: absolute; left: 0; top: 0; will-change: transform, opacity; white-space: nowrap; text-align: center;
+  font-weight: 900; font-size: 24px; line-height: 1; text-shadow: 0 2px 3px #000, 0 0 2px #000, 0 0 6px rgba(0,0,0,0.6);
+}
+.dmgnum[hidden] { display: none; }
+.dmgnum small { display: block; font-size: 15px; margin-top: 1px; }
+.dmgnum small:empty { display: none; }
+.dmgnum[data-kind="shock"] { font-size: 19px; }
+.dmgnum[data-kind="ko"] { font-size: 28px; }
+.dmgnum[data-kind="blocked"] { font-size: 18px; }
+@media (max-height: 430px) {
+  .dmgnum { font-size: 20px; }
+  .dmgnum[data-kind="ko"] { font-size: 23px; }
+  .dmgnum[data-kind="shock"], .dmgnum[data-kind="blocked"] { font-size: 16px; }
+}
 .toast { position: absolute; left: 50%; top: 62%; transform: translateX(-50%); font-weight: 900; font-size: 18px; color: var(--gold); text-shadow: 0 2px 4px #000; opacity: 0; transition: opacity 0.4s; white-space: nowrap; }
 .toast.show { opacity: 1; transition: none; }
 

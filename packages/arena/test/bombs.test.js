@@ -96,6 +96,10 @@ test('the Bomb explodes exactly 3 s after the throw: 3 damage to everyone in the
   assert.equal(hp(outside), 100);
   assert.equal(hp(a), 97, 'the Bomb hurts its thrower too');
   assert.equal(msgs(out, 'hurt', inside).length, 1);
+  // damage numbers (#33) for bomb hits too, sent to the players near each victim
+  const nums = out.filter(e => e.msg?.t === 'dmg' && Array.isArray(e.to)).map(e => e.msg);
+  assert.deepEqual(nums.filter(m => m.id === inside), [{ t: 'dmg', id: inside, amount: 3 }]);
+  assert.deepEqual(nums.filter(m => m.id === a), [{ t: 'dmg', id: a, amount: 3 }]);
   assert.equal(msgs(out, 'hitmark', a).length, 2, 'the thrower sees a hit marker for each other player hit');
 });
 

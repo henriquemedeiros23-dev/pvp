@@ -10,6 +10,8 @@ import { createInputState, attachTouchControls, attachDesktopControls, isTouchDe
 import { decodeServerMessage, encodeClient, unpackSnapshotPlayer, makeFlags, readFlags } from '@pvp/net-protocol';
 import { slotBar, heldDurabilityView, healthView, pickSlot, brokeMessage, shieldView, WEAPON_ICONS } from '@pvp/hud-model';
 import { potionView, drinkState, drinkMessage, POTION_ICON_SVG, bombView } from '@pvp/hud-model';
+import { chargeView } from '@pvp/hud-model';
+import { DamageNumbers } from './damage-numbers.js';
 
 const $ = id => document.getElementById(id);
 const JOIN_TIMEOUT_MS = 8000;  // give up joining if 'welcome' does not come
@@ -73,6 +75,8 @@ export class Game {
     $('potionIcon').innerHTML = POTION_ICON_SVG; // the flask from the boss's drawing (@pvp/hud-model)
     $('drinkIcon').innerHTML = POTION_ICON_SVG;
     this.drink = null; // the potion drinking in progress: { startedAt, ms } (from the server's 'drink' messages)
+    this.dmgNums = new DamageNumbers($('dmgNums')); // "-15" above heads (#33)
+    this.lastFire = -Infinity; // when I last shot or swung (performance.now()), for "Charging 1.4s" (#35)
     this.mode = 'menu';
     this.time = 0;
 
@@ -276,6 +280,9 @@ export class Game {
       frozen: this.frozen,
       // potion drinking: null, or how far it is (0..1) as the HUD shows it
       drinking: this.drink ? potionView(this.inv, { drink: this.drink, now: performance.now() }).progress : null,
+      // the "Charging 1.4s" text under the crosshair (#35) and the damage numbers above heads (#33)
+      charge: play ? $('charge').classList.contains('hidden') ? '' : $('chargeText').textContent : '',
+      damageNumbers: play ? this.dmgNums.shown() : [],
     };
   }
 
@@ -298,6 +305,7 @@ export class Game {
       case 'block': return this.onBlock(m);
       case 'shieldbroke': this.shieldUp = false; return this.toast(brokeMessage(m.weapon)); // an 'inv' follows
       case 'hitmark': return this.hitmark(m.dead, m.blocked);
+      case 'dmg': return this.dmgNums.add(m, this.playerPos(m.id), performance.now());
       case 'hurt': return this.onHurt(m);
       case 'drink': return this.onDrink(m);
       case 'broke': this.flashSlot(m.slot); return this.toast(brokeMessage(m.weapon)); // an 'inv' follows
@@ -337,7 +345,7 @@ export class Game {
     if (this.preview) this.preview.root.visible = false;
     this.mode = 'play';
     this.frameMenu();
-    this.lastSend = 0; this.lastFire = 0;
+    this.lastSend = 0; this.lastFire = -Infinity;
     this.input.reset();
     this.input.enabled = true;
     $('hud').classList.remove('hidden');
@@ -349,6 +357,9 @@ export class Game {
     this.mode = 'menu';
     this.drink = null;
     this.renderPotion();
+    this.dmgNums.clear();
+    this.lastFire = -Infinity;
+    this.renderCharge();
     this.input.enabled = false;
     this.input.reset();
     if (this.me) { this.scene.remove(this.me.sm.root); this.me.sm.dispose(); this.me = null; }
@@ -599,6 +610,27 @@ export class Game {
     this.send('throw', { b: id, d: aim });
   }
 
+  // "Charging 1.4s" and a small ring just under the crosshair after you shoot or swing (#35); "Ready!" for a moment.
+  // Hidden while drinking a potion (no shooting then, and the big drinking ring is around the crosshair).
+  renderCharge() {
+    const def = this.inv && C.WEAPONS[this.inv.weapons[this.inv.slot]];
+    const v = this.mode === 'play' && !this.drink ? chargeView(def, this.lastFire, performance.now()) : null;
+    const el = $('charge');
+    const show = !!v?.visible;
+    if (el.classList.contains('hidden') === show) el.classList.toggle('hidden', !show);
+    if (!show) return;
+    el.classList.toggle('ready', v.ready);
+    el.style.setProperty('--p', v.progress.toFixed(3));
+    const text = $('chargeText');
+    if (text.textContent !== v.text) text.textContent = v.text;
+  }
+
+  // Where a player stands now (me or someone I can see), or null.
+  playerPos(id) {
+    if (id === this.myId) return this.me ? this.me.sm.root.position : null;
+    return this.remotes.get(id)?.sm.root.position ?? null;
+  }
+
   // The big Durability bar: the weapon in your hand (full with ∞ if it never breaks, '–' if the hand is empty).
   renderDurability() {
     const d = heldDurabilityView(this.inv);
@@ -795,6 +827,7 @@ export class Game {
     if (this.mode === 'play' && this.me) this.updatePlay(dt);
     else this.updateMenu(dt);
     this.updateWorld(dt);
+    if (this.mode === 'play') this.dmgNums.update(this.camera, innerWidth, innerHeight, performance.now(), id => this.playerPos(id));
     this.renderer.render(this.scene, this.camera);
   }
 
@@ -929,6 +962,7 @@ export class Game {
     }
 
     if (this.drink) this.renderPotion(); // the drinking ring fills up
+    this.renderCharge(); // "Charging 1.4s" counts down (#35)
 
     // nearby chest?
     let near = null, best = 2.8;

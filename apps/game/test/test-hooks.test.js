@@ -10,6 +10,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import WebSocket from 'ws';
 import { decodeServerMessage, unpackSnapshotPlayer, CLIENT_MESSAGES } from '@pvp/net-protocol';
+import { generateIsland } from '@pvp/world-gen';
 
 const SERVER = fileURLToPath(new URL('../server.js', import.meta.url));
 
@@ -63,7 +64,7 @@ async function joinArena(port) {
   ws.send(JSON.stringify({ t: 'join' }));
   for (let i = 0; i < 100 && !me; i++) await new Promise(r => setTimeout(r, 20));
   assert.ok(me, 'joined and got a snapshot');
-  return { ws, seen, me: () => me };
+  return { ws, seen, me: () => me, id: () => id };
 }
 
 const wait = ms => new Promise(r => setTimeout(r, ms));
@@ -121,4 +122,27 @@ test('debugCoins (a browser test buys bombs with it) works only with PVP_TEST_HO
       c.ws.close();
     });
   }
+});
+
+test('damage numbers (#33): the server sends "dmg" to the players near the one who got hit', async () => {
+  // an open place on the island (same seed as the server) with nothing between the two players
+  const g = generateIsland().grid;
+  let spot = null;
+  for (let x = -60; x <= 60 && !spot; x += 4) for (let z = -60; z <= 60 && !spot; z += 4) if (g.near(x, z, 4).length === 0) spot = { x, z };
+  assert.ok(spot, 'an open place');
+  await withServer({ PVP_TEST_HOOKS: '1' }, async port => {
+    const a = await joinArena(port);
+    const b = await joinArena(port);
+    a.ws.send(JSON.stringify({ t: 'debugTeleport', x: spot.x, z: spot.z }));
+    b.ws.send(JSON.stringify({ t: 'debugTeleport', x: spot.x, z: spot.z + 2 }));
+    await wait(3300); // spawn protection is over
+    a.ws.send(JSON.stringify({ t: 'fire', d: [0, -0.24, 0.97] }));
+    for (let i = 0; i < 100 && !b.seen.some(m => m.t === 'dmg'); i++) await wait(20);
+    const dmg = { t: 'dmg', id: b.id(), amount: 2 }; // the Gun does 2
+    assert.deepEqual(b.seen.filter(m => m.t === 'dmg'), [dmg]);
+    for (let i = 0; i < 50 && !a.seen.some(m => m.t === 'dmg'); i++) await wait(20);
+    assert.deepEqual(a.seen.filter(m => m.t === 'dmg'), [dmg]);
+    a.ws.close();
+    b.ws.close();
+  });
 });

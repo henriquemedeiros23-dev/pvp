@@ -5,7 +5,7 @@
 import { deepFreeze } from './freeze.js';
 
 /** Bump when a message changes in a way old phones or servers would not understand. */
-export const PROTOCOL_VERSION = 3; // 2: shields and status effects (#26), explosives removed; 3: bombs (#32)
+export const PROTOCOL_VERSION = 4; // 2: shields and status effects (#26), explosives removed; 3: 'dmg' damage numbers (#33); 4: bombs (#32)
 
 /** Longest raw message a client may send (bytes). Same as the server's WebSocket maxPayload. */
 export const MAX_CLIENT_MESSAGE_SIZE = 4096;
@@ -194,6 +194,13 @@ export const SERVER_MESSAGES = deepFreeze({
   hitmark: m('You hit someone.', {
     dead: ['bool', 'true if that hit knocked them out'],
     blocked: ['bool?', 'true if their shield blocked it'],
+  }),
+  dmg: m('A player near you lost health (or a shield blocked the hit): show the number above their head.', {
+    id: ['uint', 'Player who got hurt (can be you)'],
+    amount: ['uint', 'Health lost (0 when blocked)'],
+    ko: ['bool?', 'true if it knocked them out'],
+    blocked: ['bool?', 'true if their raised shield blocked it (amount 0)'],
+    shock: ['bool?', 'true for a shock tick (Electric Sword)'],
   }),
   hurt: m('You got hurt.', {
     hp: ['int', 'Your health now'], kx: ['number', 'Knockback X'], kz: ['number', 'Knockback Z'],

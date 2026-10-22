@@ -3,7 +3,7 @@
 // a shield is a weapon with type 'shield' (durability = blocked hits, optional reflect), and a
 // weapon may have shock / freezeMs / knockout / shieldWear. Time is passed in.
 
-import { at, send, weaponDef, maxDurability } from './state.js';
+import { at, send, sendNear, weaponDef, maxDurability } from './state.js';
 import { inventoryMsg } from './players.js';
 import { damage } from './combat.js';
 
@@ -71,6 +71,7 @@ function block(A, attacker, victim, def) {
   victim.shield.dur = Math.max(0, victim.shield.dur - wear);
   send(A, 'all', { t: 'block', id: victim.id, by: attacker.id });
   send(A, attacker.id, { t: 'hitmark', dead: false, blocked: true });
+  sendNear(A, victim, { t: 'dmg', id: victim.id, amount: 0, blocked: true }); // "Blocked" above the holder (#33)
   if (victim.shield.dur === 0) {
     victim.shield = null;
     victim.shieldUp = false;
@@ -91,7 +92,7 @@ export function tickEffects(A, now) {
       s.next += s.everyMs;
       if (s.left === 0) p.shock = null;
       const by = A.players.get(s.byId) ?? null;
-      damage(A, p, s.dmg, by, s.weapon, 0, 0, { byName: s.by });
+      damage(A, p, s.dmg, by, s.weapon, 0, 0, { byName: s.by, shock: true });
     }
   }
 }

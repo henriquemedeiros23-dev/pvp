@@ -220,7 +220,43 @@ test('bombs (#32): bought bombs come along, "throw" throws one, it explodes afte
   assert.equal(c.of('inv').at(-1).bombs[0].n, 4);
   await run(3000);
   assert.deepEqual(c.of('boom').map(m => m.id), [thrown.id]);
+  // a Bomb thrown at your own feet hurts you: the damage number (#33) shows for bomb hits too
+  c.send('throw', { b: 'bomb', d: [0, -1, 0] });
+  await settle();
+  await run(3100);
+  const me = c.of('welcome')[0].id;
+  assert.deepEqual(c.of('dmg').filter(m => m.id === me), [{ t: 'dmg', id: me, amount: 3 }]);
   c.send('leave');
   await settle();
-  assert.deepEqual((await api.me()).account.bombs, { bomb: 5, legendarybomb: 3 }, 'unused bombs go back');
+  assert.deepEqual((await api.me()).account.bombs, { bomb: 4, legendarybomb: 3 }, 'unused bombs go back');
+});
+
+test('damage numbers (#33): a hit sends "dmg" to the players near the victim, not to far ones', async () => {
+  const { server, run } = setup();
+  const api = server.createApi();
+  const clients = [];
+  for (const name of ['Shooter', 'Target', 'Faraway']) {
+    const { token } = await api.signup(name, 'secret');
+    const c = await open(server, token);
+    c.send('join');
+    clients.push({ c, token, id: null });
+  }
+  await settle();
+  for (const p of clients) p.id = p.c.of('welcome')[0].id;
+  await run(3200); // spawn protection is over
+  // an open place with nothing between the shooter and the target
+  const g = server.island.grid;
+  let spot = null;
+  for (let x = -60; x <= 60 && !spot; x += 4) for (let z = -60; z <= 60 && !spot; z += 4) if (g.near(x, z, 4).length === 0) spot = { x, z };
+  assert.ok(spot, 'an open place');
+  const [shooter, target, far] = clients;
+  assert.ok(server.teleport(shooter.token, spot.x, spot.z));
+  assert.ok(server.teleport(target.token, spot.x, spot.z + 2));
+  assert.ok(server.teleport(far.token, spot.x + 200, spot.z));
+  shooter.c.send('fire', { d: [0, -0.24, 0.97] });
+  await run(50);
+  const dmg = { t: 'dmg', id: target.id, amount: 2 }; // the Gun does 2
+  assert.deepEqual(shooter.c.of('dmg'), [dmg]);
+  assert.deepEqual(target.c.of('dmg'), [dmg]);
+  assert.deepEqual(far.c.of('dmg'), []);
 });

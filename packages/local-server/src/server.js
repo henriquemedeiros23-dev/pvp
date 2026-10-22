@@ -139,6 +139,8 @@ export function createLocalServer({
       const text = JSON.stringify(ev.msg);
       if (ev.to === 'all') {
         for (const id of arena.playerIds()) if (id !== ev.except) sendRaw(conns.get(id), text);
+      } else if (Array.isArray(ev.to)) {
+        for (const id of ev.to) sendRaw(conns.get(id), text); // the players near someone (e.g. 'dmg' numbers, #33)
       } else {
         sendRaw(conns.get(ev.to), text);
       }

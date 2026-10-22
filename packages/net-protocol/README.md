@@ -44,7 +44,11 @@ Shields and status effects (#26, protocol version 2): the client message `shield
 messages `block` (a raised shield blocked a hit), `shieldbroke`, and `hitmark.blocked`. The explosive messages
 (`proj`, `boom`, `mine+` ...) are gone with the explosives.
 
-Bombs (#32, protocol version 3): the client message `throw` (`{ b, d }`), the server messages `bomb` (thrown: flight and fuse)
+Damage numbers (#33, protocol version 3): the server message `dmg` (`{ id, amount, ko?, blocked?, shock? }`) goes to
+every player near the one who got hurt (within the snapshot radius, the hurt player too), so everyone can show
+"-15" above that head; `blocked` = a raised shield took it (`amount` 0), `shock` = a shock tick, `ko` = knocked out.
+
+Bombs (#32, protocol version 4): the client message `throw` (`{ b, d }`), the server messages `bomb` (thrown: flight and fuse)
 and `boom` (exploded), `inv.bombs` (`[{ id, n }]`), `welcome.bombs` (bombs not exploded yet) and bomb ground items
 (`kind: 'bomb'`, the bomb id in `weapon`, how many in `n`). The new fields are optional, so older messages stay valid.
 

@@ -56,6 +56,21 @@ export function send(A, to, msg, except) {
   A.out.push(ev);
 }
 
+/** Ids of every player within snapshotRadius of player p (p included): who can see p. */
+export function nearIds(A, p) {
+  const ids = [];
+  for (const o of A.players.values()) {
+    if (o === p || Math.hypot(o.x - p.x, o.z - p.z) <= A.tune.snapshotRadius) ids.push(o.id);
+  }
+  return ids;
+}
+
+/** Queue a message for every player near p (see nearIds): the event's `to` is a list of player ids. */
+export function sendNear(A, p, msg) {
+  const ids = nearIds(A, p);
+  if (ids.length) A.out.push({ to: ids, msg });
+}
+
 /** Queue an event for the server itself (accounts and so on). */
 export function tellServer(A, kind, data) {
   A.out.push({ to: 'server', kind, ...data });

@@ -3,7 +3,7 @@
 
 import { rayBoxes, rayCylinder } from '@pvp/collision';
 import { droppedDurability } from '@pvp/game-rules';
-import { at, send, tellServer, weaponDef, heightOf, wearOf } from './state.js';
+import { at, send, sendNear, tellServer, weaponDef, heightOf, wearOf } from './state.js';
 import { removePlayer, inventoryMsg } from './players.js';
 import { dropItem } from './loot.js';
 import { strike, isFrozen } from './effects.js';
@@ -13,14 +13,23 @@ const round2 = v => +v.toFixed(2);
 /**
  * Hurt `victim` (no shield check: use strike() in effects.js for weapon hits).
  * `attacker` is a player object (may have left already) or null; opts.byName names an attacker who left.
+ * opts.shock marks a shock tick (for the 'dmg' number).
+ * Everyone near the victim (the victim too) gets a 'dmg' with the health lost (#33).
  * Returns true if the damage was done (false: not in the arena, already out, or spawn protection).
  */
 export function damage(A, victim, amount, attacker, weapon, kx = 0, kz = 0, opts = {}) {
   if (!A.players.has(victim.id) || victim.hp <= 0) return false;
   if (A.now < victim.protectUntil) return false;
+  const before = victim.hp;
   victim.hp = Math.max(0, victim.hp - Math.round(amount));
   if (attacker && A.players.has(attacker.id)) send(A, attacker.id, { t: 'hitmark', dead: victim.hp <= 0 });
   send(A, victim.id, { t: 'hurt', hp: victim.hp, kx, kz, from: attacker ? [attacker.x, attacker.z] : null });
+  if (before > victim.hp) {
+    const dmg = { t: 'dmg', id: victim.id, amount: before - victim.hp };
+    if (victim.hp <= 0) dmg.ko = true;
+    if (opts.shock) dmg.shock = true;
+    sendNear(A, victim, dmg); // before the knockout, so the victim gets it too
+  }
   if (victim.hp <= 0) knockOut(A, victim, attacker, weapon, opts.byName);
   return true;
 }
