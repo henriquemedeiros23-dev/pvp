@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { RULES } from '@pvp/game-rules';
 import {
-  chargeView, damageNumber, damageFloat, READY_FLASH_MS, DAMAGE_NUMBER_MS, DAMAGE_NUMBER_RISE, DAMAGE_COLORS,
+  chargeView, chargeStarts, damageNumber, damageFloat, READY_FLASH_MS, DAMAGE_NUMBER_MS, DAMAGE_NUMBER_RISE, DAMAGE_COLORS,
 } from '../src/index.js';
 
 const GUN = RULES.WEAPONS.gun;           // rate 2 s
@@ -11,7 +11,7 @@ const SUPER = RULES.WEAPONS.supersword;  // melee, rate 1.5 s
 
 test('chargeView: counts down from the weapon\'s rate after a shot', () => {
   assert.deepEqual(chargeView(GUN, 1000, 1000), {
-    visible: true, charging: true, ready: false, progress: 0, percent: 0, secondsLeft: 2, text: 'Charging 2.0s',
+    visible: true, charging: true, ready: false, progress: 0, percent: 0, secondsLeft: 2, text: 'Charging 2.0s', hint: '25%',
   });
   const v = chargeView(GUN, 1000, 1600); // 0.6 s after the shot: 1.4 s left
   assert.equal(v.text, 'Charging 1.4s');
@@ -23,6 +23,31 @@ test('chargeView: counts down from the weapon\'s rate after a shot', () => {
   assert.equal(chargeView(GUN, 0, 1901).secondsLeft, 0.1, 'rounded up to 0.1 s');
 });
 
+test('chargeView: "25%" hint while charging (a hit does 25% now, #38), tunable', () => {
+  assert.equal(chargeView(GUN, 0, 500).hint, '25%');
+  assert.equal(chargeView(GUN, 0, 500, { chargingDamage: 0.5 }).hint, '50%');
+  assert.equal(chargeView(GUN, 0, 2000).hint, '', 'ready: no hint');
+  assert.equal(chargeView(GUN, null, 500).hint, '', 'never used: no hint');
+});
+
+test('chargeStarts: each slot\'s charge from inv.charge (#38)', () => {
+  const inv = { weapons: ['gun', 'shootbm', 'icesword'], charge: [0, 2700, 0] };
+  // the Shootbm has 2.7 s left at 10000: it "started" 3 s before it is ready
+  assert.deepEqual(chargeStarts(inv, 10000), [null, 10000 + 2700 - 3000, null]);
+  assert.equal(chargeView(SHOOTBM, chargeStarts(inv, 10000)[1], 10000).text, 'Charging 2.7s');
+  // the held weapon decides what shows: switching to the ready Gun hides it
+  assert.equal(chargeView(GUN, chargeStarts(inv, 10000)[0], 10000).visible, false);
+  // a slot that just got ready keeps its old start, so "Ready!" still flashes
+  const later = chargeStarts({ weapons: inv.weapons, charge: [0, 0, 0] }, 12800, [null, 9700, null]);
+  assert.deepEqual(later, [null, 9700, null]);
+  assert.equal(chargeView(SHOOTBM, later[1], 12800).text, 'Ready!');
+  // no charge info (older server), unknown or shield ids, bad numbers: ready
+  assert.deepEqual(chargeStarts({ weapons: ['gun'] }, 5), [null]);
+  assert.deepEqual(chargeStarts({ weapons: ['nope', 'gun'], charge: [100, -5] }, 5), [null, null]);
+  assert.deepEqual(chargeStarts(null, 5), []);
+  assert.deepEqual(chargeStarts({ weapons: ['gun'], charge: [99999] }, 0), [0], 'never more than the rate');
+});
+
 test('chargeView: works for melee too (Supersword 1.5 s)', () => {
   assert.equal(chargeView(SUPER, 0, 500).text, 'Charging 1.0s');
   assert.equal(chargeView(SUPER, 0, 1500).text, 'Ready!');
@@ -30,7 +55,7 @@ test('chargeView: works for melee too (Supersword 1.5 s)', () => {
 
 test('chargeView: "Ready!" for a moment, then hidden', () => {
   const ready = chargeView(GUN, 0, 2000);
-  assert.deepEqual(ready, { visible: true, charging: false, ready: true, progress: 1, percent: 100, secondsLeft: 0, text: 'Ready!' });
+  assert.deepEqual(ready, { visible: true, charging: false, ready: true, progress: 1, percent: 100, secondsLeft: 0, text: 'Ready!', hint: '' });
   assert.equal(chargeView(GUN, 0, 2000 + READY_FLASH_MS - 1).text, 'Ready!');
   const gone = chargeView(GUN, 0, 2000 + READY_FLASH_MS);
   assert.equal(gone.visible, false);

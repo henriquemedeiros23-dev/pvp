@@ -38,11 +38,14 @@ test('gun does not shoot through a wall', () => {
   assert.ok(Math.abs(end[0] - (WALL.x - WALL.w / 2)) < 0.01, 'tracer stops at the wall');
 });
 
-test('fire rate is respected: Shootbm waits 3 s between shots', () => {
+test('charging (#38): Shootbm charges 3 s; a shot while charging does 25%, after the charge 100%', () => {
   const { arena, s, v } = duel();
   assert.equal(arena.fire(s, aimAt(arena, s, v), READY), true);
-  assert.equal(arena.fire(s, aimAt(arena, s, v), READY + 2000), false);
-  assert.equal(arena.fire(s, aimAt(arena, s, v), READY + 3000), true);
+  assert.equal(hp(arena, v), RULES.MAX_HP - 5);
+  assert.equal(arena.fire(s, aimAt(arena, s, v), READY + 2000), true, 'allowed while charging');
+  assert.equal(hp(arena, v), RULES.MAX_HP - 5 - 1, '25% of 5 = 1.25 -> 1');
+  assert.equal(arena.fire(s, aimAt(arena, s, v), READY + 2000 + 3000), true);
+  assert.equal(hp(arena, v), RULES.MAX_HP - 5 - 1 - 5, 'charged again: full damage');
 });
 
 test('melee needs the target in front', () => {

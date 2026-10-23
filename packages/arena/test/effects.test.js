@@ -107,9 +107,11 @@ test('Supersword: any hit knocks out at once, 1.5 s between hits', () => {
   arena.teleport(c, { x: 0.5, z: 2.5 });
   assert.equal(swing(arena, a, READY), true);
   assert.equal(arena.getPlayer(v), undefined, 'one hit, knocked out');
-  assert.equal(swing(arena, a, READY + 1300), false, 'too soon (the server allows 10% early for lag)');
-  assert.equal(swing(arena, a, READY + 1500), true);
-  assert.equal(arena.getPlayer(c), undefined);
+  assert.equal(swing(arena, a, READY + 100), false, 'too soon: the anti-spam gap (150 ms)');
+  assert.equal(swing(arena, a, READY + 1300), true, 'still charging (the server allows 10% early for lag) ...');
+  assert.equal(arena.getPlayer(c)?.hp, RULES.MAX_HP - 25, '... so no knockout: 25% of 100 (#38)');
+  assert.equal(swing(arena, a, READY + 1300 + 1500), true);
+  assert.equal(arena.getPlayer(c), undefined, 'fully charged again: knockout');
   // even with more HP than 100 it is a knockout
   const rules = { ...RULES, MAX_HP: 250 };
   const big = face({ loadout: ['supersword'], rules });

@@ -5,6 +5,7 @@ import * as weapons from './weapons.js';
 import * as skins from './skins.js';
 import * as potion from './potion.js';
 import * as bombs from './bombs.js';
+import * as charge from './charge.js';
 import { deepFreeze } from './freeze.js';
 
 export * from './player.js';
@@ -14,6 +15,7 @@ export {
   isShield, rarityRank,
 } from './weapons.js';
 export { MAX_POTIONS, POTION, potionPrice, potionHeal } from './potion.js';
+export { CHARGING_DAMAGE, MIN_FIRE_GAP_MS, chargingDamage } from './charge.js';
 export { BOMBS, isBomb, bombPrice, bombMaxCarry, bombCounts, inBombArea } from './bombs.js';
 export { COLORS, OUTFITS, SKIN_SLOTS, DEFAULT_SKIN, skinPrice } from './skins.js';
 export { validateRules } from './validate.js';
@@ -41,4 +43,4 @@ export function isBuyable(kind, id) {
 const pickData = mod => Object.fromEntries(Object.entries(mod).filter(([, v]) => typeof v !== 'function'));
 
 /** Every rule in one frozen object, handy for validateRules(RULES) or sending to a client. */
-export const RULES = deepFreeze({ ...pickData(player), ...pickData(weapons), ...pickData(potion), ...pickData(bombs), ...pickData(skins) });
+export const RULES = deepFreeze({ ...pickData(player), ...pickData(weapons), ...pickData(potion), ...pickData(bombs), ...pickData(charge), ...pickData(skins) });

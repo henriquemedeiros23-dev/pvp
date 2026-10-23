@@ -1,6 +1,8 @@
 // Browser check for the fight feedback on a phone (issues #35 and #33).
 // Skipped in a normal `npm test`. Run it with:  npm run test:e2e   (from the repo root)
-// 1) After a shot, "Charging 1.9s" shows just under the crosshair and goes away when the Gun is ready.
+// 1) After a shot, "Charging 1.9s" shows just under the crosshair with a "25%" hint (a hit now does 25%, #38),
+//    and goes away when the Gun is ready. The player has two Guns (one bought): switching to the second one
+//    hides it (that Gun is ready) and it fires right away (#38: each weapon charges on its own).
 // 2) Two more players (plain WebSockets) stand in front of the phone player; one shoots the other with the Gun:
 //    the real server sends 'dmg' and "-2" floats above the hit player's head. Faked 'dmg' messages also show
 //    a shock tick, "Blocked" and "KO!".
@@ -14,7 +16,7 @@ import WebSocket from 'ws';
 import { generateIsland } from '@pvp/world-gen';
 import { RULES } from '@pvp/game-rules';
 import { encode } from '@pvp/net-protocol';
-import { RUN, SKIP, SLOW, startServer, launchBrowser, signedIn, debug, waitDebug } from './helpers.js';
+import { RUN, SKIP, SLOW, startServer, launchBrowser, debug, waitDebug } from './helpers.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const SHOTS = path.join(HERE, '..', '..', '..', '..', 'docs', 'screenshots');
@@ -49,6 +51,32 @@ function openSpot(r = 12) {
     }
   }
   return null;
+}
+
+// Sign up, get 3 coins (test hook 'debugCoins' on a plain WebSocket), buy a second Gun, then log the page in.
+async function signedInWithTwoGuns(page, prefix) {
+  const name = prefix + Date.now().toString(36).slice(-7);
+  const post = async (url, body, token) => {
+    const res = await fetch(`${server.url}${url}`, {
+      method: 'POST', headers: { 'content-type': 'application/json', ...(token ? { 'x-token': token } : {}) }, body: JSON.stringify(body),
+    });
+    assert.equal(res.status, 200, `${url}: ${res.status}`);
+    return res.json();
+  };
+  const { token } = await post('/api/signup', { name, password: 'secret1' });
+  const ws = new WebSocket(`ws://127.0.0.1:${server.port}/?token=${encodeURIComponent(token)}`);
+  await new Promise((resolve, reject) => { ws.once('open', resolve); ws.once('error', reject); });
+  ws.send(JSON.stringify({ t: 'debugCoins', n: RULES.WEAPONS.gun.price }));
+  let coins = 0;
+  for (let i = 0; i < 100 && coins < RULES.WEAPONS.gun.price; i++) {
+    await new Promise(r => setTimeout(r, 30));
+    coins = (await post('/api/me', {}, token)).account.coins;
+  }
+  ws.close();
+  await post('/api/buy', { kind: 'weapon', id: 'gun' }, token);
+  await page.addInitScript(t => localStorage.setItem('pvp.token', t), token);
+  await page.goto(`${server.url}/?debug=1`);
+  await page.locator('#menu').waitFor({ state: 'visible', timeout: SLOW });
 }
 
 // A player on a plain WebSocket (no browser): joins, can teleport (test hook) and shoot.
@@ -86,18 +114,23 @@ test('phone: "Charging" after a shot, and damage numbers above heads', { skip: S
   page.on('console', m => { if (m.type() === 'error' && !m.text().startsWith('Failed to load resource')) errors.push(m.text()); });
   page.on('pageerror', e => errors.push(String(e)));
   // the real server, plus: the test can teleport the page's player and send extra messages to the page
-  let toServer = null, toPage = null;
+  let toServer = null, toPage = null, fires = 0;
   await page.routeWebSocket(/\/\?token=/, ws => {
     const s = ws.connectToServer();
     toServer = text => s.send(text);
     toPage = text => ws.send(text);
+    ws.onMessage(text => { // count the page's 'fire' messages (and pass everything on)
+      if (/"t":"fire"/.test(String(text))) fires++;
+      s.send(text);
+    });
   });
   const bots = [];
   try {
-    await signedIn(page, server.url, 'fb_');
+    await signedInWithTwoGuns(page, 'fb_');
     await page.click('#btnJoin');
     await page.locator('#hud').waitFor({ state: 'visible' });
-    await waitDebug(page, s => s.mode === 'play' && s.inv, { what: 'joined' });
+    const joined = await waitDebug(page, s => s.mode === 'play' && s.inv, { what: 'joined' });
+    assert.deepEqual(joined.inv.weapons, ['gun', 'gun'], 'the free Gun and the bought one');
 
     // stand in an open place
     const spot = openSpot();
@@ -121,6 +154,21 @@ test('phone: "Charging" after a shot, and damage numbers above heads', { skip: S
     // the small text sits just under the crosshair (the middle of the screen)
     const cb = await page.locator('#charge').boundingBox();
     assert.ok(Math.abs(cb.x + cb.width / 2 - 422) < 4 && cb.y > 195 && cb.y < 230, JSON.stringify(cb));
+    // #38: while it charges a small "25%" says a hit now does only 25% of the damage
+    assert.equal((await debug(page)).chargeHint, `${RULES.CHARGING_DAMAGE * 100}%`);
+    assert.equal(await page.locator('#chargeHint').textContent(), '25%');
+    assert.ok(await page.locator('#chargeHint').isVisible());
+    assert.equal(fires, 1, 'one shot');
+    // switch to the second Gun: it is ready, so nothing shows under the crosshair ...
+    await page.locator('#slots .slot[data-slot="1"]').dispatchEvent('pointerdown');
+    await waitDebug(page, s => s.inv.slot === 1 && s.charge === '', { what: 'slot 2 in hand, nothing charging' });
+    // ... and it fires right away (the first Gun is still charging)
+    await touch('touchStart', [{ x: box.x + box.width / 2, y: box.y + box.height / 2, id: 4 }]);
+    await touch('touchEnd', []);
+    const second = await waitDebug(page, s => s.inv.dur[1] === RULES.WEAPONS.gun.durability - 1 && /^Charging/.test(s.charge),
+      { what: 'the second Gun shot at once' });
+    assert.equal(fires, 2, 'the second shot was sent');
+    assert.deepEqual(second.inv.dur, [RULES.WEAPONS.gun.durability - 1, RULES.WEAPONS.gun.durability - 1], 'one shot from each Gun');
     // ... and goes away when the Gun is ready (after a short "Ready!")
     await waitDebug(page, s => s.charge === '', { what: 'the charge to finish' });
 

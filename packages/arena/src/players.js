@@ -2,13 +2,13 @@
 
 import { findSpawn } from '@pvp/world-gen';
 import { potionHeal, bombCounts } from '@pvp/game-rules';
-import { at, send, weaponDef, maxDurability, isShieldId } from './state.js';
+import { at, send, weaponDef, maxDurability, isShieldId, chargeLeft } from './state.js';
 import { welcomeFor } from './snapshot.js';
 import { equipShield, isFrozen } from './effects.js';
 
-export function inventoryMsg(p, picked) {
+export function inventoryMsg(A, p, picked) {
   const msg = {
-    t: 'inv', weapons: [...p.weapons], dur: [...p.dur], slot: p.slot, potions: p.potions, coins: p.coins, hp: p.hp,
+    t: 'inv', weapons: [...p.weapons], dur: [...p.dur], charge: p.weapons.map((w, i) => chargeLeft(A, p, i)), slot: p.slot, potions: p.potions, coins: p.coins, hp: p.hp,
     shield: p.shield ? { id: p.shield.id, dur: p.shield.dur } : null,
   };
   // bombs carried (#32), one entry per bomb id of the rules (rules without bombs: no field)
@@ -58,7 +58,10 @@ export function join(A, key, { name, skin, loadout = [], coins = 0, potions = 0,
     coins: Number.isInteger(coins) && coins >= 0 ? coins : 0,
     x: spot.x, y: 0, z: spot.z, ry: 0, pitch: 0, flags: 0,
     // dur: uses left per slot (parallel to weapons), null = never breaks. Loadout weapons start full.
-    hp: R.MAX_HP, weapons, dur: weapons.map(w => maxDurability(A, w)), slot: 0, lastFire: -Infinity,
+    hp: R.MAX_HP, weapons, dur: weapons.map(w => maxDurability(A, w)), slot: 0,
+    // charging (#38): useAt = when each slot's weapon last started charging (parallel to weapons; -Infinity = ready),
+    // lastFire = the last use of any weapon (for the MIN_FIRE_GAP_MS anti-spam gap)
+    useAt: weapons.map(() => -Infinity), lastFire: -Infinity,
     // Healing Potions carried (from the backpack, up to MAX_POTIONS) and the drinking in progress (or null)
     potions: Math.min(maxPotions(A), Number.isInteger(potions) && potions > 0 ? potions : 0), drink: null,
     // bombs carried (#32): { bombId: count }, each at most its maxCarry (a counter, not weapon slots)
@@ -76,7 +79,7 @@ export function join(A, key, { name, skin, loadout = [], coins = 0, potions = 0,
   A.byKey.set(key, p.id);
 
   send(A, p.id, welcomeFor(A, p.id));
-  send(A, p.id, inventoryMsg(p));
+  send(A, p.id, inventoryMsg(A, p));
   send(A, 'all', { t: 'pjoin', ...playerInfo(p) }, p.id);
   return { ok: true, id: p.id, weapons: taken, potions: p.potions, bombs: { ...p.bombs }, replaced };
 }
@@ -89,7 +92,7 @@ export function setCoins(A, id, total) {
   const p = A.players.get(id);
   if (!p || !Number.isInteger(total) || total < 0) return false;
   p.coins = total;
-  send(A, p.id, inventoryMsg(p));
+  send(A, p.id, inventoryMsg(A, p));
   return true;
 }
 
@@ -162,7 +165,7 @@ export function selectSlot(A, id, i) {
   if (p.drink && A.now >= p.drink.end) finishDrink(A, p);
   if (p.drink && i !== p.slot) cancelDrink(A, p);
   p.slot = i;
-  send(A, p.id, inventoryMsg(p));
+  send(A, p.id, inventoryMsg(A, p));
   return true;
 }
 
@@ -186,7 +189,7 @@ export function startDrink(A, id, now) {
   p.potions--;
   p.drink = { start: now, end: now + P.drinkMs };
   send(A, p.id, { t: 'drink', state: 'start', ms: P.drinkMs, hp: p.hp });
-  send(A, p.id, inventoryMsg(p));
+  send(A, p.id, inventoryMsg(A, p));
   return true;
 }
 
@@ -208,5 +211,5 @@ function finishDrink(A, p) {
   p.drink = null;
   p.hp = potionHeal(p.hp, A.rules.MAX_HP, potionRules(A));
   send(A, p.id, { t: 'drink', state: 'done', ms: 0, hp: p.hp });
-  send(A, p.id, inventoryMsg(p));
+  send(A, p.id, inventoryMsg(A, p));
 }

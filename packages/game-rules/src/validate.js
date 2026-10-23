@@ -180,5 +180,13 @@ export function validateRules(rules) {
     }
   }
 
+  // Charging (#38): optional, the arena uses the defaults when they are missing
+  const { CHARGING_DAMAGE, MIN_FIRE_GAP_MS } = rules;
+  if (CHARGING_DAMAGE !== undefined && !(typeof CHARGING_DAMAGE === 'number' && CHARGING_DAMAGE >= 0 && CHARGING_DAMAGE <= 1)) {
+    problems.push('CHARGING_DAMAGE must be a number from 0 to 1');
+  }
+  if (MIN_FIRE_GAP_MS !== undefined && !(Number.isInteger(MIN_FIRE_GAP_MS) && MIN_FIRE_GAP_MS >= 0)) {
+    problems.push('MIN_FIRE_GAP_MS must be a whole number of ms >= 0');
+  }
   return problems;
 }

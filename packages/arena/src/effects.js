@@ -3,7 +3,8 @@
 // a shield is a weapon with type 'shield' (durability = blocked hits, optional reflect), and a
 // weapon may have shock / freezeMs / knockout / shieldWear. Time is passed in.
 
-import { at, send, sendNear, weaponDef, maxDurability } from './state.js';
+import { chargingDamage } from '@pvp/game-rules';
+import { at, send, sendNear, weaponDef, maxDurability, chargingFactor } from './state.js';
 import { inventoryMsg } from './players.js';
 import { damage } from './combat.js';
 
@@ -43,16 +44,20 @@ function facesAttacker(A, victim, attacker) {
  *    back to the attacker, and at 0 the shield breaks. No shock or freeze on a blocked hit.
  * 2. otherwise the damage (a knockout weapon takes every HP that is left), then shock / freeze if
  *    the target is still in.
+ * full = false (#38): the weapon was still charging: the hit does only chargingDamage(dmg) (CHARGING_DAMAGE of
+ * the rules, 25%, at least 1) and has NO specials: no knockout, no shock, no freeze. A blocked weak hit
+ * still costs the shield its shieldWear; a Mega Shield sends back its part of the weak damage.
  */
-export function strike(A, attacker, victim, w, def, kx = 0, kz = 0) {
+export function strike(A, attacker, victim, w, def, kx = 0, kz = 0, full = true) {
   if (!A.players.has(victim.id) || victim.hp <= 0 || A.now < victim.protectUntil) return;
+  const dmg = full ? (def.dmg || 0) : chargingDamage(def.dmg || 0, chargingFactor(A));
   if (victim.shield && victim.shieldUp && facesAttacker(A, victim, attacker)) {
-    block(A, attacker, victim, def);
+    block(A, attacker, victim, def, dmg);
     return;
   }
-  const amount = def.knockout ? Math.max(def.dmg || 0, victim.hp) : def.dmg;
+  const amount = full && def.knockout ? Math.max(dmg, victim.hp) : dmg;
   if (!damage(A, victim, amount, attacker, w, kx, kz)) return;
-  if (victim.hp <= 0) return;
+  if (victim.hp <= 0 || !full) return; // specials only on a fully charged hit
   if (def.shock) {
     // a new shock starts over: forMs / everyMs more ticks, the first one everyMs from now
     const { dmg, everyMs, forMs } = def.shock;
@@ -64,7 +69,7 @@ export function strike(A, attacker, victim, w, def, kx = 0, kz = 0) {
   }
 }
 
-function block(A, attacker, victim, def) {
+function block(A, attacker, victim, def, dmg) {
   const shieldId = victim.shield.id;
   const sdef = weaponDef(A, shieldId) || {};
   const wear = Number.isInteger(def.shieldWear) && def.shieldWear > 0 ? def.shieldWear : 1;
@@ -77,9 +82,9 @@ function block(A, attacker, victim, def) {
     victim.shieldUp = false;
     send(A, victim.id, { t: 'shieldbroke', weapon: shieldId });
   }
-  send(A, victim.id, inventoryMsg(victim));
+  send(A, victim.id, inventoryMsg(A, victim));
   // Mega Shield: part of the blocked damage goes back to the attacker (never knocks back).
-  const back = sdef.reflect > 0 ? Math.round((def.dmg || 0) * sdef.reflect) : 0;
+  const back = sdef.reflect > 0 ? Math.round(dmg * sdef.reflect) : 0;
   if (back > 0) damage(A, attacker, back, victim, shieldId);
 }
 

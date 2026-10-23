@@ -84,7 +84,7 @@ test('damage numbers replay exactly the same', () => {
   const run = () => {
     const { arena, a, v } = setup({ loadout: ['electricsword', 'icesword'], victimLoadout: ['shield'] });
     const log = [];
-    for (let t = READY, i = 0; t < READY + 30000; t += 250, i++) {
+    for (let t = READY, i = 0; t < READY + 60000; t += 1000, i++) {
       if (i % 9 === 0) arena.setShield(v, i % 2 === 0, t);
       if (i % 7 === 0) arena.selectSlot(a, 1 + (i % 2));
       swing(arena, a, t);

@@ -28,6 +28,16 @@ Decided by the boss through 22 questions.
   | **Supersword** | sword | knockout | 1.5 s | 40 hits | 0.3 | 250 | Megalegend | any hit knocks out at once; costs a raised shield 5 blocks |
 
 - Everyone starts with **the Gun**, finds better weapons in chests, or buys them in the shop.
+- **Charging (#38):** after you use a weapon it **charges** for its **Wait** time ("Charging 1.4s" under the crosshair).
+  - Each weapon charges **on its own**: while one charges, switch to another weapon and use it right away.
+    Two copies of the same weapon charge separately too. A weapon you drop and pick up again is ready.
+  - You **can** attack with a weapon that is still charging, but it only does **25%** of its damage
+    (rounded, at least 1) and **no special**: no shock, no freeze, no knockout (a charging Supersword hit does 25).
+    A small **"25%"** shows next to "Charging". It still uses durability and starts the charge over.
+  - A sword swing that hits only **air** does not start the charge (and costs no durability).
+  - Tapping super fast does not help: at most one attack every **0.15 s**.
+  - Holding the fire button attacks again only when the weapon is charged; a new tap always attacks.
+  - The 25% is one number in the rules (`CHARGING_DAMAGE`), easy to change.
 - **Shock (Electric Sword):** after the hit, 1 H.P is lost at 5 s, 10 s and 15 s (3 more). A new hit starts it over.
 - **Freeze (Ice Sword):** for 2 s you cannot move, turn, shoot, hit, switch weapons or raise your shield.
   You turn ice-blue inside an ice block.

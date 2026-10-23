@@ -3,7 +3,7 @@
 
 import { rayBoxes, rayCylinder } from '@pvp/collision';
 import { droppedDurability } from '@pvp/game-rules';
-import { at, send, sendNear, tellServer, weaponDef, heightOf, wearOf } from './state.js';
+import { at, send, sendNear, tellServer, weaponDef, heightOf, wearOf, chargeLeft, minFireGap } from './state.js';
 import { removePlayer, inventoryMsg } from './players.js';
 import { dropItem } from './loot.js';
 import { strike, isFrozen } from './effects.js';
@@ -63,7 +63,8 @@ function knockOut(A, victim, attacker, weapon, byName) {
 }
 
 // Returns true if the swing hit someone (a player, or a raised shield); a swing at the air returns false.
-function melee(A, p, w, def) {
+// full: the weapon is fully charged (false: a weak charging hit, see strike).
+function melee(A, p, w, def, full) {
   const T = A.tune;
   send(A, 'all', { t: 'swing', id: p.id });
   let target = null, best = def.range;
@@ -77,11 +78,11 @@ function melee(A, p, w, def) {
   }
   if (!target) return false;
   const d = best || 1, k = def.knock || T.meleeKnock;
-  strike(A, p, target, w, def, ((target.x - p.x) / d) * k, ((target.z - p.z) / d) * k);
+  strike(A, p, target, w, def, ((target.x - p.x) / d) * k, ((target.z - p.z) / d) * k, full);
   return true;
 }
 
-function gun(A, p, w, def, o, dir) {
+function gun(A, p, w, def, o, dir, full) {
   const R = A.rules, r = A.rnd.combat, spread = def.spread || 0;
   const radius = R.PLAYER_RADIUS + A.tune.hitRadiusExtra;
   const tracers = [];
@@ -98,7 +99,7 @@ function gun(A, p, w, def, o, dir) {
       const t = rayCylinder(o, sd, { x: v.x, y: v.y, z: v.z, height: heightOf(A, v), radius });
       if (t < dist) { dist = t; hit = v; }
     }
-    if (hit) strike(A, p, hit, w, def);
+    if (hit) strike(A, p, hit, w, def, 0, 0, full);
     tracers.push([round2(o.x + sx * dist), round2(o.y + sy * dist), round2(o.z + sz * dist)]);
   }
   send(A, 'all', { t: 'shot', id: p.id, w, from: [round2(o.x), round2(o.y), round2(o.z)], to: tracers });
@@ -107,6 +108,11 @@ function gun(A, p, w, def, o, dir) {
 /**
  * Use the weapon in hand, aiming along dir ([x, y, z] or { x, y, z }). Returns true if it fired.
  * Not while frozen, and not while the shield is raised.
+ * Charging (#38): every carried weapon (slot) charges on its own for its `rate` after a use, so another
+ * weapon can be used right away. A weapon that is still charging can be used too, but a hit then does only
+ * CHARGING_DAMAGE (25%) of the damage and no specials (see strike). A gun shot always (re)starts the charge,
+ * a melee swing only when it hits someone (a swing at the air neither charges nor wears, #34).
+ * Anti-spam: at most one use every MIN_FIRE_GAP_MS (150 ms) per player, whatever the weapon.
  */
 export function fire(A, id, dir, now) {
   const p = A.players.get(id);
@@ -116,7 +122,7 @@ export function fire(A, id, dir, now) {
   const w = p.weapons[p.slot];
   const def = weaponDef(A, w);
   if (p.drink) return false; // busy drinking a potion (switch slots to stop, the potion is wasted)
-  if (!def || now - p.lastFire < def.rate * 1000 * A.tune.fireRateSlack) return false;
+  if (!def || now - p.lastFire < minFireGap(A)) return false;
   let [dx, dy, dz] = Array.isArray(dir) ? dir.map(Number) : dir ? [dir.x, dir.y, dir.z].map(Number) : [0, 0, 1];
   const len = Math.hypot(dx, dy, dz);
   if (!len || !Number.isFinite(len)) return false;
@@ -126,14 +132,18 @@ export function fire(A, id, dir, now) {
   const o = { x: p.x, y: p.y + heightOf(A, p) - A.tune.muzzleDrop, z: p.z };
 
   const slot = p.slot;
-  let used = true; // a gun shot always wears; a melee swing only when it hits someone (#34)
+  const full = chargeLeft(A, p, slot) === 0; // fully charged: full damage and specials
+  let used = true; // a gun shot always wears and charges; a melee swing only when it hits someone (#34, #38)
   switch (def.type) {
-    case 'melee': used = melee(A, p, w, def); break;
-    case 'gun': gun(A, p, w, def, o, d); break;
+    case 'melee': used = melee(A, p, w, def, full); break;
+    case 'gun': gun(A, p, w, def, o, d, full); break;
     default: return false;
   }
   if (!A.players.has(p.id)) return true; // knocked out by a reflected hit: everything already dropped
-  if (used) wear(A, p, slot);
+  if (used) {
+    p.useAt[slot] = now; // this weapon charges again (the others keep their own charge)
+    wear(A, p, slot);
+  }
   return true;
 }
 
@@ -152,25 +162,30 @@ export function dropWeapon(A, id, now) {
   const [weapon] = p.weapons.splice(slot, 1);
   const [dur] = p.dur.splice(slot, 1);
   const [free] = p.free.splice(slot, 1);
+  p.useAt.splice(slot, 1); // its charge is lost: whoever picks it up gets it fully charged (#38)
   p.slot = Math.max(0, Math.min(slot, p.weapons.length - 1));
   const it = dropItem(A, 'weapon', weapon, p.x, p.z, A.tune.dropSpread, dur);
   it.ignore = p.id; // not picked straight back up by the one who dropped it
   if (free) it.free = true;
-  send(A, p.id, inventoryMsg(p));
+  send(A, p.id, inventoryMsg(A, p));
   return it.id;
 }
 
-/** One use of the weapon in `slot`: lose wearPerUse durability; at 0 it breaks and is gone. */
+/** One use of the weapon in `slot`: lose wearPerUse durability; at 0 it breaks and is gone. Sends an 'inv'. */
 function wear(A, p, slot) {
   const left = p.dur[slot];
-  if (left === null || left === undefined) return; // never breaks
+  if (left === null || left === undefined) { // never breaks
+    send(A, p.id, inventoryMsg(A, p)); // still: the new charge of this slot (#38)
+    return;
+  }
   p.dur[slot] = Math.max(0, left - wearOf(A, p.weapons[slot]));
   if (p.dur[slot] === 0) {
     const [weapon] = p.weapons.splice(slot, 1);
     p.dur.splice(slot, 1);
     p.free.splice(slot, 1);
+    p.useAt.splice(slot, 1);
     p.slot = Math.max(0, Math.min(p.slot, p.weapons.length - 1)); // same slot number, or the last one
     send(A, p.id, { t: 'broke', slot, weapon });
   }
-  send(A, p.id, inventoryMsg(p)); // so the durability bar is always right
+  send(A, p.id, inventoryMsg(A, p)); // so the durability bar is always right
 }

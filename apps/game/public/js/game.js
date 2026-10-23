@@ -10,7 +10,7 @@ import { createInputState, attachTouchControls, attachDesktopControls, isTouchDe
 import { decodeServerMessage, encodeClient, unpackSnapshotPlayer, makeFlags, readFlags } from '@pvp/net-protocol';
 import { slotBar, heldDurabilityView, healthView, pickSlot, brokeMessage, shieldView, WEAPON_ICONS } from '@pvp/hud-model';
 import { potionView, drinkState, drinkMessage, POTION_ICON_SVG, bombView } from '@pvp/hud-model';
-import { chargeView } from '@pvp/hud-model';
+import { chargeView, chargeStarts } from '@pvp/hud-model';
 import { DamageNumbers } from './damage-numbers.js';
 
 const $ = id => document.getElementById(id);
@@ -22,6 +22,10 @@ const MENU_PREVIEW_SHIFT_Y = 0.2;  // ... or below the middle (portrait)
 const HIT_RADIUS = C.PLAYER_RADIUS + 0.1; // a bit wider than the body, like the server
 const v3 = (x, y, z) => ({ x, y, z });
 const BOMB_ARC = 0.18; // a thrown bomb flies this high per meter (plus 0.6 m)
+// Charging (#38): a new press of the fire button always fires (at most every MIN_FIRE_GAP_MS, like the server);
+// holding it fires again only when the held weapon is charged, and not more often than this.
+const MIN_FIRE_GAP_MS = Number.isFinite(C.MIN_FIRE_GAP_MS) ? C.MIN_FIRE_GAP_MS : 150;
+const HOLD_REPEAT_MS = 500;
 
 // Distance along a unit ray to the first wall or the ground, at most maxDist.
 function rayWorld(world, ox, oy, oz, dx, dy, dz, maxDist) {
@@ -76,7 +80,9 @@ export class Game {
     $('drinkIcon').innerHTML = POTION_ICON_SVG;
     this.drink = null; // the potion drinking in progress: { startedAt, ms } (from the server's 'drink' messages)
     this.dmgNums = new DamageNumbers($('dmgNums')); // "-15" above heads (#33)
-    this.lastFire = -Infinity; // when I last shot or swung (performance.now()), for "Charging 1.4s" (#35)
+    this.lastFire = -Infinity; // when I last shot or swung (performance.now()), for the anti-spam gap
+    this.chargeAt = []; // per slot: when that weapon started charging (performance.now()) or null = ready (#35, #38)
+    this.fireHeld = false; this.firePending = false; // the fire button: held last frame / a new press not sent yet
     this.mode = 'menu';
     this.time = 0;
 
@@ -271,7 +277,7 @@ export class Game {
       openChests: this.chests.meshes.flatMap((m, id) => (m.userData.open ? [{ id, lid: +m.userData.lid.rotation.x.toFixed(3) }] : [])),
       nearChest: play ? this.nearChest ?? null : null,
       items: [...this.items.values()].map(it => ({ id: it.id, kind: it.kind, weapon: it.weapon, x: it.x, y: it.y, z: it.z })),
-      inv: this.inv ? { weapons: [...this.inv.weapons], potions: this.inv.potions, coins: this.inv.coins, shield: this.inv.shield ?? null, bombs: this.inv.bombs ?? [] } : null,
+      inv: this.inv ? { weapons: [...this.inv.weapons], slot: this.inv.slot, dur: [...(this.inv.dur ?? [])], potions: this.inv.potions, coins: this.inv.coins, shield: this.inv.shield ?? null, bombs: this.inv.bombs ?? [] } : null,
       // bombs thrown that have not exploded yet, and how many explosions this page has seen (#32)
       bombs: [...this.bombs.values()].map(b => ({ id: b.id, b: b.b, landed: b.landed, area: b.areaSide, ...pos(b.mesh.position) })),
       booms: this.booms,
@@ -282,6 +288,7 @@ export class Game {
       drinking: this.drink ? potionView(this.inv, { drink: this.drink, now: performance.now() }).progress : null,
       // the "Charging 1.4s" text under the crosshair (#35) and the damage numbers above heads (#33)
       charge: play ? $('charge').classList.contains('hidden') ? '' : $('chargeText').textContent : '',
+      chargeHint: play && !$('charge').classList.contains('hidden') ? $('chargeHint').textContent : '', // '25%' while charging (#38)
       damageNumbers: play ? this.dmgNums.shown() : [],
     };
   }
@@ -345,7 +352,7 @@ export class Game {
     if (this.preview) this.preview.root.visible = false;
     this.mode = 'play';
     this.frameMenu();
-    this.lastSend = 0; this.lastFire = -Infinity;
+    this.lastSend = 0; this.lastFire = -Infinity; this.chargeAt = []; this.fireHeld = this.firePending = false;
     this.input.reset();
     this.input.enabled = true;
     $('hud').classList.remove('hidden');
@@ -358,7 +365,7 @@ export class Game {
     this.drink = null;
     this.renderPotion();
     this.dmgNums.clear();
-    this.lastFire = -Infinity;
+    this.lastFire = -Infinity; this.chargeAt = [];
     this.renderCharge();
     this.input.enabled = false;
     this.input.reset();
@@ -428,7 +435,8 @@ export class Game {
   }
 
   onInventory(m) {
-    this.inv = m; // weapons, dur (uses left per slot, null = never breaks), slot, potions, coins, hp
+    this.inv = m; // weapons, dur (uses left per slot, null = never breaks), charge (ms per slot), slot, potions, coins, hp
+    this.chargeAt = chargeStarts(m, performance.now(), this.chargeAt, C); // each weapon charges on its own (#38)
     this.coins = m.coins;
     $('hudCoins').textContent = m.coins;
     this.setHp(m.hp);
@@ -611,10 +619,13 @@ export class Game {
   }
 
   // "Charging 1.4s" and a small ring just under the crosshair after you shoot or swing (#35); "Ready!" for a moment.
+  // Only for the weapon in your hand: each weapon charges on its own, so a ready one shows nothing (#38).
+  // While charging a small "25%" hint: a hit now does only that much damage.
   // Hidden while drinking a potion (no shooting then, and the big drinking ring is around the crosshair).
   renderCharge() {
     const def = this.inv && C.WEAPONS[this.inv.weapons[this.inv.slot]];
-    const v = this.mode === 'play' && !this.drink ? chargeView(def, this.lastFire, performance.now()) : null;
+    const at = this.inv ? this.chargeAt[this.inv.slot] : null;
+    const v = this.mode === 'play' && !this.drink ? chargeView(def, at, performance.now(), { chargingDamage: C.CHARGING_DAMAGE }) : null;
     const el = $('charge');
     const show = !!v?.visible;
     if (el.classList.contains('hidden') === show) el.classList.toggle('hidden', !show);
@@ -623,6 +634,9 @@ export class Game {
     el.style.setProperty('--p', v.progress.toFixed(3));
     const text = $('chargeText');
     if (text.textContent !== v.text) text.textContent = v.text;
+    const hint = $('chargeHint');
+    if (hint.textContent !== v.hint) hint.textContent = v.hint;
+    hint.classList.toggle('hidden', !v.hint);
   }
 
   // Where a player stands now (me or someone I can see), or null.
@@ -937,12 +951,20 @@ export class Game {
       this.throwBomb(id, [ax / len, ay / len, az / len]);
     }
 
-    // shooting
+    // shooting (#38): a new press always fires (a weapon still charging does 25%); holding fires again when charged
     const w = this.inv && this.inv.weapons[this.inv.slot];
     const def = C.WEAPONS[w];
     const now = performance.now();
-    if (fire && def && !this.shieldUp && now - this.lastFire >= def.rate * 1000) {
+    if (fire && !this.fireHeld) this.firePending = true;
+    if (!fire) this.firePending = false;
+    this.fireHeld = fire;
+    const slot = this.inv ? this.inv.slot : 0;
+    const charged = !(this.chargeAt[slot] + (def ? def.rate * 1000 : 0) > now);
+    const want = this.firePending || (fire && charged && now - this.lastFire >= HOLD_REPEAT_MS);
+    if (want && def && !this.shieldUp && now - this.lastFire >= MIN_FIRE_GAP_MS) {
       this.lastFire = now;
+      this.firePending = false;
+      if (def.type === 'gun') this.chargeAt[slot] = now; // a shot always charges (the server's 'inv' fixes the exact time)
       const cam = this.camera.position;
       const range = def.type === 'gun' ? def.range : 60;
       // what is under the crosshair?

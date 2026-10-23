@@ -92,7 +92,7 @@ export function throwBomb(A, id, bombId, dir, now) {
   };
   A.bombs.set(b.id, b);
   send(A, 'all', bombMsg(A, b));
-  send(A, p.id, inventoryMsg(p));
+  send(A, p.id, inventoryMsg(A, p));
   return b.id;
 }
 

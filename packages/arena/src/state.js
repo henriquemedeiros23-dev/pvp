@@ -1,6 +1,6 @@
 // The arena's inner state and the small helpers every part uses.
 
-import { RULES as defaultRules, weaponDurability, weaponWear, RARITIES } from '@pvp/game-rules';
+import { RULES as defaultRules, weaponDurability, weaponWear, RARITIES, CHARGING_DAMAGE, MIN_FIRE_GAP_MS } from '@pvp/game-rules';
 import { ARENA_DEFAULTS } from './tuning.js';
 
 // Accept a @pvp/seeded-random generator (or anything with next(), or a plain function).
@@ -96,3 +96,21 @@ export const heightOf = (A, p) => ((p.flags & 1) ? A.rules.CROUCH_HEIGHT : A.rul
 export const bombTable = A => (A.rules.BOMBS && typeof A.rules.BOMBS === 'object' ? A.rules.BOMBS : {});
 /** One bomb's rules, or undefined for an unknown id. */
 export const bombDef = (A, id) => (typeof id === 'string' && Object.hasOwn(bombTable(A), id) ? bombTable(A)[id] : undefined);
+
+// ---------------------------------------------------------------- charging (#38)
+// Every carried weapon charges on its own: p.useAt[slot] (parallel to p.weapons) is when that weapon's
+// charge last started (-Infinity = never used: ready). A weapon picked up from the ground starts ready.
+
+/** How long (ms) a weapon charges after a use: its rate * 1000 * tuning fireRateSlack (0 for no rate). */
+export function chargeMs(A, id) {
+  const rate = weaponDef(A, id)?.rate;
+  return typeof rate === 'number' && rate > 0 ? rate * 1000 * A.tune.fireRateSlack : 0;
+}
+/** Ms left until the weapon in `slot` is fully charged (0 = ready), rounded up to whole ms. */
+export function chargeLeft(A, p, slot) {
+  const since = A.now - (p.useAt?.[slot] ?? -Infinity);
+  return Math.max(0, Math.ceil(chargeMs(A, p.weapons[slot]) - since));
+}
+/** The rules' charging factor (CHARGING_DAMAGE, default 0.25) and anti-spam gap (MIN_FIRE_GAP_MS, default 150). */
+export const chargingFactor = A => (typeof A.rules.CHARGING_DAMAGE === 'number' ? A.rules.CHARGING_DAMAGE : CHARGING_DAMAGE);
+export const minFireGap = A => (Number.isFinite(A.rules.MIN_FIRE_GAP_MS) ? A.rules.MIN_FIRE_GAP_MS : MIN_FIRE_GAP_MS);

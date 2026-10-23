@@ -5,7 +5,7 @@
 import { deepFreeze } from './freeze.js';
 
 /** Bump when a message changes in a way old phones or servers would not understand. */
-export const PROTOCOL_VERSION = 4; // 2: shields and status effects (#26), explosives removed; 3: 'dmg' damage numbers (#33); 4: bombs (#32)
+export const PROTOCOL_VERSION = 5; // 2: shields and status effects (#26), explosives removed; 3: 'dmg' damage numbers (#33); 4: bombs (#32); 5: inv.charge per slot (#38)
 
 /** Longest raw message a client may send (bytes). Same as the server's WebSocket maxPayload. */
 export const MAX_CLIENT_MESSAGE_SIZE = 4096;
@@ -126,6 +126,7 @@ export const SERVER_MESSAGES = deepFreeze({
   inv: m('Your inventory and health.', {
     weapons: [{ list: 'string', max: 32 }, 'Weapon ids, one per slot'],
     dur: [{ optional: { list: DUR, max: 32 } }, 'Uses left per slot, same order as weapons (null = never breaks); max is the weapon\'s durability in the rules'],
+    charge: [{ optional: { list: 'uint', max: 32 } }, 'Ms until each slot\'s weapon is fully charged, same order as weapons (0 = ready); a hit while charging does CHARGING_DAMAGE (25%) (#38)'],
     slot: ['uint', 'Slot in hand'],
     potions: ['uint', 'Healing Potions carried (max MAX_POTIONS in the rules)'],
     coins: [BIG_INT, 'Your coins'],

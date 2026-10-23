@@ -101,6 +101,7 @@ function take(A, p, it) {
     p.weapons.push(it.weapon);
     p.dur.push(it.dur === undefined ? maxDurability(A, it.weapon) : it.dur); // what the ground item had
     p.free.push(!!it.free); // a dropped free starting Gun stays free (never goes into a backpack)
+    p.useAt.push(-Infinity); // a picked-up weapon starts fully charged (#38)
     return weaponDef(A, it.weapon)?.name ?? it.weapon;
   }
   if (it.kind === 'bomb') {
@@ -133,7 +134,7 @@ export function tickItems(A, now) {
       if (picked === null) continue;
       A.items.delete(it.id);
       send(A, 'all', { t: 'item-', id: it.id, by: p.id });
-      send(A, p.id, inventoryMsg(p, picked));
+      send(A, p.id, inventoryMsg(A, p, picked));
       break;
     }
   }

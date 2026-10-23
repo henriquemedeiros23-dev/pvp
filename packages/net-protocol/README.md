@@ -52,6 +52,9 @@ Bombs (#32, protocol version 4): the client message `throw` (`{ b, d }`), the se
 and `boom` (exploded), `inv.bombs` (`[{ id, n }]`), `welcome.bombs` (bombs not exploded yet) and bomb ground items
 (`kind: 'bomb'`, the bomb id in `weapon`, how many in `n`). The new fields are optional, so older messages stay valid.
 
+Charging (#38, protocol version 5): `inv.charge` (ms until each slot's weapon is fully charged, same order as `weapons`,
+0 = ready). Every weapon charges on its own; `fire` is allowed while charging (25% damage). The field is optional.
+
 Weapon durability: `inv.dur` (uses left per slot, `null` = never breaks), `dur` on ground items (`item+`, `welcome.items`)
 and the `broke` message (`{ t: 'broke', slot, weapon }`). The `dur` fields are optional, so older messages stay valid.
 

@@ -243,6 +243,8 @@ body:not(.desktop) .bombbtn .bkey { display: none; }
 .charge .ctext { font-size: 12px; font-weight: 800; color: #fff; text-shadow: 0 1px 2px #000; font-variant-numeric: tabular-nums; }
 .charge.ready .cring { background: #45e070; }
 .charge.ready .ctext { color: #8dffa8; }
+/* "25%" while the held weapon is still charging: a hit now does only that much damage (#38) */
+.charge .chint { font-size: 10px; font-weight: 900; color: #1a1200; background: #ffd34d; border-radius: 999px; padding: 0 5px; line-height: 14px; }
 /* Damage numbers above heads (#33): "-15" floats up and fades (moved by js/damage-numbers.js) */
 .dmgnums { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
 .dmgnum {

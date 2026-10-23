@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as rules from '../src/index.js';
 import {
+  CHARGING_DAMAGE, MIN_FIRE_GAP_MS, chargingDamage,
   BOMBS, isBomb, bombPrice, bombMaxCarry, bombCounts, inBombArea,
   RULES, WEAPONS, COLORS, OUTFITS, DEFAULT_SKIN, LOOT_TABLE, POTION, MAX_POTIONS, potionPrice, potionHeal, STARTING_WEAPON, RARITIES, RARITY_COLORS,
   CHEST_COINS, GOLDEN_CHEST_COINS, GOLDEN_CHEST_BOOST, WEAPON_TYPES, isShield, rarityRank, rarityStyle, droppedDurability, chestChance, validateRules, weaponPrice, weaponDurability, weaponWear, skinPrice, isBuyable, itemPrice, weaponsByRarity,
@@ -369,4 +370,32 @@ test('bad bombs are reported', () => {
     'bomb gun: the id is also a weapon',
   ]);
   assert.deepEqual(validateRules({ ...RULES, BOMBS: 5 }).filter(p => p.startsWith('BOMBS')), ['BOMBS must be an object']);
+});
+
+test('charging (#38): a hit while the weapon is still charging does 25% (rounded, at least 1)', () => {
+  assert.equal(CHARGING_DAMAGE, 0.25);
+  assert.equal(RULES.CHARGING_DAMAGE, 0.25);
+  assert.equal(MIN_FIRE_GAP_MS, 150);
+  assert.equal(RULES.MIN_FIRE_GAP_MS, 150);
+  assert.equal(chargingDamage(2), 1);    // 0.5 rounds to 1
+  assert.equal(chargingDamage(5), 1);    // 1.25
+  assert.equal(chargingDamage(10), 3);   // 2.5 rounds up
+  assert.equal(chargingDamage(15), 4);   // 3.75
+  assert.equal(chargingDamage(25), 6);   // 6.25
+  assert.equal(chargingDamage(100), 25); // the Supersword while charging: no knockout, 25
+  assert.equal(chargingDamage(1, 0.1), 1, 'at least 1');
+  assert.equal(chargingDamage(10, 0.5), 5, 'the factor can be tuned');
+  assert.equal(chargingDamage(0), 0);
+  assert.equal(chargingDamage(undefined), 0);
+});
+
+test('bad charging numbers are reported', () => {
+  assert.deepEqual(validateRules({ ...RULES, CHARGING_DAMAGE: 2, MIN_FIRE_GAP_MS: -1 }).slice(-2), [
+    'CHARGING_DAMAGE must be a number from 0 to 1',
+    'MIN_FIRE_GAP_MS must be a whole number of ms >= 0',
+  ]);
+  const without = { ...RULES };
+  delete without.CHARGING_DAMAGE;
+  delete without.MIN_FIRE_GAP_MS;
+  assert.deepEqual(validateRules(without), [], 'optional');
 });

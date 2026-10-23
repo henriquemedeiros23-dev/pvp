@@ -10,7 +10,7 @@ export const ARENA_DEFAULTS = Object.freeze({
   koDropSpread: 2,             // how far a knocked-out player's items scatter (m)
   pickupRadius: 1.5,           // auto pick up within this distance (m)
   pickupHeight: 2,             // ... and this height difference (m)
-  fireRateSlack: 0.9,          // next shot allowed after rate * 1000 * slack ms
+  fireRateSlack: 0.9,          // a weapon is fully charged rate * 1000 * slack ms after its last use (#38: before that 25% damage)
   muzzleDrop: 0.3,             // shots start this far below the head (m)
   meleeMaxHeightDiff: 2,
   meleeFrontDot: 0.45,         // target must be in front (cos of the angle)

@@ -13,7 +13,7 @@ import {
   WEAPONS, STARTING_WEAPON, RARITIES, RARITY_COLORS, MAX_HP, DEFAULT_SKIN, RULES, CHEST_COINS, GOLDEN_CHEST_COINS,
   weaponPrice, skinPrice, isBuyable, weaponsByRarity, weaponDurability, weaponWear,
   chestChance, droppedDurability, rarityStyle, isShield, rarityRank, validateRules, POTION, MAX_POTIONS, potionHeal, itemPrice,
-  BOMBS, isBomb, bombPrice, bombMaxCarry, bombCounts, inBombArea,
+  BOMBS, isBomb, bombPrice, bombMaxCarry, bombCounts, inBombArea, CHARGING_DAMAGE, MIN_FIRE_GAP_MS, chargingDamage,
 } from '@pvp/game-rules';
 // In the browser without a bundler: import from '/path/to/packages/game-rules/src/index.js'
 
@@ -41,6 +41,9 @@ itemPrice('bomb', 'legendarybomb'); // 60: one pack of 3 Legendary Bombs
 bombMaxCarry('bomb');           // 5
 bombCounts({ bomb: 9 }, { cap: true }); // { bomb: 5, legendarybomb: 0 } (a clean counter, capped at maxCarry)
 inBombArea('bomb', 10, 10, 11, 9); // true: inside the 2x2 m square around (10, 10) (the edge counts)
+CHARGING_DAMAGE;                // 0.25: a hit with a weapon that is still charging does 25% (#38; tune it here)
+chargingDamage(15);             // 4: 15 * 0.25 rounded, at least 1 (chargingDamage(100) = 25: no knockout)
+MIN_FIRE_GAP_MS;                // 150: anti-spam, at most one use every 150 ms whatever the weapon
 
 validateRules(RULES);           // [] — empty means valid
 validateRules({ ...RULES, STARTING_WEAPON: 'laser' });

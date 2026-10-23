@@ -22,7 +22,7 @@ test('a melee swing that hits nothing costs no durability; a hit on a player doe
   assert.equal(arena.fire(id, [0, 0, 1], READY), true, 'it still swings (and waits for the next swing)');
   assert.deepEqual(msgs(drain(arena), 'swing'), [{ t: 'swing', id }]);
   assert.equal(dur(arena, id), 50);
-  assert.equal(arena.fire(id, [0, 0, 1], READY + 100), false, 'the wait between swings still counts');
+  assert.equal(arena.fire(id, [0, 0, 1], READY + 100), false, 'the anti-spam gap (150 ms) still counts');
   arena.teleport(v, { x: 0, z: 2 });
   arena.fire(id, [0, 0, 1], READY + 3000);
   assert.equal(arena.getPlayer(v).hp, 90);

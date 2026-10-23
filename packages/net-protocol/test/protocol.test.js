@@ -36,7 +36,7 @@ const SERVER_EXAMPLES = {
   full: {},
   left: {},
   snap: { p: [[3, 1.5, 0, -2.25, 0.5, -0.1, 5, 'shootbm', 100, 1, 'shield', 5]], n: 4 },
-  inv: { weapons: ['fists', 'shootbm'], dur: [null, 12], slot: 0, potions: 2, coins: 120, hp: 100, shield: { id: 'megashield', dur: 64 },
+  inv: { weapons: ['fists', 'shootbm'], dur: [null, 12], charge: [0, 1800], slot: 0, potions: 2, coins: 120, hp: 100, shield: { id: 'megashield', dur: 64 },
     bombs: [{ id: 'bomb', n: 4 }, { id: 'legendarybomb', n: 0 }] },
   broke: { slot: 1, weapon: 'shootbm' },
   drink: { state: 'start', ms: 5000, hp: 40 },
@@ -70,7 +70,7 @@ const rejected = (raw) => {
 };
 
 test('constants', () => {
-  assert.equal(PROTOCOL_VERSION, 4);
+  assert.equal(PROTOCOL_VERSION, 5);
   assert.equal(MAX_MESSAGE_SIZE, 4096);
   assert.deepEqual([FLAG_CROUCH, FLAG_SLIDE, FLAG_MOVING, FLAG_AIR], [1, 2, 4, 8]);
   assert.equal(SNAP_LENGTH, 12);
@@ -266,6 +266,14 @@ test('status helpers and the shield fields', () => {
   assert.equal(parseClientMessage(J({ t: 'shield', up: 'yes' })).ok, false);
   assert.equal(parseClientMessage(J({ t: 'shield' })).ok, false);
   assert.deepEqual(decodeServerMessage(encode('hitmark', { dead: true })).msg, { t: 'hitmark', dead: true });
+});
+
+test('inv.charge (#38): ms until each slot is charged, optional, whole numbers >= 0', () => {
+  const { charge, ...noCharge } = SERVER_EXAMPLES.inv;
+  assert.deepEqual(decodeServerMessage(encode('inv', SERVER_EXAMPLES.inv)).msg.charge, charge);
+  assert.ok(decodeServerMessage(encode('inv', noCharge)).ok, 'older messages without charge stay valid');
+  assert.equal(decodeServerMessage(J({ t: 'inv', ...noCharge, charge: [-1] })).ok, false);
+  assert.equal(decodeServerMessage(J({ t: 'inv', ...noCharge, charge: [1.5] })).ok, false);
 });
 
 test('flags helpers', () => {

@@ -9,7 +9,7 @@ export { POTION_ICON_SVG, drinkState, drinkMessage, potionView } from './potion.
 export { BOMB_KEYS, bombIconSvg, bombView } from './bombs.js';
 // The "Charging 1.4s" text under the crosshair (#35) and the damage numbers above heads (#33).
 export {
-  chargeView, damageNumber, damageFloat, READY_FLASH_MS, DAMAGE_NUMBER_MS, DAMAGE_NUMBER_RISE, DAMAGE_COLORS,
+  chargeView, chargeStarts, damageNumber, damageFloat, READY_FLASH_MS, DAMAGE_NUMBER_MS, DAMAGE_NUMBER_RISE, DAMAGE_COLORS,
 } from './feedback.js';
 
 /** One emoji per weapon id, for slots, the kill feed and the shop (bombs too: they can knock out). */

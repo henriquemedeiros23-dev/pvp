@@ -96,6 +96,7 @@ graph LR
 | `chestChance(id)`, `CHEST_COINS`, `GOLDEN_CHEST_COINS`, `GOLDEN_CHEST_BOOST` | `chestChance('gun'); // 15 (a weight: 15 / 54.8 of chests)` |
 | `isShield(id)`, `rarityRank(r)` | `isShield('megashield'); // true (worn on the arm, no slot)` |
 | `droppedDurability(id, usesLeft)` | `droppedDurability('gun', 3); // 8 (half, rounded up)` |
+| `CHARGING_DAMAGE`, `MIN_FIRE_GAP_MS`, `chargingDamage(dmg)` | `chargingDamage(15); // 4: a hit while the weapon still charges does 25% (#38)` |
 | `RULES` | `createArena({ rules: RULES, ... }) // everything in one object` |
 | `weaponPrice(id)` / `skinPrice(slot, id)` | `weaponPrice('gun'); // 3` |
 | `isBuyable(kind, id)` | `isBuyable('weapon', 'supersword'); // true` |
@@ -181,7 +182,7 @@ graph LR
 |---|---|
 | `createArena(opts)` | `const arena = createArena({ island: generateIsland(), rules: RULES, random: createRandom(1234), now: 0 });` |
 | `arena.join` / `arena.leave` | `const r = arena.join('alice', { name: 'Alice', skin, loadout: ['shootbm', 'shield'] }, now);` |
-| `arena.setState` / `arena.fire` | `arena.fire(id, [dx, dy, dz], now);` |
+| `arena.setState` / `arena.fire` | `arena.fire(id, [dx, dy, dz], now); // each slot charges on its own; charging = 25% damage (#38)` |
 | `arena.setShield` | `arena.setShield(id, true, now); // raise the shield (no firing while up)` |
 | `arena.dropWeapon` | `arena.dropWeapon(id, now); // drop the weapon in hand, exact durability (#34)` |
 | `arena.openChest` | `arena.openChest(id, 3, now); // or 'golden'` |
@@ -229,7 +230,8 @@ graph LR
 | `potionView(inv, { drink, now })` / `drinkState` | `potionView(inv, { drink, now }).progress; // drinking ring 0..1` |
 | `POTION_ICON_SVG` | `btn.innerHTML = POTION_ICON_SVG; // the flask from the drawing` |
 | `bombView(inv)` / `bombIconSvg(color)` / `BOMB_KEYS` | `bombView(inv)[0]; // { id: 'bomb', count: 4, max: 5, key: 'B', … }` |
-| `chargeView(weaponDef, lastFireAt, now)` | `chargeView(RULES.WEAPONS.gun, 1000, 1600).text; // 'Charging 1.4s' (then 'Ready!', then hidden)` |
+| `chargeView(weaponDef, lastFireAt, now)` | `chargeView(RULES.WEAPONS.gun, 1000, 1600).text; // 'Charging 1.4s' (hint '25%'; then 'Ready!', then hidden)` |
+| `chargeStarts(inv, now, prev)` | `chargeStarts({ weapons: ['gun', 'shootbm'], charge: [0, 2700] }, now); // per slot lastFireAt for chargeView (#38)` |
 | `damageNumber(msg)` / `damageFloat(age)` | `damageNumber({ t: 'dmg', id: 3, amount: 15 }).text; // '-15'; damageFloat(1000) // { rise, opacity, scale, done }` |
 | `WEAPON_ICONS` | `WEAPON_ICONS.icesword; // '❄️'` |
 

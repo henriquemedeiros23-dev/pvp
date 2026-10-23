@@ -83,9 +83,21 @@ setInterval(() => {
   fire, switch slots or raise its shield, and a raised shield drops. **Knockout** (`knockout: true`): the hit
   takes all HP that is left. The snapshot shows the shield id and status bits (1 shield up, 2 shocked, 4 frozen).
 - **Durability** (from the rules' `durability` / `wearPerUse`, see `@pvp/game-rules`): each player weapon has
-  uses left (`getPlayer(id).dur`, parallel to `weapons`; `null` = never breaks). Every fire that passes the rate
-  check costs `wearPerUse` and queues an `inv` (with `dur`) for that player: every shot, but a melee swing only
-  when it hits a player or a raised shield (a swing at the air is free, #34; it still waits `rate`).
+  uses left (`getPlayer(id).dur`, parallel to `weapons`; `null` = never breaks). Every use costs `wearPerUse`
+  and queues an `inv` (with `dur` and `charge`) for that player: every shot, but a melee swing only when it hits
+  a player or a raised shield (a swing at the air is free, #34). A weak hit while charging wears it the same.
+- **Charging (#38):** every carried weapon charges on its **own** (per slot, `getPlayer(id).useAt`, parallel to
+  `weapons`: when that slot last started charging, `-Infinity` = ready). A weapon is charged `rate * 1000 *
+  fireRateSlack` ms (tuning, 0.9: 10% early for lag) after its last use, so you can switch to another weapon
+  and use it right away; copies of the same weapon charge separately. A weapon that is still charging can be
+  used too: a hit then does only `chargingDamage(dmg, CHARGING_DAMAGE)` (rules, 0.25 = 25%, rounded, at least 1)
+  and **no specials** (no knockout, no shock, no freeze; a Supersword hit does 25). Every shot, and a melee
+  swing that hits someone (a player or a raised shield), starts that weapon's charge over; a swing at the air
+  does not. A blocked weak hit still costs the shield its `shieldWear`; a Mega Shield sends back its part of the
+  weak damage. A weapon dropped (or picked up) loses its charge: picked up it is ready; a broken weapon's charge
+  goes with it. `inv.charge` = ms left per slot (0 = ready), so the phone can show the held weapon's charge.
+  **Anti-spam:** at most one use every `MIN_FIRE_GAP_MS` (rules, 150 ms) per player, whatever the weapon;
+  faster fires are refused (`false`) and cost nothing.
 - **Drop (#34):** `dropWeapon(id)` puts the weapon in hand on the ground with exactly its durability (the half rule
   is only for knockouts). The dropper picks it up again only after stepping out of pickup range once; a dropped
   free starting Gun stays free (never goes into a backpack). Not while frozen.

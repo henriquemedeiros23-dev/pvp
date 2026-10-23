@@ -105,7 +105,7 @@ test('the starting Gun: 2 damage, one shot every 2 s, breaks after 15 shots and 
   let t = READY;
   assert.equal(arena.fire(id, aimAt(arena, id, v), t), true);
   assert.equal(arena.getPlayer(v).hp, RULES.MAX_HP - 2);
-  assert.equal(arena.fire(id, aimAt(arena, id, v), t + 1000), false, 'too soon: 2 s between shots');
+  assert.equal(arena.fire(id, aimAt(arena, id, v), t + 100), false, 'too soon: the anti-spam gap (150 ms)');
   for (let i = 1; i < 15; i++) { t += 2000; assert.equal(arena.fire(id, [0, 1, 0], t), true, `shot ${i + 1}`); }
   const out = drain(arena);
   assert.deepEqual(msgs(out, 'broke', id), [{ t: 'broke', slot: 0, weapon: 'gun' }]);

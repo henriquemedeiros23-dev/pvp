@@ -1,4 +1,4 @@
-# PvP network protocol (version 4)
+# PvP network protocol (version 5)
 
 Phone and server talk over a WebSocket (`/?token=<login token>`). Every message is **one JSON object**.
 The field `t` says what kind of message it is. A phone may send at most **4096 bytes** per message.
@@ -14,7 +14,7 @@ The exact rules live in `src/messages.js`.
 | `join` | – | Join the fight. |
 | `leave` | – | Leave alive; weapons go back to the backpack. Server answers `left`. |
 | `state` | `x, y, z` number, `ry, pitch` number (radians), `f` int 0–255 | My position and look, ~20 times a second. `f` = movement flags (below). |
-| `fire` | `d` vec3 | Use the weapon in my hand, aiming in direction `d`. |
+| `fire` | `d` vec3 | Use the weapon in my hand, aiming in direction `d`. Allowed while the weapon is still charging (the hit then does `CHARGING_DAMAGE`, 25%, and no specials); at most one every `MIN_FIRE_GAP_MS` (150 ms), faster ones are ignored (#38). |
 | `slot` | `i` int 0–31 | Switch to weapon slot `i` (0 = the first slot; it may hold nothing if your weapons broke). |
 | `open` | `id` int or `"golden"` | Open the chest next to me (chest index, or the golden chest). |
 | `drop` | – | Drop the weapon in my hand on the ground, with exactly the durability it has (#34). Anyone can pick it up. Ignored while drinking. |
@@ -30,7 +30,7 @@ The exact rules live in `src/messages.js`.
 | `full` | – | Arena is full. |
 | `left` | – | You left (answer to `leave`). |
 | `snap` | `p` [snapshot player], `n` uint | 20 times a second: players near you, and how many are in the arena. |
-| `inv` | `weapons` [weapon id], `dur?` [uint or null], `slot`, `potions`, `coins`, `hp`, `shield?` {id, dur} or null, `bombs?` [{id, n}], `picked?` string | Your inventory and health (`potions` = Healing Potions carried, max `MAX_POTIONS` (3); `picked` = name of what you just picked up). `dur` = uses left per slot, same order as `weapons`; `null` = never breaks. The max is the weapon's `durability` in `@pvp/game-rules`. `shield` = the shield on your other arm and the blocks it has left (never in a slot). `bombs` = how many of each bomb you carry (max = the bomb's `maxCarry`). |
+| `inv` | `weapons` [weapon id], `dur?` [uint or null], `charge?` [uint], `slot`, `potions`, `coins`, `hp`, `shield?` {id, dur} or null, `bombs?` [{id, n}], `picked?` string | Your inventory and health (`potions` = Healing Potions carried, max `MAX_POTIONS` (3); `picked` = name of what you just picked up). `dur` = uses left per slot, same order as `weapons`; `null` = never breaks. The max is the weapon's `durability` in `@pvp/game-rules`. `charge` (#38) = ms until each slot's weapon is fully charged (0 = ready), same order as `weapons`; every weapon charges on its own. `shield` = the shield on your other arm and the blocks it has left (never in a slot). `bombs` = how many of each bomb you carry (max = the bomb's `maxCarry`). |
 | `drink` | `state` `"start"`/`"done"`/`"cancel"`, `ms` uint, `hp` | Potion drinking: `start` (the potion is used up now, `ms` = drinking time, show a progress ring), `done` (`hp` is full now), `cancel` (switched weapon or ended: the potion is wasted). An `inv` follows `start` and `done`. |
 | `broke` | `slot` uint, `weapon` id | Your weapon in `slot` broke (durability 0) and is gone, e.g. show "Your Shootbm broke!". An updated `inv` follows. |
 | `shieldbroke` | `weapon` id | Your shield broke (no blocks left) and is gone. An updated `inv` follows. |

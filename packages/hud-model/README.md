@@ -55,11 +55,18 @@ button.innerHTML = POTION_ICON_SVG;                 // the flask from the boss's
 
 ```js
 import { RULES } from '@pvp/game-rules';
-import { chargeView, damageNumber, damageFloat } from '@pvp/hud-model';
+import { chargeView, chargeStarts, damageNumber, damageFloat } from '@pvp/hud-model';
 
 // after you shoot or swing: the held weapon's `rate` (seconds between uses), from the moment of the last shot
 chargeView(RULES.WEAPONS.gun, lastFireAt, performance.now());
-// 0.6 s after a Gun shot: { visible: true, charging: true, ready: false, progress: 0.3, percent: 30, secondsLeft: 1.4, text: 'Charging 1.4s' }
+// 0.6 s after a Gun shot: { visible: true, charging: true, ready: false, progress: 0.3, percent: 30, secondsLeft: 1.4,
+//   text: 'Charging 1.4s', hint: '25%' }   hint: a hit now does only CHARGING_DAMAGE (25%) of the damage (#38)
+
+// #38: every weapon (slot) charges on its own. The server's 'inv' has charge = ms left per slot (0 = ready);
+// chargeStarts turns it into each slot's lastFireAt (prev: the last result, so "Ready!" still flashes).
+let starts = [];
+starts = chargeStarts(inv, performance.now(), starts);           // on every 'inv'
+chargeView(RULES.WEAPONS[inv.weapons[inv.slot]], starts[inv.slot], performance.now()); // only the HELD weapon
 // right when it is ready, for READY_FLASH_MS (0.5 s): { visible: true, ready: true, progress: 1, text: 'Ready!', ... }
 // after that, never shot, or no weapon: { visible: false, text: '', ... }
 
