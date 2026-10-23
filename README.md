@@ -1,4 +1,4 @@
-# PvP Game: Stickman Ruins
+# PvP Island
 
 A 3D stickman battle game for phones. Everyone joins one big arena that never stops,
 on an island full of ancient ruins. Open chests for coins and weapons, buy skins in the

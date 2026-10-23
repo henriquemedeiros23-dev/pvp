@@ -3,7 +3,7 @@
 import { createApiClient } from '@pvp/api-client';
 import { shopTabs, shopItems, backpackSummary, swatchBackground } from '@pvp/shop-catalog';
 import { WEAPONS, BOMBS } from '@pvp/game-rules';
-import { WEAPON_ICONS, POTION_ICON_SVG, bombIconSvg } from '@pvp/hud-model';
+import { WEAPON_ICONS, POTION_ICON_SVG, bombIconSvg, coinIconDataUrl } from '@pvp/hud-model';
 import { Game } from './game.js';
 
 const $ = id => document.getElementById(id);
@@ -17,6 +17,10 @@ const api = inject.api || createApiClient({ storage: (() => { try { return windo
 let account = null;
 let tab = 'color';
 let busy = false;
+
+// Every coin on the page (menu, shop, buy buttons, HUD pill, "+3 coins" pop-up) is a <span class="coin">
+// that draws this picture: the coin from the boss's drawing (#29).
+document.documentElement.style.setProperty('--coin-icon', `url("${coinIconDataUrl()}")`);
 
 // ------------------------------------------------------------ screens
 function show(screen) {

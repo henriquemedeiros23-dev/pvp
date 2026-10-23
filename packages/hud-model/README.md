@@ -2,7 +2,7 @@
 
 ## What it does
 
-Pure functions that turn the player's inventory (the server's `inv` message) and health into what the in-game HUD shows (the boss's drawing, #24): a big **Durability** bar for the weapon you are holding, the **H.P** bar with its percent, always all weapon slots (empty ones too), which slot a key picks, the small **Shield** pill for the shield on your other arm (#26), the "Your Shootbm broke!" text, and the **Healing Potion button** with its count and drinking progress ring (#28), the **"Charging 1.4s"** text after a shot (#35) and the **damage numbers** above heads (#33). The game only draws the result. Plain ES module, works in Node and directly in the browser (with an import map for `@pvp/game-rules`).
+Pure functions that turn the player's inventory (the server's `inv` message) and health into what the in-game HUD shows (the boss's drawing, #24): a big **Durability** bar for the weapon you are holding, the **H.P** bar with its percent, always all weapon slots (empty ones too), which slot a key picks, the small **Shield** pill for the shield on your other arm (#26), the "Your Shootbm broke!" text, and the **Healing Potion button** with its count and drinking progress ring (#28), the **"Charging 1.4s"** text after a shot (#35), the **damage numbers** above heads (#33) and the **coin icon** from the boss's drawing (#29). The game only draws the result. Plain ES module, works in Node and directly in the browser (with an import map for `@pvp/game-rules`).
 
 ## How to use
 
@@ -94,6 +94,19 @@ bombView({ bombs: [{ id: 'bomb', n: 4 }] });
 //    color, icon: '<svg…>', title: 'Bomb (B): 3 damage in 2x2 m, up to 7 m away (it hurts you too!) · 4/5' },
 //  { id: 'legendarybomb', …, count: 0, empty: true, key: 'N' }]
 bombIconSvg('#ffc531');   // the round bomb with a fuse and a spark (the Legendary Bomb is gold)
+```
+
+**Coin icon** (`src/coin.js`, #29): the coin from the boss's drawing, used everywhere a coin shows (menu, shop,
+buy buttons, the HUD coin pill and the "+3 coins" pop-up). An almost square yellow coin with slightly cut corners,
+a darker outline, a "P" on it and three shiny sparkle lines on its top right.
+
+```js
+import { COIN_ICON_SVG, coinIconSvg, coinIconDataUrl, coinsToast, COIN_COLORS } from '@pvp/hud-model';
+
+el.innerHTML = COIN_ICON_SVG;                       // 64x64 viewBox; flat colors, no ids: fine to use many times
+coinIconSvg({ label: 'PvP', sparkle: false });      // 'P' (default), 'PvP' or '' on it; sparkle lines on/off
+document.documentElement.style.setProperty('--coin-icon', `url("${coinIconDataUrl()}")`); // for CSS backgrounds
+coinsToast(3);                                      // { amount: 3, text: '+3 coins' }  (1 -> '+1 coin')
 ```
 
 ## Determinism

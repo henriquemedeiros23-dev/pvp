@@ -56,7 +56,8 @@ input:focus { border-color: var(--gold); }
 .topbar { width: 100%; display: flex; justify-content: space-between; align-items: center; padding: 12px calc(16px + var(--safe-r)) 12px calc(16px + var(--safe-l)); }
 .who { font-weight: 800; font-size: 18px; }
 .coins { display: flex; align-items: center; gap: 8px; background: rgba(0,0,0,0.45); border: 1px solid var(--line); padding: 8px 14px; border-radius: 999px; font-weight: 800; font-size: 18px; }
-.coin { display: inline-block; width: 18px; height: 18px; border-radius: 50%; background: radial-gradient(circle at 35% 35%, #fff3b0, var(--gold) 45%, #c88a00); box-shadow: 0 0 0 2px #a87400 inset; vertical-align: middle; }
+/* the coin from the boss's drawing (#29): js/main.js sets --coin-icon from @pvp/hud-model's coinIconDataUrl() */
+.coin { display: inline-block; flex: none; width: 24px; height: 24px; background: var(--coin-icon, none) center / contain no-repeat; vertical-align: middle; }
 .back { background: rgba(0,0,0,0.45); border: 1px solid var(--line); border-radius: 999px; padding: 8px 16px; font-weight: 700; }
 
 .menu-body { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 0 16px 24px; }
@@ -264,6 +265,9 @@ body:not(.desktop) .bombbtn .bkey { display: none; }
 }
 .toast { position: absolute; left: 50%; top: 62%; transform: translateX(-50%); font-weight: 900; font-size: 18px; color: var(--gold); text-shadow: 0 2px 4px #000; opacity: 0; transition: opacity 0.4s; white-space: nowrap; }
 .toast.show { opacity: 1; transition: none; }
+.toast .coin { width: 30px; height: 30px; margin-right: 4px; vertical-align: -8px; }
+.toast.show .coin { animation: coin-pop 0.45s ease-out; }
+@keyframes coin-pop { 0% { transform: scale(0.4) translateY(8px); } 60% { transform: scale(1.25) translateY(-4px); } 100% { transform: none; } }
 
 .touch { position: absolute; inset: 0; pointer-events: none; }
 .stick { pointer-events: auto; position: absolute; left: calc(28px + var(--safe-l)); bottom: calc(28px + var(--safe-b)); width: 140px; height: 140px; border-radius: 50%; background: rgba(255,255,255,0.08); border: 2px solid rgba(255,255,255,0.22); }

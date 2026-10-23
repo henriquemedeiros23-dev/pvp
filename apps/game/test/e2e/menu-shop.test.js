@@ -186,6 +186,9 @@ async function checkPhoneLayout(p, { width, height }, others = ['stick', 'btnFir
 test('sign up, shop, join the arena, leave: no errors', { skip: !RUN && 'set E2E=1 to run (npm run test:e2e)', timeout: 240000 }, async () => {
   await page.goto(`http://127.0.0.1:${port}/?debug=1`); // ?debug: window.pvpDebug() shows the game state
   await page.locator('#login').waitFor({ state: 'visible' });
+  // the game's name (#31)
+  assert.equal(await page.title(), 'PvP Island');
+  assert.equal((await page.textContent('#login .logo')).trim(), 'PvPISLAND');
 
   // sign up
   const name = 'e2e_' + Date.now().toString(36).slice(-8);
@@ -196,6 +199,10 @@ test('sign up, shop, join the arena, leave: no errors', { skip: !RUN && 'set E2E
   assert.equal(await page.textContent('#menuName'), name);
   assert.equal(await page.textContent('#menuCoins'), '0');
   assert.match(await page.textContent('#menuBackpack'), /Backpack is empty/);
+  assert.equal((await page.textContent('#menu .logo')).trim(), 'PvP ISLAND');
+  // every coin is the coin from the boss's drawing (#29): an SVG picture, not a round CSS dot
+  const coinBg = await page.$eval('#menu .coins .coin', e => getComputedStyle(e).backgroundImage);
+  assert.match(coinBg, /^url\("data:image\/svg\+xml,/);
   await shot('menu.png');
 
   // shop: colors first, then every tab

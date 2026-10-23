@@ -1,4 +1,4 @@
-// Stickman Ruins game server: thin glue around the packages.
+// PvP Island game server: thin glue around the packages.
 // - serves the game files (and the browser code of the @pvp packages)
 // - accounts and the shop: @pvp/accounts-shop
 // - the single always-on arena: @pvp/arena on the island from @pvp/world-gen
@@ -283,7 +283,7 @@ wss.on('connection', (ws, req) => {
 });
 
 server.listen(PORT, () => {
-  console.log(`Stickman Ruins is running!`);
+  console.log(`PvP Island is running!`);
   console.log(`  On this computer:  http://localhost:${PORT}`);
   for (const list of Object.values(os.networkInterfaces())) {
     for (const n of list || []) if (n.family === 'IPv4' && !n.internal) console.log(`  On phones (same Wi-Fi): http://${n.address}:${PORT}`);

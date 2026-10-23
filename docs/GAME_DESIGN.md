@@ -1,8 +1,9 @@
-# Game design: Stickman Ruins
+# Game design: PvP Island
 
 Decided by the boss through 22 questions.
 
 ## Big idea
+- The game is called **PvP Island** (the boss named it).
 - An abandoned island of **ruins** where stickmen fight.
 - **One online server** that is always running. Players drop in and out anytime.
 - **Solo only:** everyone against everyone. No teams, no chat.
@@ -100,6 +101,8 @@ Decided by the boss through 22 questions.
 
 ## Chests and coins
 - Coins only come from **chests**.
+- A coin looks like the boss's drawing (`docs/design/coin.jpg`): yellow, almost square with slightly cut corners,
+  a darker outline, a **P** on it and shiny sparkle lines. When a chest opens, a few of these coins jump out of it in 3D and fade.
 - Chests are always in the **same spots**. Each one comes back **2 minutes** after it's opened.
 - Every normal chest gives **3 coins** and **exactly one weapon**, and **15%** of the time an **extra Healing Potion** next to it
   (picked up like other items, only if you have fewer than 3).
