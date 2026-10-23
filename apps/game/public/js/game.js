@@ -11,6 +11,7 @@ import { decodeServerMessage, encodeClient, unpackSnapshotPlayer, makeFlags, rea
 import { slotBar, heldDurabilityView, healthView, pickSlot, brokeMessage, shieldView, WEAPON_ICONS } from '@pvp/hud-model';
 import { potionView, drinkState, drinkMessage, POTION_ICON_SVG, bombView } from '@pvp/hud-model';
 import { chargeView } from '@pvp/hud-model';
+import { coinsToast } from '@pvp/hud-model';
 import { DamageNumbers } from './damage-numbers.js';
 
 const $ = id => document.getElementById(id);
@@ -94,6 +95,7 @@ export class Game {
     this.island = createIslandScene({ island: this.world, mobile: this.mobile }).addTo(this.scene);
     this.chests = this.island.chests;
     this.golden = null;
+    this.coinsPopped = 0; // 3D coins that jumped out of opened chests so far (#29)
 
     this.remotes = new Map();   // id -> remote player
     this.infos = new Map();     // id -> { name, skin }
@@ -275,6 +277,7 @@ export class Game {
       // bombs thrown that have not exploded yet, and how many explosions this page has seen (#32)
       bombs: [...this.bombs.values()].map(b => ({ id: b.id, b: b.b, landed: b.landed, area: b.areaSide, ...pos(b.mesh.position) })),
       booms: this.booms,
+      coinPops: { flying: this.island.coinPops.active, popped: this.coinsPopped }, // 3D coins out of opened chests (#29)
       effects: this.effects.length, // shots, puffs and explosions still fading out
       shieldUp: this.shieldUp,
       frozen: this.frozen,
@@ -295,8 +298,8 @@ export class Game {
       case 'pjoin': this.infos.set(m.id, { name: m.name, skin: m.skin }); return;
       case 'pleave': this.removeRemote(m.id); this.infos.delete(m.id); return;
       case 'pos': if (this.me) { this.me.x = m.x; this.me.y = m.y; this.me.z = m.z; } return;
-      case 'coins': this.coins = m.total; $('hudCoins').textContent = m.total; this.toast(`+${m.amount} coins`); return;
-      case 'chest': return this.chests.setOpen(m.id, m.open);
+      case 'coins': this.coins = m.total; $('hudCoins').textContent = m.total; this.toast(coinsToast(m.amount).text, { coin: true }); return;
+      case 'chest': if (m.open && !this.chests.isOpen(m.id)) this.coinsPopped += this.island.popChestCoins(m.id); return this.chests.setOpen(m.id, m.open); // coins jump out (#29)
       case 'golden': return this.onGolden(m);
       case 'item+': return this.addItem(m);
       case 'item-': return this.removeItem(m.id);
@@ -701,11 +704,13 @@ export class Game {
   }
 
   onGolden(m) {
+    const was = this.golden;
     this.golden = m.golden;
     if (m.golden) {
       this.island.golden.show(m.golden.x, m.golden.z);
       if (!m.quiet) this.banner('★ A GOLDEN CHEST appeared! Follow the light! ★');
     } else {
+      if (m.by && was) this.coinsPopped += this.island.popGoldenCoins(was.x, was.z); // coins jump out of it (#29)
       this.island.golden.hide();
       if (m.by) this.banner(`${m.by} opened the golden chest!`);
     }
@@ -804,9 +809,11 @@ export class Game {
     this.hmTimer = setTimeout(() => h.classList.remove('show'), 90);
   }
 
-  toast(text) {
+  toast(text, { coin = false } = {}) {
     const t = $('toast');
     t.textContent = text;
+    if (coin) { const c = document.createElement('span'); c.className = 'coin'; t.prepend(c); } // the coin picture (#29)
+    t.classList.remove('show'); void t.offsetWidth; // restart the pop animation
     t.classList.add('show');
     clearTimeout(this.toastTimer);
     this.toastTimer = setTimeout(() => t.classList.remove('show'), 1400);

@@ -1,6 +1,6 @@
 # Package catalog
 
-This is the list of our reusable packages in [`packages/`](packages/). Each one is a small piece
+This is the list of our reusable packages in [`packages/`](packages/), the building blocks of **PvP Island**. Each one is a small piece
 that works on its own, so it can be used in this game **and in other games too**. Every package
 follows the template in [packages/README.md](packages/README.md): an ES module with `src/index.js`,
 tests with `node:test`, and a README with "What it does", "How to use" and "Determinism".
@@ -55,10 +55,10 @@ graph LR
 | `@pvp/accounts-shop` | Accounts, log in, coins, buying skins, weapons, potions and bombs, the backpack. | Node (browser via `/browser`) | partly: logic is pure, tokens/clock are passed in, file saving is real I/O | 36 |
 | `@pvp/arena` | The fight itself: players, chests, loot, weapons, shields, shock and freeze, drinking potions, thrown bombs, damage, knockouts, damage numbers for nearby players. | both | fully: time and seeded random are passed in (replay tests) | 101 |
 | `@pvp/shop-catalog` | Turns the rules and an account into the cards the shop screen shows. | both | fully: pure functions of their inputs | 11 |
-| `@pvp/hud-model` | Turns your inventory and health into the in-game HUD: Durability bar of the held weapon, H.P bar, 5 slots, shield pill, potion button with drinking ring, "Charging 1.4s" after a shot, damage numbers above heads, bomb buttons. | both | fully: pure functions of their inputs (time passed in) | 26 |
+| `@pvp/hud-model` | Turns your inventory and health into the in-game HUD: Durability bar of the held weapon, H.P bar, 5 slots, shield pill, potion button with drinking ring, "Charging 1.4s" after a shot, damage numbers above heads, bomb buttons, the coin icon from the boss's drawing. | both | fully: pure functions of their inputs (time passed in) | 30 |
 | `@pvp/api-client` | Talks to the server's account and shop API and keeps the login token. | both | fully: fetch and storage are passed in | 10 |
 | `@pvp/stickman-3d` | A three.js stickman with skins, outfits, the boss's weapons and shields, the Healing Potion flask, bombs and their red area, frozen/shocked looks and animation. | browser (pose math also in Node) | partly: pose math is pure, how it looks depends on the renderer | 26 |
-| `@pvp/island-scene` | The 3D island: sky, sun, ground, water, palms, ruins and chests. | browser (also builds in Node) | partly: all placement and colors from a seed, how it looks depends on the renderer | 8 |
+| `@pvp/island-scene` | The 3D island: sky, sun, ground, water, palms, ruins and chests, and gold coins popping out of opened chests. | browser (also builds in Node) | partly: all placement and colors from a seed, how it looks depends on the renderer | 12 |
 | `@pvp/local-server` | The game server inside the page (practice mode): arena, accounts in localStorage, tick, fake WebSocket, bots. | browser (also Node) | partly: seeded arena and bots, time and timer passed in; tokens and localStorage are real | 16 |
 | `@pvp/touch-controls` | Joystick, aim by dragging, buttons, held actions (shield), keyboard and mouse. | browser (core also in Node) | partly: the core is pure, the DOM part depends on real fingers and mice | 21 |
 
@@ -215,7 +215,7 @@ graph LR
 
 ## `@pvp/hud-model`
 
-**Purpose:** pure functions that turn the `inv` message and your health into what the in-game HUD shows (the boss's drawing): the Durability bar of the weapon you hold, the H.P bar with its percent, always all 5 weapon slots (empty ones too), the small Shield pill, which slot a key picks, the "Charging 1.4s" text under the crosshair and the damage numbers above heads.
+**Purpose:** pure functions that turn the `inv` message and your health into what the in-game HUD shows (the boss's drawing): the Durability bar of the weapon you hold, the H.P bar with its percent, always all 5 weapon slots (empty ones too), the small Shield pill, which slot a key picks, the "Charging 1.4s" text under the crosshair, the damage numbers above heads, and the coin icon (the boss's drawing: almost square, cut corners, a "P", sparkle lines).
 
 | Export | Example |
 |---|---|
@@ -231,6 +231,8 @@ graph LR
 | `bombView(inv)` / `bombIconSvg(color)` / `BOMB_KEYS` | `bombView(inv)[0]; // { id: 'bomb', count: 4, max: 5, key: 'B', … }` |
 | `chargeView(weaponDef, lastFireAt, now)` | `chargeView(RULES.WEAPONS.gun, 1000, 1600).text; // 'Charging 1.4s' (then 'Ready!', then hidden)` |
 | `damageNumber(msg)` / `damageFloat(age)` | `damageNumber({ t: 'dmg', id: 3, amount: 15 }).text; // '-15'; damageFloat(1000) // { rise, opacity, scale, done }` |
+| `COIN_ICON_SVG` / `coinIconSvg(opts)` / `coinIconDataUrl()` | `el.innerHTML = COIN_ICON_SVG; coinIconSvg({ label: 'PvP', sparkle: false }); // CSS: url("${coinIconDataUrl()}")` |
+| `coinsToast(amount)` | `coinsToast(3).text; // '+3 coins'` |
 | `WEAPON_ICONS` | `WEAPON_ICONS.icesword; // '❄️'` |
 
 **Depends on:** `@pvp/game-rules`.
@@ -274,7 +276,7 @@ graph LR
 
 ## `@pvp/island-scene`
 
-**Purpose:** the three.js scenery of an island from `@pvp/world-gen`: sky dome and sun, lights and shadows, ground, beach, water, grass, palms, ruins of light sandy stone, chests with a lid that opens backwards, and the golden chest.
+**Purpose:** the three.js scenery of an island from `@pvp/world-gen`: sky dome and sun, lights and shadows, ground, beach, water, grass, palms, ruins of light sandy stone, chests with a lid that opens backwards, the golden chest, and the coin pop (a few square gold coins jump out of an opened chest and fade).
 
 | Export | Example |
 |---|---|
@@ -283,6 +285,8 @@ graph LR
 | `isl.chests` | `isl.chests.setOpen(3, true); isl.chests.isOpen(3); isl.chests.closeAll();` |
 | `isl.golden` | `isl.golden.show(x, z); isl.golden.hide();` |
 | `buildChest({ golden })` | `scene.add(buildChest()); // one chest model, lid in userData.lid` |
+| `isl.popChestCoins(i)` / `isl.popGoldenCoins(x, z)` | `isl.popChestCoins(3); // 6 coins jump out (4 on phones), moved by isl.update()` |
+| `buildCoin()` / `createCoinPops(opts)` | `scene.add(buildCoin()); const pops = createCoinPops({ max: 12, random: 1 }); pops.burst(x, y, z, { count: 5 }); pops.update(dt);` |
 | `noiseTexture(random, opts)` | `noiseTexture(createRandom(1), { blocks: true, cracks: 6 });` |
 
 **Depends on:** `@pvp/seeded-random`, and `three` (peer dependency). Tests also use `@pvp/world-gen`.

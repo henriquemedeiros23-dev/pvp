@@ -112,6 +112,10 @@ test('play: sign up, join, open a chest, pick up the loot, leave', { skip: SKIP,
     await page.waitForFunction(() => Number(document.getElementById('hudCoins').textContent) > 0, null, { timeout: 60000 });
     const coins = await hudNumber(page, '#hudCoins');
     assert.equal(coins, 3, 'a chest gives exactly 3 coins');
+    // the "+3 coins" pop-up shows the coin from the boss's drawing (#29), and 3D coins jump out of the chest
+    assert.equal(await page.textContent('#toast'), '+3 coins');
+    assert.equal(await page.locator('#toast .coin').count(), 1);
+    await waitDebug(page, x => x.coinPops.popped > 0, { what: 'coins to pop out of the chest' });
     // the lid opens (it turns to about -1.9 radians)
     s = await waitDebug(page, x => x.openChests.some(c => c.id === chest.id && c.lid < -1.5), { what: 'the chest lid to open' });
     assert.equal(s.nearChest, null); // an open chest can't be opened again

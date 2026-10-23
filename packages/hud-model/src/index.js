@@ -7,6 +7,8 @@ import { RULES } from '@pvp/game-rules';
 export { POTION_ICON_SVG, drinkState, drinkMessage, potionView } from './potion.js';
 // The bomb buttons (#32).
 export { BOMB_KEYS, bombIconSvg, bombView } from './bombs.js';
+// The coin from the boss's drawing (#29): menu, shop, HUD and the "+3 coins" pop-up.
+export { COIN_COLORS, COIN_ICON_SVG, coinIconSvg, coinIconDataUrl, coinsToast } from './coin.js';
 // The "Charging 1.4s" text under the crosshair (#35) and the damage numbers above heads (#33).
 export {
   chargeView, damageNumber, damageFloat, READY_FLASH_MS, DAMAGE_NUMBER_MS, DAMAGE_NUMBER_RISE, DAMAGE_COLORS,
