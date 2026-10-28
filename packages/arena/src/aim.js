@@ -1,5 +1,5 @@
-// Aiming (#37): the client sets the aim bit in its movement flags (state.f) while the AIM button
-// (or the right mouse button) is held. Only weapons with an `aim` in the rules (the Shootbm and the DM Gun)
+// Aiming (#37): the client sets the aim bit in its movement flags (state.f) while aiming is switched on
+// (the AIM button or a right click toggles it, #40). Only weapons with an `aim` in the rules (the Shootbm and the DM Gun)
 // can aim: their shots are more accurate (spread * aim.spreadMul) and walking is slower (aim.moveMul,
 // the client moves the player; the server tells it the multiplier). Aiming is ignored with any other weapon,
 // while the shield is raised, while drinking a potion and while frozen.

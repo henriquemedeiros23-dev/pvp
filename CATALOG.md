@@ -55,12 +55,12 @@ graph LR
 | `@pvp/accounts-shop` | Accounts, log in, coins, buying skins, weapons, potions and bombs, the backpack. | Node (browser via `/browser`) | partly: logic is pure, tokens/clock are passed in, file saving is real I/O | 36 |
 | `@pvp/arena` | The fight itself: players, chests, loot, weapons, shields, shock and freeze, drinking potions, aiming, thrown bombs, damage, knockouts, damage numbers for nearby players. | both | fully: time and seeded random are passed in (replay tests) | 123 |
 | `@pvp/shop-catalog` | Turns the rules and an account into the cards the shop screen shows. | both | fully: pure functions of their inputs | 11 |
-| `@pvp/hud-model` | Turns your inventory and health into the in-game HUD: Durability bar of the held weapon, H.P bar, 5 slots, shield pill, potion button with drinking ring, "Charging 1.4s" after a shot, damage numbers above heads, aiming (zoom, scope ring, AIM button), bomb buttons, the coin icon from the boss's drawing. | both | fully: pure functions of their inputs (time passed in) | 37 |
+| `@pvp/hud-model` | Turns your inventory and health into the in-game HUD: Durability bar of the held weapon, H.P bar, 5 slots, shield pill, potion button with drinking ring, "Charging 1.4s" after a shot, damage numbers above heads, aiming (zoom, scope ring, AIM / AIM ON button), bomb buttons, the coin icon from the boss's drawing. | both | fully: pure functions of their inputs (time passed in) | 39 |
 | `@pvp/api-client` | Talks to the server's account and shop API and keeps the login token. | both | fully: fetch and storage are passed in | 10 |
 | `@pvp/stickman-3d` | A three.js stickman with skins, outfits, the boss's weapons and shields, the Healing Potion flask, bombs and their red area, frozen/shocked looks and animation. | browser (pose math also in Node) | partly: pose math is pure, how it looks depends on the renderer | 26 |
 | `@pvp/island-scene` | The 3D island: sky, sun, ground, water, palms, ruins and chests, and gold coins popping out of opened chests. | browser (also builds in Node) | partly: all placement and colors from a seed, how it looks depends on the renderer | 12 |
 | `@pvp/local-server` | The game server inside the page (practice mode): arena, accounts in localStorage, tick, fake WebSocket, bots. | browser (also Node) | partly: seeded arena and bots, time and timer passed in; tokens and localStorage are real | 16 |
-| `@pvp/touch-controls` | Joystick, aim by dragging, buttons, held actions (shield, aim), buttons that hide and show, keyboard and mouse (right button aims). | browser (core also in Node) | partly: the core is pure, the DOM part depends on real fingers and mice | 25 |
+| `@pvp/touch-controls` | Joystick, aim by dragging, buttons, held actions (shield), toggled actions (aim: on until pressed again), buttons that hide and show, keyboard and mouse (right click aims). | browser (core also in Node) | partly: the core is pure, the DOM part depends on real fingers and mice | 27 |
 
 "Both" means Node and the browser (in the browser, `@pvp/*` imports need an import map or a bundler).
 
@@ -233,7 +233,8 @@ graph LR
 | `POTION_ICON_SVG` | `btn.innerHTML = POTION_ICON_SVG; // the flask from the drawing` |
 | `bombView(inv)` / `bombIconSvg(color)` / `BOMB_KEYS` | `bombView(inv)[0]; // { id: 'bomb', count: 4, max: 5, key: 'B', … }` |
 | `chargeView(weaponDef, lastFireAt, now)` | `chargeView(RULES.WEAPONS.gun, 1000, 1600).text; // 'Charging 1.4s' (hint '25%'; then 'Ready!', then hidden)` |
-| `aimView(weapon, { held, blocked, blend })`, `aimBlend(prev, on, dtMs)`, `zoomedFov(fov, zoom)` | `aimView('shootbm', { held: true }); // { canAim, aiming, zoom: 2, moveMul: 0.6, cameraDistance, crosshairScale, scope, … } (#37)` |
+| `aimView(weapon, { on, blocked, blend })`, `aimBlend(prev, on, dtMs)`, `zoomedFov(fov, zoom)` | `aimView('shootbm', { on: true }); // { canAim, aiming, zoom: 2, moveMul: 0.6, cameraDistance, crosshairScale, scope, … } (#37)` |
+| `aimButtonView(on, { paused })`, `aimHandKey(inv)` | `aimButtonView(true).label; // 'AIM ON' (#40); aimHandKey(inv) // '1:shootbm': aiming switches off when it changes` |
 | `chargeStarts(inv, now, prev)` | `chargeStarts({ weapons: ['gun', 'shootbm'], charge: [0, 2700] }, now); // per slot lastFireAt for chargeView (#38)` |
 | `damageNumber(msg)` / `damageFloat(age)` | `damageNumber({ t: 'dmg', id: 3, amount: 15 }).text; // '-15'; damageFloat(1000) // { rise, opacity, scale, done }` |
 | `COIN_ICON_SVG` / `coinIconSvg(opts)` / `coinIconDataUrl()` | `el.innerHTML = COIN_ICON_SVG; coinIconSvg({ label: 'PvP', sparkle: false }); // CSS: url("${coinIconDataUrl()}")` |
@@ -316,13 +317,14 @@ graph LR
 
 ## `@pvp/touch-controls`
 
-**Purpose:** game controls for phones and computers: joystick, drag to aim, buttons, held actions (hold Shift or the shield button to raise the shield), keyboard (WASD, arrows, keys) and mouse with pointer lock.
+**Purpose:** game controls for phones and computers: joystick, drag to aim, buttons, held actions (hold Shift or the shield button to raise the shield), toggled actions (tap AIM or right click: aim on, again: off), keyboard (WASD, arrows, keys) and mouse with pointer lock.
 
 | Export | Example |
 |---|---|
 | `createInputState(config)` | `const input = createInputState({ enabled: false });` |
-| `input.take()` | `const { ev, look, move, fire, shield, aim } = input.take(); // every frame (aim: AIM button or right mouse, #37)` |
-| `input.show(name, visible)` | `input.show('aim', canAim); // hide/show an on-screen button (aim starts hidden); hiding lets go of it` |
+| `input.take()` | `const { ev, look, move, fire, shield, aim } = input.take(); // every frame (aim: switched on by the AIM button or a right click, #37, #40)` |
+| `input.show(name, visible)` | `input.show('aim', canAim); // hide/show an on-screen button (aim starts hidden); hiding lets go of it / switches it off` |
+| `input.setToggle(name, on)`, `input.toggled(name)`, `input.onToggle(fn)` | `input.setToggle('aim', false); // switch aiming off (weapon broke); config toggleButtons ['aim'], toggleMouse { 2: 'aim' }` |
 | `attachTouchControls(input, els)` | `const detach = attachTouchControls(input, { canvas, stick, knob, buttons });` |
 | `attachDesktopControls(input, opts)` | `attachDesktopControls(input, { canvas, target: window });` |
 | `isTouchDevice(window)` | `isTouchDevice(window) ? attachTouch... : attachDesktop...` |

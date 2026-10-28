@@ -117,7 +117,7 @@ test('touch adapter: the shield button is held (and you can aim by dragging on i
   assert.equal(s.shield, false);
 });
 
-test('touch adapter: the aim button is hidden until shown, then held (#37)', () => {
+test('touch adapter: the aim button is hidden until shown, then a tap switches it on / off (#37, #40)', () => {
   const s = createInputState();
   const canvas = fakeEl(), aim = fakeEl();
   const detach = attachTouchControls(s, { canvas, buttons: { aim } });
@@ -125,27 +125,42 @@ test('touch adapter: the aim button is hidden until shown, then held (#37)', () 
   s.show('aim', true);
   assert.ok(!aim.classList.has('hidden'));
   aim.fire('pointerdown', { pointerId: 2, clientX: 0, clientY: 0 });
-  assert.equal(s.aim, true);
+  aim.fire('pointermove', { pointerId: 2, clientX: 10, clientY: 0 });
+  assert.ok(s.take().look.x > 0, 'drag on it to turn');
   aim.fire('pointerup', { pointerId: 2 });
-  assert.equal(s.aim, false, 'let go = stop aiming');
+  assert.equal(s.aim, true, 'stays on after letting go');
+  assert.ok(aim.classList.has('pressed') && aim.classList.has('on'), 'looks pressed while on');
   aim.fire('pointerdown', { pointerId: 3, clientX: 0, clientY: 0 });
+  aim.fire('pointerup', { pointerId: 3 });
+  assert.equal(s.aim, false, 'tap again = off');
+  assert.ok(!aim.classList.has('pressed') && !aim.classList.has('on'));
+  aim.fire('pointerdown', { pointerId: 4, clientX: 0, clientY: 0 });
+  assert.ok(aim.classList.has('on'));
+  s.setToggle('aim', false); // e.g. the weapon broke
+  assert.ok(!aim.classList.has('on'), 'switched off by the game: the look follows');
+  s.setToggle('aim', true);
   s.show('aim', false);
-  assert.ok(aim.classList.has('hidden') && !aim.classList.has('pressed'));
+  assert.ok(aim.classList.has('hidden') && !aim.classList.has('pressed') && !aim.classList.has('on'));
   assert.equal(s.aim, false);
   detach();
   s.show('aim', true);
-  assert.ok(aim.classList.has('hidden'), 'detached: the element is not changed any more');
+  s.setToggle('aim', true);
+  assert.ok(aim.classList.has('hidden') && !aim.classList.has('on'), 'detached: the element is not changed any more');
 });
 
-test('desktop adapter: the right mouse button aims, no context menu (#37)', () => {
+test('desktop adapter: a right click switches aiming on / off, no context menu (#37, #40)', () => {
   const s = createInputState();
+  s.show('aim', true); // a weapon that can aim
   const canvas = fakeEl();
   const doc = { pointerLockElement: canvas };
   const win = fakeEl();
   attachDesktopControls(s, { canvas, target: win, doc });
   canvas.fire('mousedown', { button: 2 });
-  assert.equal(s.aim, true);
+  win.fire('mouseup', { button: 2 });
+  assert.equal(s.aim, true, 'stays on after letting go');
   assert.equal(s.fire, false);
+  canvas.fire('mousedown', { button: 2 });
+  assert.equal(s.aim, false, 'right click again = off');
   win.fire('mouseup', { button: 2 });
   assert.equal(s.aim, false);
   let prevented = false;

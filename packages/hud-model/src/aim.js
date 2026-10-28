@@ -1,5 +1,6 @@
 // Aiming (#37): the AIM button (phone) / right mouse button (computer) for the weapons that can aim
-// (the Shootbm and the DM Gun: their `aim` in @pvp/game-rules). While aiming the camera zooms in and comes
+// (the Shootbm and the DM Gun: their `aim` in @pvp/game-rules). Since #40 it is a toggle: tap (or right click) once
+// to aim, again to stop; it stops by itself when the weapon in hand changes (aimHandKey). While aiming the camera zooms in and comes
 // closer over the shoulder, a round scope ring shows and the crosshair gets smaller.
 // Pure functions: time is passed in (any clock, e.g. performance.now() in the browser).
 
@@ -18,8 +19,32 @@ export const AIM_TIME_MS = 160;
  */
 export const AIM_CAMERA = Object.freeze({ distance: 0.45, shoulder: 0.75, crosshair: 0.6 });
 
-/** The aim button's look: icon, label and title. */
-export const AIM_BUTTON = Object.freeze({ icon: '🎯', label: 'AIM', title: 'Hold to aim' });
+/** The aim button's look: icon, label and title (off), labelOn and titleOn (while switched on, #40). */
+export const AIM_BUTTON = Object.freeze({
+  icon: '🎯', label: 'AIM', title: 'Tap to aim', labelOn: 'AIM ON', titleOn: 'Tap to stop aiming',
+});
+
+/**
+ * How the aim button looks (#40). on: aiming is switched on (the toggle); paused: switched on but the shield is up,
+ * you drink or you are frozen (no zoom until that ends). Returns { on, paused, icon, label, title }.
+ */
+export function aimButtonView(on = false, { paused = false } = {}) {
+  const o = !!on;
+  return {
+    on: o, paused: o && !!paused, icon: AIM_BUTTON.icon,
+    label: o ? AIM_BUTTON.labelOn : AIM_BUTTON.label, title: o ? AIM_BUTTON.titleOn : AIM_BUTTON.title,
+  };
+}
+
+/**
+ * The weapon in your hand as a key ('1:shootbm'), or null (empty hand / no inventory). When it changes from one frame
+ * to the next (switched slot, the weapon broke or was dropped) aiming is switched off (#40).
+ */
+export function aimHandKey(inv) {
+  const slot = inv?.slot;
+  const w = Number.isInteger(slot) ? inv.weapons?.[slot] : null;
+  return w ? `${slot}:${w}` : null;
+}
 
 /**
  * Move the zoom amount (0 = not aimed, 1 = fully aimed) toward `on` over AIM_TIME_MS.
@@ -39,7 +64,7 @@ export function zoomedFov(fovDeg, zoom) {
 
 /**
  * The aim view for the weapon in your hand (an id or the weapon's rules object).
- * state: { held (the aim button / right mouse is down), blocked (shield raised, drinking or frozen: no aiming),
+ * state: { on (aiming is switched on: the AIM button / right click toggle; `held` is the same), blocked (shield raised, drinking or frozen: no aiming),
  *          blend (the zoom amount 0..1 from aimBlend; default 1 when aiming, else 0) }.
  * Returns {
  *   canAim:  the weapon can aim (show the AIM button),
@@ -51,9 +76,9 @@ export function zoomedFov(fovDeg, zoom) {
  *   crosshairScale: 1 = normal ... AIM_CAMERA.crosshair, scope: show the round scope ring, scopeOpacity 0..1
  * }
  */
-export function aimView(weapon, { held = false, blocked = false, blend } = {}, rules = RULES) {
+export function aimView(weapon, { on, held = false, blocked = false, blend } = {}, rules = RULES) {
   const a = aimDef(weapon, rules.WEAPONS);
-  const aiming = !!a && !!held && !blocked;
+  const aiming = !!a && !!(on ?? held) && !blocked;
   const b = a ? clamp01(Number.isFinite(blend) ? blend : aiming ? 1 : 0) : 0;
   const e = ease(b);
   return {

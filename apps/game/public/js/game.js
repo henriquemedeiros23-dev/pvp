@@ -11,7 +11,7 @@ import { decodeServerMessage, encodeClient, unpackSnapshotPlayer, makeFlags, rea
 import { slotBar, heldDurabilityView, healthView, pickSlot, brokeMessage, shieldView, WEAPON_ICONS } from '@pvp/hud-model';
 import { potionView, drinkState, drinkMessage, POTION_ICON_SVG, bombView } from '@pvp/hud-model';
 import { chargeView, chargeStarts } from '@pvp/hud-model';
-import { aimView, aimBlend, zoomedFov } from '@pvp/hud-model';
+import { aimView, aimBlend, aimButtonView, aimHandKey, zoomedFov } from '@pvp/hud-model';
 import { coinsToast } from '@pvp/hud-model';
 import { DamageNumbers } from './damage-numbers.js';
 
@@ -113,6 +113,7 @@ export class Game {
     this.shieldUp = false; // my shield is raised (Shift / the shield button)
     this.aimAmount = 0; // aiming (#37): how far the zoom is in (0..1, see aimBlend in @pvp/hud-model)
     this.aim = aimView(null); // the aim view of this frame (zoom, scope, AIM button)
+    this.aimHand = null; // the weapon in hand last frame (aimHandKey): when it changes aiming switches off (#40)
     this.frozen = false;   // I am frozen (Ice Sword): no moving, turning, shooting or switching
     this.me = null;
     this.ws = null;
@@ -140,7 +141,7 @@ export class Game {
         canvas, stick: $('stick'), knob: $('knob'),
         buttons: {
           fire: $('btnFire'), jump: $('btnJump'), crouch: $('btnCrouch'), open: $('btnOpen'),
-          potion: $('btnPotion'), shield: $('btnShield'), aim: $('btnAim'), // aim: held, shown only with a weapon that can aim (#37)
+          potion: $('btnPotion'), shield: $('btnShield'), aim: $('btnAim'), // aim: tap on / tap off, shown only with a weapon that can aim (#37, #40)
           ...Object.fromEntries(this.bombEls.map(e => [e.dataset.action, e])), // 'throw:bomb' ...
         },
       });
@@ -294,7 +295,7 @@ export class Game {
       // aiming (#37): can the weapon in hand aim, am I aiming, the zoom now (0..1 amount and factor), the camera's
       // field of view, the AIM button shown (phone) and the scope ring shown
       aim: {
-        canAim: this.aim.canAim, aiming: this.aim.aiming, amount: +this.aimAmount.toFixed(3), zoom: +this.aim.zoom.toFixed(3),
+        canAim: this.aim.canAim, aiming: this.aim.aiming, on: this.input.aim, label: $('btnAim').querySelector('small').textContent, amount: +this.aimAmount.toFixed(3), zoom: +this.aim.zoom.toFixed(3),
         fov: +this.camera.fov.toFixed(2), baseFov: this.baseFov,
         button: play && this.mobile && !$('btnAim').classList.contains('hidden'), scope: play && !$('scope').classList.contains('hidden'),
       },
@@ -662,14 +663,20 @@ export class Game {
     if (scope.classList.contains('hidden') === v.scope) scope.classList.toggle('hidden', !v.scope);
     if (v.scope) scope.style.setProperty('--o', v.scopeOpacity.toFixed(3));
     $('crosshair').style.setProperty('--s', v.crosshairScale.toFixed(3));
-    $('btnAim').classList.toggle('pressed', v.aiming);
+    // the AIM button: 'AIM ON' while switched on (the touch adapter gives it the pressed / on look), dimmer while paused
+    const on = this.mode === 'play' && this.input.aim;
+    const b = aimButtonView(on, { paused: on && !v.aiming });
+    const btn = $('btnAim'), label = btn.querySelector('small');
+    if (label.textContent !== b.label) { label.textContent = b.label; btn.title = b.title; btn.setAttribute('aria-label', b.title); }
+    btn.classList.toggle('paused', b.paused);
   }
 
-  // Stop aiming and zoom straight back out (leaving the arena, knocked out).
+  // Stop aiming and zoom straight back out (leaving the arena, knocked out, a new game): the toggle switches off too.
   resetAim() {
     this.aimAmount = 0;
     this.aim = aimView(null);
-    this.input.show('aim', false);
+    this.aimHand = null;
+    this.input.show('aim', false); // hiding the button switches the aim toggle off
     this.camera.fov = this.baseFov;
     this.renderAim();
   }
@@ -912,9 +919,12 @@ export class Game {
     }
     me.sm.shieldUp = this.shieldUp;
 
-    // aiming (#37): hold the AIM button / right mouse with a weapon that can aim (Shootbm, DM Gun);
-    // not with the shield up, while drinking or frozen. The zoom goes in smoothly (@pvp/hud-model).
-    const aimState = { held: !frozen && input.aim, blocked: frozen || this.shieldUp || !!this.drink };
+    // aiming (#37, #40): a tap on AIM / a right click switches it on, the next one off (a toggle in @pvp/touch-controls),
+    // only with a weapon that can aim (Shootbm, DM Gun). It switches off when the weapon in hand changes (switched,
+    // broke, dropped); it is paused (no zoom) with the shield up, while drinking or frozen. The zoom goes in smoothly (@pvp/hud-model).
+    const hand = aimHandKey(this.inv);
+    if (hand !== this.aimHand) { this.aimHand = hand; this.input.setToggle('aim', false); }
+    const aimState = { on: this.input.aim, blocked: frozen || this.shieldUp || !!this.drink };
     const heldWeapon = this.inv ? this.inv.weapons[this.inv.slot] : null;
     const wasAiming = this.aim.aiming;
     this.aimAmount = aimBlend(this.aimAmount, aimView(heldWeapon, aimState).aiming, dt * 1000);

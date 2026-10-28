@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { RULES } from '@pvp/game-rules';
-import { aimView, aimBlend, zoomedFov, AIM_TIME_MS, AIM_CAMERA, AIM_BUTTON } from '../src/index.js';
+import { aimView, aimBlend, aimButtonView, aimHandKey, zoomedFov, AIM_TIME_MS, AIM_CAMERA, AIM_BUTTON } from '../src/index.js';
 
 const close = (a, b, eps = 1e-9) => assert.ok(Math.abs(a - b) < eps, `${a} != ${b}`);
 
@@ -11,7 +11,7 @@ test('the AIM button shows only for the Shootbm and the DM Gun', () => {
   assert.deepEqual(shown, ['shootbm', 'dmgun']);
   assert.equal(aimView(RULES.WEAPONS.shootbm).canAim, true, 'a weapon object works too');
   for (const w of [undefined, null, '', 'nope']) assert.equal(aimView(w).canAim, false);
-  assert.deepEqual(AIM_BUTTON, { icon: '🎯', label: 'AIM', title: 'Hold to aim' });
+  assert.deepEqual(AIM_BUTTON, { icon: '🎯', label: 'AIM', title: 'Tap to aim', labelOn: 'AIM ON', titleOn: 'Tap to stop aiming' });
 });
 
 test('aiming fully with the Shootbm: zoom, slower walk, closer camera, scope, small crosshair', () => {
@@ -65,4 +65,23 @@ test('zoomedFov: twice the zoom makes things look twice as big', () => {
   close(Math.tan((f * Math.PI) / 360), Math.tan(Math.PI / 4) / 2);
   assert.equal(zoomedFov(70, 0), 70);
   assert.equal(zoomedFov(70, NaN), 70);
+});
+
+test('aim toggle (#40): `on` works like `held`; the button says AIM ON while switched on', () => {
+  assert.deepEqual(aimView('shootbm', { on: true }), aimView('shootbm', { held: true }));
+  assert.equal(aimView('shootbm', { on: false, held: true }).aiming, false, '`on` wins');
+  assert.equal(aimView('dmgun', { on: true, blocked: true }).aiming, false, 'paused while the shield is up / drinking / frozen');
+  assert.deepEqual(aimButtonView(false), { on: false, paused: false, icon: '🎯', label: 'AIM', title: 'Tap to aim' });
+  assert.deepEqual(aimButtonView(true), { on: true, paused: false, icon: '🎯', label: 'AIM ON', title: 'Tap to stop aiming' });
+  assert.equal(aimButtonView(true, { paused: true }).paused, true);
+  assert.equal(aimButtonView(false, { paused: true }).paused, false, 'only paused while on');
+});
+
+test('aimHandKey (#40): changes when the weapon in hand changes (switch, break, drop)', () => {
+  const inv = { weapons: ['gun', 'shootbm', null, null, null], slot: 1 };
+  assert.equal(aimHandKey(inv), '1:shootbm');
+  assert.equal(aimHandKey({ ...inv, slot: 0 }), '0:gun', 'switched slot');
+  assert.equal(aimHandKey({ ...inv, weapons: ['gun', null, null, null, null] }), null, 'broke or dropped');
+  assert.equal(aimHandKey({ ...inv, weapons: ['gun', 'dmgun', null, null, null] }), '1:dmgun', 'another weapon in the same slot');
+  for (const v of [null, undefined, {}, { weapons: [], slot: 0 }]) assert.equal(aimHandKey(v), null);
 });

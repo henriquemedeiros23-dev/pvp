@@ -139,7 +139,7 @@ test('disabled state ignores input but still lets go', () => {
   s.stickStart(30, 0); s.lookStart(1, 0, 0); s.lookMove(1, 50, 50);
   s.button('fire', true); s.button('jump', true); s.mouseButton(0, true);
   s.mouseMove(5, 5); s.wheel(1); s.key('w', true); s.key(' ', true);
-  assert.deepEqual(s.take(), { ev: [], actions: [], look: { x: 0, y: 0 }, move: { x: 0, y: 0 }, fire: false, shield: false, aim: false, holds: { shield: false, aim: false } });
+  assert.deepEqual(s.take(), { ev: [], actions: [], look: { x: 0, y: 0 }, move: { x: 0, y: 0 }, fire: false, shield: false, aim: false, holds: { shield: false, aim: false }, toggles: { aim: false } });
 
   s.enabled = true;
   s.key('w', true); s.button('fire', true);
@@ -155,7 +155,7 @@ test('reset clears everything and calls listeners', () => {
   const off = s.onReset(() => calls++);
   s.stickStart(40, 0); s.button('fire', true); s.key('e', true); s.mouseMove(3, 3);
   s.reset();
-  assert.deepEqual(s.take(), { ev: [], actions: [], look: { x: 0, y: 0 }, move: { x: 0, y: 0 }, fire: false, shield: false, aim: false, holds: { shield: false, aim: false } });
+  assert.deepEqual(s.take(), { ev: [], actions: [], look: { x: 0, y: 0 }, move: { x: 0, y: 0 }, fire: false, shield: false, aim: false, holds: { shield: false, aim: false }, toggles: { aim: false } });
   assert.equal(calls, 1);
   off(); s.reset();
   assert.equal(calls, 1);
@@ -218,62 +218,130 @@ test('held actions are configurable', () => {
   s.key('b', true);
   assert.equal(s.held('block'), true);
   s.button('guard', true);
-  assert.deepEqual(s.take().holds, { block: true, guard: true, aim: false }, 'the right mouse button still aims (holdMouse)');
+  assert.deepEqual(s.take().holds, { block: true, guard: true, aim: false }, 'aim is still there (toggleButtons / toggleMouse)');
 });
 
-test('aim (#37): hold the aim button or the right mouse button', () => {
+test('aim (#37, #40): a tap on the aim button or a right click switches aiming on, the next one off', () => {
   const s = createInputState();
   assert.equal(s.shown('aim'), false, 'the aim button starts hidden');
   s.button('aim', true);
   assert.equal(s.aim, false, 'a hidden button cannot be pressed');
   s.mouseButton(2, true);
-  assert.equal(s.aim, true, 'right mouse button');
+  assert.equal(s.aim, false, 'a hidden toggle cannot be switched on with the mouse either (weapon cannot aim)');
+
+  const seen = [], toggles = [];
+  const stop = s.onShow((name, visible) => seen.push(`${name}:${visible}`));
+  const stopT = s.onToggle((name, on) => toggles.push(`${name}:${on}`));
+  s.show('aim', true);
+  s.show('aim', true); // no change, no call
+  assert.equal(s.shown('aim'), true);
+
+  // tap: on, and it stays on after letting go
+  s.button('aim', true);
+  s.button('aim', false);
+  assert.equal(s.aim, true, 'stays on after letting go');
+  assert.equal(s.toggled('aim'), true);
   assert.equal(s.fire, false, 'aiming is not shooting');
   let t = s.take();
   assert.equal(t.aim, true);
   assert.equal(t.holds.aim, true);
-  assert.deepEqual(t.ev, []);
-  s.mouseButton(2, false);
-  assert.equal(s.aim, false, 'let go = stop aiming');
-
-  // show the button (e.g. holding the Shootbm), hold it, then hide it (switched to the Gun): it lets go
-  const seen = [];
-  const stop = s.onShow((name, visible) => seen.push(`${name}:${visible}`));
-  s.show('aim', true);
-  s.show('aim', true); // no change, no call
-  assert.equal(s.shown('aim'), true);
+  assert.deepEqual(t.toggles, { aim: true });
+  assert.deepEqual(t.ev, [], 'a toggle is not an action');
+  assert.equal(s.take().aim, true, 'still on after a take');
+  // tap again: off
   s.button('aim', true);
-  assert.equal(s.take().aim, true);
+  assert.equal(s.aim, false);
+  s.button('aim', false);
+  assert.equal(s.aim, false, 'letting go does nothing');
+
+  // the right mouse button: press = switch, release does nothing; it is the same toggle as the button
+  s.mouseButton(2, true);
+  s.mouseButton(2, false);
+  assert.equal(s.aim, true, 'right click: on');
+  s.button('aim', true);
+  assert.equal(s.aim, false, 'the button switches the same toggle off');
+  s.mouseButton(2, true);
+  s.mouseButton(2, false);
+  s.mouseButton(2, true);
+  assert.equal(s.aim, false, 'right click again: off');
+
+  // blur keeps it on (nothing is held down)
+  s.button('aim', true);
+  s.blur();
+  assert.equal(s.aim, true, 'blur keeps a toggle on');
+
+  // the game switches it off (e.g. the weapon broke), or hiding the button does (switched to the Gun)
+  s.setToggle('aim', false);
+  assert.equal(s.aim, false);
+  s.setToggle('aim', true);
+  assert.equal(s.aim, true, 'the game can switch it on too');
   s.show('aim', false);
-  assert.equal(s.aim, false, 'hiding the button lets go of it');
+  assert.equal(s.aim, false, 'hiding the button switches it off');
+  s.setToggle('aim', true);
+  assert.equal(s.aim, false, 'not while hidden');
   assert.deepEqual(seen, ['aim:true', 'aim:false']);
   stop();
   s.show('aim', true);
   assert.equal(seen.length, 2, 'listener removed');
 
-  // disabled: no new aiming, but letting go works; blur and reset let go
-  s.mouseButton(2, true);
-  s.enabled = false;
+  // disabled: cannot switch on, but can switch off; reset switches off
   s.button('aim', true);
-  s.mouseButton(2, false);
-  assert.equal(s.aim, false);
+  s.enabled = false;
+  s.mouseButton(2, true);
+  assert.equal(s.aim, false, 'switching off works while disabled');
+  s.button('aim', true);
+  assert.equal(s.aim, false, 'switching on does not');
   s.enabled = true;
   s.button('aim', true);
-  s.blur();
-  assert.equal(s.aim, false, 'blur lets go');
-  s.mouseButton(2, true);
   s.reset();
-  assert.equal(s.aim, false, 'reset lets go');
+  assert.equal(s.aim, false, 'reset switches it off (new game)');
   assert.equal(s.shown('aim'), true, 'reset keeps what is shown');
+  assert.deepEqual(toggles, ['aim:true', 'aim:false', 'aim:true', 'aim:false', 'aim:true', 'aim:false', 'aim:true', 'aim:false',
+    'aim:true', 'aim:false', 'aim:true', 'aim:false', 'aim:true', 'aim:false']);
+  stopT();
+  s.button('aim', true);
+  assert.equal(toggles.length, 14, 'toggle listener removed');
 });
 
-test('hiddenButtons and holdMouse are configurable', () => {
-  const s = createInputState({ hiddenButtons: [], holdMouse: { 1: 'zoom' } });
+test('the shield stays a hold button', () => {
+  const s = createInputState();
+  s.button('shield', true);
+  s.button('shield', false);
+  assert.equal(s.shield, false);
+  assert.deepEqual(DEFAULT_CONFIG.holdButtons, ['shield']);
+});
+
+test('aim is deterministic: the same events give the same result', () => {
+  const run = () => {
+    const s = createInputState();
+    const out = [];
+    s.show('aim', true);
+    for (const [kind, v] of [['b', true], ['b', false], ['m', true], ['m', false], ['m', true], ['b', true], ['b', false]]) {
+      if (kind === 'b') s.button('aim', v); else s.mouseButton(2, v);
+      out.push(s.take().aim);
+    }
+    return out;
+  };
+  assert.deepEqual(run(), [true, true, false, false, true, false, false]);
+  assert.deepEqual(run(), run());
+});
+
+test('hiddenButtons, holdMouse and toggles are configurable', () => {
+  const s = createInputState({ hiddenButtons: [], holdMouse: { 1: 'zoom' }, toggleMouse: {}, toggleButtons: ['map'] });
   assert.equal(s.shown('aim'), true);
   s.mouseButton(2, true);
   assert.equal(s.aim, false, 'right button not bound any more');
   s.mouseButton(1, true);
   assert.equal(s.held('zoom'), true);
-  assert.deepEqual(DEFAULT_CONFIG.holdMouse, { 2: 'aim' });
+  s.mouseButton(1, false);
+  assert.equal(s.held('zoom'), false, 'holdMouse: held only while down');
+  s.button('map', true); s.button('map', false);
+  assert.equal(s.toggled('map'), true);
+  assert.deepEqual(s.take().toggles, { map: true });
+  s.button('aim', true);
+  assert.deepEqual(s.take().ev, ['aim'], 'aim is a plain tap button when it is not a toggle');
+  assert.deepEqual(DEFAULT_CONFIG.holdMouse, {});
+  assert.deepEqual(DEFAULT_CONFIG.toggleMouse, { 2: 'aim' });
+  assert.deepEqual(DEFAULT_CONFIG.toggleButtons, ['aim']);
   assert.deepEqual(DEFAULT_CONFIG.hiddenButtons, ['aim']);
 });

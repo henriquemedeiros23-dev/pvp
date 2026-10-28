@@ -1,6 +1,7 @@
-// Browser check for aiming (issue #37) on a phone: the 🎯 AIM button shows only with the Shootbm (or the
-// DM Gun), holding it zooms the camera in with a round scope ring and tells the server (aim flag 16 in
-// 'state'), letting go zooms back out, and the button is hidden with the Gun.
+// Browser check for aiming (issues #37, #40) on a phone: the 🎯 AIM button shows only with the Shootbm (or the
+// DM Gun). It is a toggle: a tap zooms the camera in with a round scope ring and tells the server (aim flag 16 in
+// 'state'), and it keeps aiming after the finger lets go ('AIM ON'); a second tap zooms back out. Switching to the
+// Gun switches aiming off and hides the button.
 // Skipped in a normal `npm test`. Run it with:  npm run test:e2e   (from the repo root)
 // With SCREENSHOTS=1 it saves docs/screenshots/aim.png (aiming with the Shootbm, phone size).
 import { test, before, after } from 'node:test';
@@ -82,7 +83,7 @@ async function standingPlayer(x, z) {
   return { id, ws };
 }
 
-test('phone: hold 🎯 AIM with the Shootbm to zoom in; no AIM button with the Gun', { skip: SKIP, timeout: 300000 }, async () => {
+test('phone: tap 🎯 AIM with the Shootbm to aim until tapped again; switching to the Gun stops it', { skip: SKIP, timeout: 300000 }, async () => {
   const context = await browser.newContext({ viewport: { width: 844, height: 390 }, isMobile: true, hasTouch: true });
   context.setDefaultTimeout(SLOW);
   const page = await context.newPage();
@@ -135,17 +136,31 @@ test('phone: hold 🎯 AIM with the Shootbm to zoom in; no AIM button with the G
     assert.equal(withShootbm.aim.scope, false);
     assert.ok(await page.locator('#btnAim').isVisible());
 
-    // hold the AIM button (a real touch): fully zoomed in, scope ring, the server is told
+    // tap the AIM button (a real touch, finger down and up again): aiming stays on, fully zoomed in, scope ring,
+    // the server is told
     const box = await page.locator('#btnAim').boundingBox();
     const cdp = await context.newCDPSession(page);
     const touch = (type, pts) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: pts });
-    await touch('touchStart', [{ x: box.x + box.width / 2, y: box.y + box.height / 2, id: 7 }]);
-    const aimed = await waitDebug(page, s => s.aim.aiming && s.aim.amount === 1, { what: 'fully aimed' });
+    const tap = async () => {
+      await touch('touchStart', [{ x: box.x + box.width / 2, y: box.y + box.height / 2, id: 7 }]);
+      await touch('touchEnd', []);
+    };
+    await tap();
+    const aimed = await waitDebug(page, s => s.aim.aiming && s.aim.amount === 1, { what: 'fully aimed after a tap' });
+    assert.equal(aimed.aim.on, true, 'the toggle is on');
+    assert.equal(aimed.aim.label, 'AIM ON');
     assert.equal(aimed.aim.zoom, RULES.WEAPONS.shootbm.aim.zoom);
     assert.ok(aimed.aim.fov < aimed.aim.baseFov * 0.6, `zoomed in: fov ${aimed.aim.fov} (was ${aimed.aim.baseFov})`);
     assert.equal(aimed.aim.scope, true, 'the scope ring shows');
     assert.ok(await page.locator('#scope').isVisible());
-    await page.waitForFunction(() => document.getElementById('btnAim').classList.contains('pressed'));
+    await page.waitForFunction(() => {
+      const b = document.getElementById('btnAim');
+      return b.classList.contains('pressed') && b.classList.contains('on') && b.getAttribute('aria-pressed') === 'true';
+    });
+    await page.waitForTimeout(400); // the finger is up for a while: still aiming
+    const still = await debug(page);
+    assert.equal(still.aim.aiming, true, 'keeps aiming after letting go');
+    assert.equal(still.aim.amount, 1);
     for (let i = 0; i < 100 && !(lastFlags & FLAG_AIM); i++) await page.waitForTimeout(50);
     assert.ok(lastFlags & FLAG_AIM, 'the aim flag goes to the server');
     if (process.env.SCREENSHOTS === '1') {
@@ -153,20 +168,35 @@ test('phone: hold 🎯 AIM with the Shootbm to zoom in; no AIM button with the G
       await page.screenshot({ path: path.join(process.env.SCREENSHOTS_DIR || SHOTS, 'aim.png') });
     }
 
-    // let go: zoom back out
-    await touch('touchEnd', []);
-    const released = await waitDebug(page, s => !s.aim.aiming && s.aim.amount === 0, { what: 'zoomed back out' });
+    // tap again: zoom back out
+    await tap();
+    const released = await waitDebug(page, s => !s.aim.aiming && s.aim.amount === 0, { what: 'zoomed back out after the second tap' });
+    assert.equal(released.aim.on, false);
+    assert.equal(released.aim.label, 'AIM');
     assert.equal(released.aim.fov, released.aim.baseFov);
     assert.equal(released.aim.scope, false);
+    assert.equal(await page.locator('#btnAim.on').count(), 0, 'no "on" look any more');
     for (let i = 0; i < 100 && (lastFlags & FLAG_AIM); i++) await page.waitForTimeout(50);
     assert.equal(lastFlags & FLAG_AIM, 0, 'the server is told we stopped');
     assert.ok(aimStates > 0);
 
-    // back to the Gun: the AIM button hides again
+    // aim again, then switch to the Gun: aiming switches off and the AIM button hides
+    await tap();
+    await waitDebug(page, s => s.aim.aiming && s.aim.on, { what: 'aiming again' });
     await page.locator('#slots .slot[data-slot="0"]').dispatchEvent('pointerdown');
     const gun = await waitDebug(page, s => s.inv.slot === 0 && !s.aim.button, { what: 'the AIM button hidden with the Gun' });
     assert.equal(gun.aim.canAim, false);
+    assert.equal(gun.aim.aiming, false);
+    assert.equal(gun.aim.on, false, 'switching to the Gun switches aiming off');
     assert.equal(await page.locator('#btnAim').isVisible(), false);
+    for (let i = 0; i < 100 && (lastFlags & FLAG_AIM); i++) await page.waitForTimeout(50);
+    assert.equal(lastFlags & FLAG_AIM, 0, 'the server is told we stopped');
+
+    // back to the Shootbm: the button shows, but aiming stays off until tapped
+    await page.locator('#slots .slot[data-slot="1"]').dispatchEvent('pointerdown');
+    const back = await waitDebug(page, s => s.inv.slot === 1 && s.aim.button, { what: 'the AIM button back with the Shootbm' });
+    assert.equal(back.aim.on, false);
+    assert.equal(back.aim.aiming, false);
     assert.deepEqual(errors, []);
   } finally {
     target?.ws.close();
