@@ -122,6 +122,9 @@ Decided by the boss through 22 questions.
 - Walk, run, jump, slide and crouch. No climbing, no vehicles.
 - **Phone:** joystick on the left, buttons on the right, you aim yourself. Hold 🛡️ to raise your shield.
 - **Computer:** WASD to move, mouse to aim and shoot, **hold Shift to raise your shield**.
+- **Aim (Shootbm and DM Gun only):** hold the 🎯 AIM button (phone) or the right mouse button (computer). The camera
+  zooms in (2x) with a round scope, your shots are much more accurate, and you walk slower. Not with the Gun or the
+  Supergun, not with the shield up, not while drinking or frozen.
 
 ## Look
 - **Camera:** behind your character, like Fortnite.

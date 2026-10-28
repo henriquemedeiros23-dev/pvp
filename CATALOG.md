@@ -48,19 +48,19 @@ graph LR
 | Package | What it does | Runs in | Determinism | Tests |
 |---|---|---|---|---|
 | `@pvp/seeded-random` | Random numbers from a seed: same seed, same numbers. | both | fully: only the seed and the calls decide | 11 |
-| `@pvp/game-rules` | All the game's numbers (the boss's weapons and shields, rarities and their colors, chest weights, the Healing Potion, the bombs, skins, prices, limits) as frozen data. | both | fully: constant data and pure helpers | 24 |
+| `@pvp/game-rules` | All the game's numbers (the boss's weapons and shields, rarities and their colors, chest weights, which guns can aim, the Healing Potion, the bombs, skins, prices, limits) as frozen data. | both | fully: constant data and pure helpers | 28 |
 | `@pvp/collision` | Walls, jumping, landing and ray hits in a world made of boxes. | both | fully: pure math, no random, no time | 18 |
 | `@pvp/world-gen` | Builds the island of ruins (houses, towers, chests) from a seed. | both | fully: all random comes from the seed | 12 |
-| `@pvp/net-protocol` | Every message between phone and server, with builders and checks. | both | fully: pure functions and frozen data | 20 |
+| `@pvp/net-protocol` | Every message between phone and server, with builders and checks. | both | fully: pure functions and frozen data | 21 |
 | `@pvp/accounts-shop` | Accounts, log in, coins, buying skins, weapons, potions and bombs, the backpack. | Node (browser via `/browser`) | partly: logic is pure, tokens/clock are passed in, file saving is real I/O | 36 |
-| `@pvp/arena` | The fight itself: players, chests, loot, weapons, shields, shock and freeze, drinking potions, thrown bombs, damage, knockouts, damage numbers for nearby players. | both | fully: time and seeded random are passed in (replay tests) | 101 |
+| `@pvp/arena` | The fight itself: players, chests, loot, weapons, shields, shock and freeze, drinking potions, aiming, thrown bombs, damage, knockouts, damage numbers for nearby players. | both | fully: time and seeded random are passed in (replay tests) | 123 |
 | `@pvp/shop-catalog` | Turns the rules and an account into the cards the shop screen shows. | both | fully: pure functions of their inputs | 11 |
-| `@pvp/hud-model` | Turns your inventory and health into the in-game HUD: Durability bar of the held weapon, H.P bar, 5 slots, shield pill, potion button with drinking ring, "Charging 1.4s" after a shot, damage numbers above heads, bomb buttons, the coin icon from the boss's drawing. | both | fully: pure functions of their inputs (time passed in) | 30 |
+| `@pvp/hud-model` | Turns your inventory and health into the in-game HUD: Durability bar of the held weapon, H.P bar, 5 slots, shield pill, potion button with drinking ring, "Charging 1.4s" after a shot, damage numbers above heads, aiming (zoom, scope ring, AIM button), bomb buttons, the coin icon from the boss's drawing. | both | fully: pure functions of their inputs (time passed in) | 37 |
 | `@pvp/api-client` | Talks to the server's account and shop API and keeps the login token. | both | fully: fetch and storage are passed in | 10 |
 | `@pvp/stickman-3d` | A three.js stickman with skins, outfits, the boss's weapons and shields, the Healing Potion flask, bombs and their red area, frozen/shocked looks and animation. | browser (pose math also in Node) | partly: pose math is pure, how it looks depends on the renderer | 26 |
 | `@pvp/island-scene` | The 3D island: sky, sun, ground, water, palms, ruins and chests, and gold coins popping out of opened chests. | browser (also builds in Node) | partly: all placement and colors from a seed, how it looks depends on the renderer | 12 |
 | `@pvp/local-server` | The game server inside the page (practice mode): arena, accounts in localStorage, tick, fake WebSocket, bots. | browser (also Node) | partly: seeded arena and bots, time and timer passed in; tokens and localStorage are real | 16 |
-| `@pvp/touch-controls` | Joystick, aim by dragging, buttons, held actions (shield), keyboard and mouse. | browser (core also in Node) | partly: the core is pure, the DOM part depends on real fingers and mice | 21 |
+| `@pvp/touch-controls` | Joystick, aim by dragging, buttons, held actions (shield, aim), buttons that hide and show, keyboard and mouse (right button aims). | browser (core also in Node) | partly: the core is pure, the DOM part depends on real fingers and mice | 25 |
 
 "Both" means Node and the browser (in the browser, `@pvp/*` imports need an import map or a bundler).
 
@@ -97,6 +97,7 @@ graph LR
 | `isShield(id)`, `rarityRank(r)` | `isShield('megashield'); // true (worn on the arm, no slot)` |
 | `droppedDurability(id, usesLeft)` | `droppedDurability('gun', 3); // 8 (half, rounded up)` |
 | `CHARGING_DAMAGE`, `MIN_FIRE_GAP_MS`, `chargingDamage(dmg)` | `chargingDamage(15); // 4: a hit while the weapon still charges does 25% (#38)` |
+| `aimDef(weapon)`, `canAim(id)`, `aimMultipliers(weapon, aiming)` | `aimDef('shootbm'); // { zoom: 2, spreadMul: 0.3, moveMul: 0.6 }: only the Shootbm and the DM Gun can aim (#37)` |
 | `RULES` | `createArena({ rules: RULES, ... }) // everything in one object` |
 | `weaponPrice(id)` / `skinPrice(slot, id)` | `weaponPrice('gun'); // 3` |
 | `isBuyable(kind, id)` | `isBuyable('weapon', 'supersword'); // true` |
@@ -148,7 +149,7 @@ graph LR
 | `encodeClient(type, fields)` | `ws.send(encodeClient('fire', { d: [0, 0, 1] }));` |
 | `decodeServerMessage(raw)` | `const r = decodeServerMessage(event.data);` |
 | `packSnapshotPlayer` / `unpackSnapshotPlayer` | `encode('snap', { p: [packSnapshotPlayer(p)], n: 1 });` |
-| `makeFlags` / `readFlags` | `readFlags(flags); // crouch, slide, moving, air` |
+| `makeFlags` / `readFlags` | `readFlags(flags); // crouch, slide, moving, air, aim (FLAG_AIM = 16, #37)` |
 | `makeStatus` / `readStatus` | `readStatus(snap[SNAP.STATUS]); // shieldUp, shocked, frozen` |
 
 **Depends on:** nothing.
@@ -183,6 +184,7 @@ graph LR
 | `createArena(opts)` | `const arena = createArena({ island: generateIsland(), rules: RULES, random: createRandom(1234), now: 0 });` |
 | `arena.join` / `arena.leave` | `const r = arena.join('alice', { name: 'Alice', skin, loadout: ['shootbm', 'shield'] }, now);` |
 | `arena.setState` / `arena.fire` | `arena.fire(id, [dx, dy, dz], now); // each slot charges on its own; charging = 25% damage (#38)` |
+| `arena.aimState(id)`, `AIM_FLAG` | `arena.aimState(id); // { aiming: true, zoom: 2, spreadMul: 0.3, moveMul: 0.6 } while state.f has 16 and a Shootbm / DM Gun is in hand (#37)` |
 | `arena.setShield` | `arena.setShield(id, true, now); // raise the shield (no firing while up)` |
 | `arena.dropWeapon` | `arena.dropWeapon(id, now); // drop the weapon in hand, exact durability (#34)` |
 | `arena.openChest` | `arena.openChest(id, 3, now); // or 'golden'` |
@@ -231,6 +233,7 @@ graph LR
 | `POTION_ICON_SVG` | `btn.innerHTML = POTION_ICON_SVG; // the flask from the drawing` |
 | `bombView(inv)` / `bombIconSvg(color)` / `BOMB_KEYS` | `bombView(inv)[0]; // { id: 'bomb', count: 4, max: 5, key: 'B', … }` |
 | `chargeView(weaponDef, lastFireAt, now)` | `chargeView(RULES.WEAPONS.gun, 1000, 1600).text; // 'Charging 1.4s' (hint '25%'; then 'Ready!', then hidden)` |
+| `aimView(weapon, { held, blocked, blend })`, `aimBlend(prev, on, dtMs)`, `zoomedFov(fov, zoom)` | `aimView('shootbm', { held: true }); // { canAim, aiming, zoom: 2, moveMul: 0.6, cameraDistance, crosshairScale, scope, … } (#37)` |
 | `chargeStarts(inv, now, prev)` | `chargeStarts({ weapons: ['gun', 'shootbm'], charge: [0, 2700] }, now); // per slot lastFireAt for chargeView (#38)` |
 | `damageNumber(msg)` / `damageFloat(age)` | `damageNumber({ t: 'dmg', id: 3, amount: 15 }).text; // '-15'; damageFloat(1000) // { rise, opacity, scale, done }` |
 | `COIN_ICON_SVG` / `coinIconSvg(opts)` / `coinIconDataUrl()` | `el.innerHTML = COIN_ICON_SVG; coinIconSvg({ label: 'PvP', sparkle: false }); // CSS: url("${coinIconDataUrl()}")` |
@@ -318,7 +321,8 @@ graph LR
 | Export | Example |
 |---|---|
 | `createInputState(config)` | `const input = createInputState({ enabled: false });` |
-| `input.take()` | `const { ev, look, move, fire, shield } = input.take(); // every frame` |
+| `input.take()` | `const { ev, look, move, fire, shield, aim } = input.take(); // every frame (aim: AIM button or right mouse, #37)` |
+| `input.show(name, visible)` | `input.show('aim', canAim); // hide/show an on-screen button (aim starts hidden); hiding lets go of it` |
 | `attachTouchControls(input, els)` | `const detach = attachTouchControls(input, { canvas, stick, knob, buttons });` |
 | `attachDesktopControls(input, opts)` | `attachDesktopControls(input, { canvas, target: window });` |
 | `isTouchDevice(window)` | `isTouchDevice(window) ? attachTouch... : attachDesktop...` |

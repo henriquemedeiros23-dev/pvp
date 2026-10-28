@@ -55,6 +55,10 @@ and `boom` (exploded), `inv.bombs` (`[{ id, n }]`), `welcome.bombs` (bombs not e
 Charging (#38, protocol version 5): `inv.charge` (ms until each slot's weapon is fully charged, same order as `weapons`,
 0 = ready). Every weapon charges on its own; `fire` is allowed while charging (25% damage). The field is optional.
 
+Aiming (#37, protocol version 6): bit 16 (`FLAG_AIM`) in `state.f` while the AIM button (phone) or the right mouse button
+(computer) is held: `makeFlags({ aim: true })`, `readFlags(f).aim`. The server only uses it with a weapon that can aim
+(Shootbm, DM Gun) and shows the bit in snapshot `FLAGS` only while that player really aims.
+
 Weapon durability: `inv.dur` (uses left per slot, `null` = never breaks), `dur` on ground items (`item+`, `welcome.items`)
 and the `broke` message (`{ t: 'broke', slot, weapon }`). The `dur` fields are optional, so older messages stay valid.
 

@@ -68,6 +68,12 @@ setInterval(() => {
 - Weapons behave only by their `type` (`melee`, `gun`, `shield`) and data in the rules (`dmg`, `range`, `rate`,
   `spread`, `pellets`, `knock`, `shock`, `freezeMs`, `knockout`, `shieldWear`, `reflect`), never by id:
   a new weapon only needs a new entry in `@pvp/game-rules`. (Explosives were removed in #26.)
+- **Aiming** (`src/aim.js`, #37): while `state.f` has the aim bit 16 (`AIM_FLAG`, the same as `FLAG_AIM` in
+  `@pvp/net-protocol`) and the weapon in hand has an `aim` in the rules (Shootbm, DM Gun), shots use
+  `spread * aim.spreadMul` (more accurate). Ignored with any other weapon, with the shield raised, while drinking and
+  while frozen. `aimState(id)` = `{ aiming, zoom, spreadMul, moveMul }` (all 1 when not aiming); the client walks at
+  `moveMul` (movement is the client's; the light anti-teleport check is not made stricter, so lag never snaps you back).
+  Snapshots show the aim bit only while really aiming.
 - **Shields** (`src/effects.js`): worn on the left arm (`getPlayer(id).shield = { id, dur }`), never in a slot;
   `inv` carries `shield`. `setShield(id, up)` raises/lowers it (not while frozen). While raised the player cannot
   fire, and hits from the **front half** (tuning `shieldFrontDot`, 0) do 0 damage and no effects: the shield loses

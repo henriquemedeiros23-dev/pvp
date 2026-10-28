@@ -11,6 +11,7 @@ import { decodeServerMessage, encodeClient, unpackSnapshotPlayer, makeFlags, rea
 import { slotBar, heldDurabilityView, healthView, pickSlot, brokeMessage, shieldView, WEAPON_ICONS } from '@pvp/hud-model';
 import { potionView, drinkState, drinkMessage, POTION_ICON_SVG, bombView } from '@pvp/hud-model';
 import { chargeView, chargeStarts } from '@pvp/hud-model';
+import { aimView, aimBlend, zoomedFov } from '@pvp/hud-model';
 import { coinsToast } from '@pvp/hud-model';
 import { DamageNumbers } from './damage-numbers.js';
 
@@ -110,6 +111,8 @@ export class Game {
     this.booms = 0;             // explosions seen (for tests)
     this.effects = [];
     this.shieldUp = false; // my shield is raised (Shift / the shield button)
+    this.aimAmount = 0; // aiming (#37): how far the zoom is in (0..1, see aimBlend in @pvp/hud-model)
+    this.aim = aimView(null); // the aim view of this frame (zoom, scope, AIM button)
     this.frozen = false;   // I am frozen (Ice Sword): no moving, turning, shooting or switching
     this.me = null;
     this.ws = null;
@@ -137,7 +140,7 @@ export class Game {
         canvas, stick: $('stick'), knob: $('knob'),
         buttons: {
           fire: $('btnFire'), jump: $('btnJump'), crouch: $('btnCrouch'), open: $('btnOpen'),
-          potion: $('btnPotion'), shield: $('btnShield'),
+          potion: $('btnPotion'), shield: $('btnShield'), aim: $('btnAim'), // aim: held, shown only with a weapon that can aim (#37)
           ...Object.fromEntries(this.bombEls.map(e => [e.dataset.action, e])), // 'throw:bomb' ...
         },
       });
@@ -154,7 +157,8 @@ export class Game {
     const w = innerWidth, h = innerHeight;
     this.renderer.setSize(w, h, false);
     this.camera.aspect = w / h;
-    this.camera.fov = w < h ? 85 : 70;
+    this.baseFov = w < h ? 85 : 70; // aiming zooms in from this (#37)
+    this.camera.fov = zoomedFov(this.baseFov, this.aim?.zoom ?? 1);
     this.frameMenu();
   }
 
@@ -287,6 +291,13 @@ export class Game {
       effects: this.effects.length, // shots, puffs and explosions still fading out
       shieldUp: this.shieldUp,
       frozen: this.frozen,
+      // aiming (#37): can the weapon in hand aim, am I aiming, the zoom now (0..1 amount and factor), the camera's
+      // field of view, the AIM button shown (phone) and the scope ring shown
+      aim: {
+        canAim: this.aim.canAim, aiming: this.aim.aiming, amount: +this.aimAmount.toFixed(3), zoom: +this.aim.zoom.toFixed(3),
+        fov: +this.camera.fov.toFixed(2), baseFov: this.baseFov,
+        button: play && this.mobile && !$('btnAim').classList.contains('hidden'), scope: play && !$('scope').classList.contains('hidden'),
+      },
       // potion drinking: null, or how far it is (0..1) as the HUD shows it
       drinking: this.drink ? potionView(this.inv, { drink: this.drink, now: performance.now() }).progress : null,
       // the "Charging 1.4s" text under the crosshair (#35) and the damage numbers above heads (#33)
@@ -352,6 +363,7 @@ export class Game {
     for (const b of m.bombs ?? []) this.addBomb(b);
     this.shieldUp = false;
     this.frozen = false;
+    this.resetAim();
     if (this.preview) this.preview.root.visible = false;
     this.mode = 'play';
     this.frameMenu();
@@ -372,6 +384,7 @@ export class Game {
     this.renderCharge();
     this.input.enabled = false;
     this.input.reset();
+    this.resetAim(); // zoom back out (frameMenu below updates the camera)
     if (this.me) { this.scene.remove(this.me.sm.root); this.me.sm.dispose(); this.me = null; }
     this.clearArena();
     $('hud').classList.add('hidden');
@@ -642,6 +655,25 @@ export class Game {
     hint.classList.toggle('hidden', !v.hint);
   }
 
+  // Aiming (#37): the round scope ring and the smaller crosshair (from this.aim, see aimView in @pvp/hud-model).
+  renderAim() {
+    const v = this.mode === 'play' ? this.aim : aimView(null);
+    const scope = $('scope');
+    if (scope.classList.contains('hidden') === v.scope) scope.classList.toggle('hidden', !v.scope);
+    if (v.scope) scope.style.setProperty('--o', v.scopeOpacity.toFixed(3));
+    $('crosshair').style.setProperty('--s', v.crosshairScale.toFixed(3));
+    $('btnAim').classList.toggle('pressed', v.aiming);
+  }
+
+  // Stop aiming and zoom straight back out (leaving the arena, knocked out).
+  resetAim() {
+    this.aimAmount = 0;
+    this.aim = aimView(null);
+    this.input.show('aim', false);
+    this.camera.fov = this.baseFov;
+    this.renderAim();
+  }
+
   // Where a player stands now (me or someone I can see), or null.
   playerPos(id) {
     if (id === this.myId) return this.me ? this.me.sm.root.position : null;
@@ -880,10 +912,21 @@ export class Game {
     }
     me.sm.shieldUp = this.shieldUp;
 
-    // look (yaw kept in -PI..PI so it always fits in a message)
-    this.yaw -= look.x;
+    // aiming (#37): hold the AIM button / right mouse with a weapon that can aim (Shootbm, DM Gun);
+    // not with the shield up, while drinking or frozen. The zoom goes in smoothly (@pvp/hud-model).
+    const aimState = { held: !frozen && input.aim, blocked: frozen || this.shieldUp || !!this.drink };
+    const heldWeapon = this.inv ? this.inv.weapons[this.inv.slot] : null;
+    const wasAiming = this.aim.aiming;
+    this.aimAmount = aimBlend(this.aimAmount, aimView(heldWeapon, aimState).aiming, dt * 1000);
+    this.aim = aimView(heldWeapon, { ...aimState, blend: this.aimAmount });
+    this.input.show('aim', this.aim.canAim); // the phone's AIM button: only with the Shootbm or the DM Gun
+    if (this.aim.aiming !== wasAiming) this.lastSend = 0; // tell the server at once (before a shot)
+    this.renderAim();
+
+    // look (yaw kept in -PI..PI so it always fits in a message); slower while zoomed in, to aim finely
+    this.yaw -= look.x / this.aim.zoom;
     this.yaw = Math.atan2(Math.sin(this.yaw), Math.cos(this.yaw));
-    this.pitch = Math.max(-1.2, Math.min(1.1, this.pitch - look.y));
+    this.pitch = Math.max(-1.2, Math.min(1.1, this.pitch - look.y / this.aim.zoom));
 
     const throws = []; // bombs to throw this frame (aimed below, once the camera is placed)
     for (const e of ev) {
@@ -918,6 +961,7 @@ export class Game {
       const wx = fx * my + rx * mx, wz = fz * my + rz * mx;
       const len = Math.hypot(wx, wz) || 1;
       speed = me.crouch ? C.CROUCH_SPEED * mag : mag > 0.85 ? C.RUN_SPEED : C.WALK_SPEED * (mag / 0.85);
+      speed *= this.aim.moveMul; // aiming (#37): walk slower
       dx = (wx / len) * speed * dt; dz = (wz / len) * speed * dt;
       me.moveYaw = Math.atan2(wx, wz);
     }
@@ -935,12 +979,15 @@ export class Game {
     me.sm.root.rotation.y = me.slide > 0 ? Math.atan2(me.slideDir[0], me.slideDir[1]) : this.yaw;
     me.sm.animate(dt, { speed, crouch: me.crouch && me.slide <= 0, slide: me.slide > 0, air: !me.onGround, pitch: this.pitch }, this.time);
 
-    // camera: over the right shoulder, pulled in if a wall is in the way
+    // camera: over the right shoulder, pulled in if a wall is in the way; closer and zoomed in while aiming (#37)
     const eyeY = me.y + (me.crouch ? 1.25 : 1.7);
     const cp = Math.cos(this.pitch), sp = Math.sin(this.pitch);
     const dirX = fx * cp, dirY = sp, dirZ = fz * cp;
-    const pivotX = me.x + rx * 0.75, pivotZ = me.z + rz * 0.75;
-    let dist = 3.6;
+    const shoulder = 0.75 * this.aim.shoulder;
+    const pivotX = me.x + rx * shoulder, pivotZ = me.z + rz * shoulder;
+    let dist = 3.6 * this.aim.cameraDistance;
+    const fov = zoomedFov(this.baseFov, this.aim.zoom);
+    if (Math.abs(this.camera.fov - fov) > 1e-3) { this.camera.fov = fov; this.camera.updateProjectionMatrix(); }
     const hit = rayWorld(this.world, pivotX, eyeY, pivotZ, -dirX, -dirY, -dirZ, dist + 0.3);
     dist = Math.max(0.6, Math.min(dist, hit - 0.3));
     const shake = this.shake > 0 ? (Math.random() - 0.5) * this.shake * 0.4 : 0;
@@ -958,10 +1005,17 @@ export class Game {
       this.throwBomb(id, [ax / len, ay / len, az / len]);
     }
 
+    // send position 20 times a second (before shooting, so the server knows we aim before the shot, #37)
+    const now = performance.now();
+    if (now - this.lastSend > 50) {
+      this.lastSend = now;
+      const f = makeFlags({ crouch: me.crouch, slide: me.slide > 0, moving: speed > 0.3, air: !me.onGround, aim: this.aim.aiming });
+      this.send('state', { x: +me.x.toFixed(2), y: +me.y.toFixed(2), z: +me.z.toFixed(2), ry: +me.sm.root.rotation.y.toFixed(3), pitch: +this.pitch.toFixed(2), f });
+    }
+
     // shooting (#38): a new press always fires (a weapon still charging does 25%); holding fires again when charged
     const w = this.inv && this.inv.weapons[this.inv.slot];
     const def = C.WEAPONS[w];
-    const now = performance.now();
     if (fire && !this.fireHeld) this.firePending = true;
     if (!fire) this.firePending = false;
     this.fireHeld = fire;
@@ -1014,13 +1068,6 @@ export class Game {
       const c = $('compass');
       c.style.left = `${50 - Math.max(-1, Math.min(1, ang / 1.2)) * 40}%`;
       $('compassDist').textContent = `${Math.round(Math.hypot(gx, gz))} m`;
-    }
-
-    // send position 20 times a second
-    if (now - this.lastSend > 50) {
-      this.lastSend = now;
-      const f = makeFlags({ crouch: me.crouch, slide: me.slide > 0, moving: speed > 0.3, air: !me.onGround });
-      this.send('state', { x: +me.x.toFixed(2), y: +me.y.toFixed(2), z: +me.z.toFixed(2), ry: +me.sm.root.rotation.y.toFixed(3), pitch: +this.pitch.toFixed(2), f });
     }
 
     this.focus = me;
