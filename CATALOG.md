@@ -58,7 +58,7 @@ graph LR
 | `@pvp/hud-model` | Turns your inventory and health into the in-game HUD: Durability bar of the held weapon, H.P bar, 5 slots, shield pill, potion button with drinking ring, "Charging 1.4s" after a shot, damage numbers above heads, aiming (zoom, scope ring, AIM / AIM ON button), bomb buttons, the coin icon from the boss's drawing. | both | fully: pure functions of their inputs (time passed in) | 39 |
 | `@pvp/api-client` | Talks to the server's account and shop API and keeps the login token. | both | fully: fetch and storage are passed in | 10 |
 | `@pvp/stickman-3d` | A three.js stickman with skins, outfits, the boss's weapons and shields, the Healing Potion flask, bombs and their red area, frozen/shocked looks and animation. | browser (pose math also in Node) | partly: pose math is pure, how it looks depends on the renderer | 27 |
-| `@pvp/island-scene` | The 3D island: sky, sun, ground, water, palms, ruins and chests, and gold coins popping out of opened chests. | browser (also builds in Node) | partly: all placement and colors from a seed, how it looks depends on the renderer | 12 |
+| `@pvp/island-scene` | The 3D island: sky with clouds, warm sun, green grass ground with dirt paths, grass tufts, flowers, bushes, rocks, beach with wet sand, waves, palms, ruins and chests, and gold coins popping out of opened chests. A lighter version for phones. | browser (also builds in Node) | partly: all placement and colors from a seed, time passed in, how it looks depends on the renderer | 19 |
 | `@pvp/local-server` | The game server inside the page (practice mode): arena, accounts in localStorage, tick, fake WebSocket, bots. | browser (also Node) | partly: seeded arena and bots, time and timer passed in; tokens and localStorage are real | 16 |
 | `@pvp/touch-controls` | Joystick, aim by dragging, buttons, held actions (shield), toggled actions (aim: on until pressed again), buttons that hide and show, keyboard and mouse (right click aims). | browser (core also in Node) | partly: the core is pure, the DOM part depends on real fingers and mice | 27 |
 
@@ -282,7 +282,7 @@ graph LR
 
 ## `@pvp/island-scene`
 
-**Purpose:** the three.js scenery of an island from `@pvp/world-gen`: sky dome and sun, lights and shadows, ground, beach, water, grass, palms, ruins of light sandy stone, chests with a lid that opens backwards, the golden chest, and the coin pop (a few square gold coins jump out of an opened chest and fade).
+**Purpose:** the three.js scenery of an island from `@pvp/world-gen`: sky dome with sun glow and clouds, warm lights and shadows (desktop), a green grass ground (seeded color texture with lush and lighter patches, worn dirt around the ruins and a few paths, times a small tiling grass detail), grass tufts, flowers, bushes and rocks (instanced), a beach from dry to wet sand with foam, water with drifting waves, palms, ruins of light sandy stone with mossy feet, chests with a lid that opens backwards, the golden chest, and the coin pop (a few square gold coins jump out of an opened chest and fade).
 
 | Export | Example |
 |---|---|
@@ -294,6 +294,10 @@ graph LR
 | `isl.popChestCoins(i)` / `isl.popGoldenCoins(x, z)` | `isl.popChestCoins(3); // 6 coins jump out (4 on phones), moved by isl.update()` |
 | `buildCoin()` / `createCoinPops(opts)` | `scene.add(buildCoin()); const pops = createCoinPops({ max: 12, random: 1 }); pops.burst(x, y, z, { count: 5 }); pops.update(dt);` |
 | `noiseTexture(random, opts)` | `noiseTexture(createRandom(1), { blocks: true, cracks: 6 });` |
+| `createGroundField(opts)` | `const f = createGroundField({ islandRadius: 210, boxes, random: createRandom(1), size: 256 }); f.sample(x, z).dirt;` |
+| `buildPlants(opts)` / `PLANT_COUNTS` | `PLANT_COUNTS.mobile.tufts; // 4200 (desktop 14000)` |
+| `grassDetailPixels`, `heightToNormalPixels`, `waterNormalTexture`, `fbm`, `valueNoise` | `fbm(createRandom(2), { cells: 8 })(0.3, 0.7); // tiling noise, 0..1` |
+| `mobile: true` | lighter for phones: smaller textures, ~30% of the plants, fewer clouds, Lambert materials, no normal maps, no shadows |
 
 **Depends on:** `@pvp/seeded-random`, and `three` (peer dependency). Tests also use `@pvp/world-gen`.
 **Determinism:** partly. Every random placement, shade and texture comes from a seeded random (one fork per part), so the same seed gives the same scenery; time is passed in to `update()`. How it looks on screen depends on the renderer.

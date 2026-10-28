@@ -168,6 +168,7 @@ test('no black shapes in the sky, from the middle and from the edge of the islan
     { x: 0, z: 0, yaw: 0 }, { x: 0, z: 0, yaw: Math.PI },
     { x: 180, z: 0, yaw: Math.PI / 2 }, { x: 180, z: 0, yaw: -Math.PI / 2 },
     { x: -120, z: 140, yaw: -2.4 }, { x: -120, z: 140, yaw: 0.7, pitch: 0.4 },
+    { x: 0, z: 218, yaw: 0.3, pitch: -0.25 }, // on the beach, looking at the shore and the sea (#43)
   ];
   for (const [i, v] of views.entries()) {
     const r = await page.evaluate(view => window.view(view), v);

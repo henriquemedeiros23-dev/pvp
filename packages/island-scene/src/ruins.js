@@ -8,7 +8,8 @@ export const STONE_COLORS = Object.freeze({
   wall: '#e8d9b8', tower: '#dccaa6', pillar: '#f1e6cf', rubble: '#cfc1a2', stone: '#e2d4b4',
 });
 
-const TILE = 2.5; // meters per texture repeat
+const TILE = 2.5;
+const MOSS_FOOT = new THREE.Color(0.9, 0.95, 0.8); // multiplies the stone color at the bottom of each block // meters per texture repeat
 
 /**
  * @param {{ boxes: Array<{x:number,y:number,z:number,w:number,h:number,d:number,kind?:string}>, random: { next(): number }, colors?: object }} opts
@@ -29,8 +30,13 @@ export function buildRuins({ boxes, random, colors = STONE_COLORS }) {
     }
     g.translate(b.x, b.y + b.h / 2, b.z);
     const c = new THREE.Color(colors[b.kind] || colors.stone).offsetHSL(0, 0, (random.next() - 0.5) * 0.06);
-    const cols = new Float32Array(g.attributes.position.count * 3);
-    for (let i = 0; i < cols.length; i += 3) { cols[i] = c.r; cols[i + 1] = c.g; cols[i + 2] = c.b; }
+    // the foot of every block is a little darker and greener (damp moss and soil creeping up, #43)
+    const foot = c.clone().multiply(MOSS_FOOT);
+    const gp = g.attributes.position, cols = new Float32Array(gp.count * 3);
+    for (let i = 0; i < gp.count; i++) {
+      const k = gp.getY(i) < b.y + 0.01 ? foot : c;
+      cols[i * 3] = k.r; cols[i * 3 + 1] = k.g; cols[i * 3 + 2] = k.b;
+    }
     g.setAttribute('color', new THREE.BufferAttribute(cols, 3));
     geos.push(g);
   }
@@ -42,17 +48,17 @@ export function buildRuins({ boxes, random, colors = STONE_COLORS }) {
     stone.name = 'stone';
     group.add(stone);
   }
-  // moss on the tops of about half of the tall walls
+  // moss on the tops of most tall walls
   const mossGeos = [];
   for (const b of boxes) {
-    if (b.h < 2.5 || random.next() < 0.5) continue;
+    if (b.h < 2.5 || random.next() < 0.35) continue;
     const g = new THREE.BoxGeometry(b.w + 0.06, 0.12, b.d + 0.06);
     g.translate(b.x, b.y + b.h + 0.02, b.z);
     mossGeos.push(g);
   }
   let moss = null;
   if (mossGeos.length) {
-    moss = new THREE.Mesh(mergeGeometries(mossGeos), new THREE.MeshStandardMaterial({ color: '#6e9c48', roughness: 1 }));
+    moss = new THREE.Mesh(mergeGeometries(mossGeos), new THREE.MeshLambertMaterial({ color: '#5f9140' }));
     for (const g of mossGeos) g.dispose();
     moss.receiveShadow = true;
     moss.name = 'moss';
