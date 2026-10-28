@@ -10,8 +10,12 @@ export const DEFAULT_CONFIG = Object.freeze({
   fireButton: 'fire',         // button name that is held to shoot
   // Held actions besides fire: true while any of their keys or buttons is held down.
   // Shift (computer) or the shield button (phone) raises the shield.
+  // The aim button (phone) or the right mouse button (computer) aims (#37).
   holdKeys: Object.freeze({ shield: Object.freeze(['shift']) }),
-  holdButtons: Object.freeze(['shield']),
+  holdButtons: Object.freeze(['shield', 'aim']),
+  holdMouse: Object.freeze({ 2: 'aim' }), // mouse button number -> held action (0 is always fire)
+  // On-screen buttons hidden at the start (show them with state.show(name, true)), e.g. aim only with a weapon that can aim.
+  hiddenButtons: Object.freeze(['aim']),
   wheelUp: 'slot:-',          // action for wheel dy < 0
   wheelDown: 'slot:+',        // action for wheel dy > 0
   moveKeys: Object.freeze({
@@ -50,6 +54,8 @@ export function createInputState(config = {}) {
     buttonActions: { ...DEFAULT_CONFIG.buttonActions, ...(config.buttonActions || {}) },
     holdKeys: { ...(config.holdKeys || DEFAULT_CONFIG.holdKeys) },
     holdButtons: [...(config.holdButtons || DEFAULT_CONFIG.holdButtons)],
+    holdMouse: { ...(config.holdMouse || DEFAULT_CONFIG.holdMouse) },
+    hiddenButtons: [...(config.hiddenButtons || DEFAULT_CONFIG.hiddenButtons)],
   };
   const actionKeys = new Map(Object.entries(cfg.actionKeys).map(([k, a]) => [lower(k), a]));
   const moveKeys = {};
@@ -57,13 +63,17 @@ export function createInputState(config = {}) {
   const holdKeys = new Map(); // key -> held action name
   for (const [name, list] of Object.entries(cfg.holdKeys)) for (const k of list) holdKeys.set(lower(k), name);
   const holdButtons = new Set(cfg.holdButtons);
-  const holding = new Map(); // held action name -> Set of sources ('key:shift', 'button')
+  const holdMouse = new Map(Object.entries(cfg.holdMouse).map(([b, n]) => [Number(b), n]));
+  const holding = new Map(); // held action name -> Set of sources ('key:shift', 'button', 'mouse:2')
   const hold = (name, source, down) => {
     if (!holding.has(name)) holding.set(name, new Set());
     if (down) holding.get(name).add(source); else holding.get(name).delete(source);
   };
   const isHeld = name => (holding.get(name)?.size ?? 0) > 0;
-  const holds = () => Object.fromEntries([...new Set([...holdKeys.values(), ...holdButtons])].map(n => [n, isHeld(n)]));
+  const holdNames = [...new Set([...holdKeys.values(), ...holdButtons, ...holdMouse.values()])];
+  const holds = () => Object.fromEntries(holdNames.map(n => [n, isHeld(n)]));
+  const hidden = new Set(cfg.hiddenButtons); // on-screen buttons hidden right now
+  const showListeners = new Set();
 
   let enabled = !!cfg.enabled;
   const keys = new Set();
@@ -110,6 +120,8 @@ export function createInputState(config = {}) {
     /** Is a held action (e.g. 'shield') held down right now? */
     held: isHeld,
     get shield() { return isHeld('shield'); },
+    /** Aiming (#37): the aim button or the right mouse button is held. */
+    get aim() { return isHeld('aim'); },
     get enabled() { return enabled; },
     set enabled(v) { enabled = !!v; },
 
@@ -153,14 +165,36 @@ export function createInputState(config = {}) {
         return;
       }
       if (holdButtons.has(name)) {
-        if (!down || enabled) hold(name, 'button', down);
+        if (!down || (enabled && !hidden.has(name))) hold(name, 'button', down);
         return;
       }
       if (down && enabled) actions.push(cfg.buttonActions[name] ?? name);
     },
 
-    // --- mouse: button 0 fires, movement looks (only while pointer is locked) ---
+    /**
+     * Show or hide an on-screen button (the DOM adapter hides its element). Hiding a held button lets go of it,
+     * and a hidden button cannot be pressed. Keys and the mouse still work (e.g. the right mouse button aims).
+     */
+    show(name, visible = true) {
+      const was = !hidden.has(name);
+      if (visible) hidden.delete(name); else hidden.add(name);
+      if (!visible) {
+        if (holdButtons.has(name)) hold(name, 'button', false);
+        if (name === cfg.fireButton) held.delete('button');
+      }
+      if (was !== !!visible) for (const fn of [...showListeners]) fn(name, !!visible);
+    },
+    /** Is this on-screen button shown? */
+    shown: name => !hidden.has(name),
+    /** Call fn(name, visible) whenever a button is shown or hidden. Returns a function that stops it. */
+    onShow(fn) { showListeners.add(fn); return () => showListeners.delete(fn); },
+
+    // --- mouse: button 0 fires, holdMouse buttons are held (2 = right button aims), movement looks (only while pointer is locked) ---
     mouseButton(button, down) {
+      if (holdMouse.has(button)) {
+        if (!down || enabled) hold(holdMouse.get(button), 'mouse:' + button, down);
+        return;
+      }
       if (button !== 0) return;
       if (!down) held.delete('mouse');
       else if (enabled) held.add('mouse');
@@ -196,7 +230,7 @@ export function createInputState(config = {}) {
     take() {
       const ev = actions; actions = [];
       const l = { x: look.x, y: look.y }; look.x = look.y = 0;
-      return { ev, actions: ev, look: l, move: { x: move.x, y: move.y }, fire: held.size > 0, shield: isHeld('shield'), holds: holds() };
+      return { ev, actions: ev, look: l, move: { x: move.x, y: move.y }, fire: held.size > 0, shield: isHeld('shield'), aim: isHeld('aim'), holds: holds() };
     },
 
     // drop all input (e.g. when a match ends)

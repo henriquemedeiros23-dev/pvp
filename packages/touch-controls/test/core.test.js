@@ -139,7 +139,7 @@ test('disabled state ignores input but still lets go', () => {
   s.stickStart(30, 0); s.lookStart(1, 0, 0); s.lookMove(1, 50, 50);
   s.button('fire', true); s.button('jump', true); s.mouseButton(0, true);
   s.mouseMove(5, 5); s.wheel(1); s.key('w', true); s.key(' ', true);
-  assert.deepEqual(s.take(), { ev: [], actions: [], look: { x: 0, y: 0 }, move: { x: 0, y: 0 }, fire: false, shield: false, holds: { shield: false } });
+  assert.deepEqual(s.take(), { ev: [], actions: [], look: { x: 0, y: 0 }, move: { x: 0, y: 0 }, fire: false, shield: false, aim: false, holds: { shield: false, aim: false } });
 
   s.enabled = true;
   s.key('w', true); s.button('fire', true);
@@ -155,7 +155,7 @@ test('reset clears everything and calls listeners', () => {
   const off = s.onReset(() => calls++);
   s.stickStart(40, 0); s.button('fire', true); s.key('e', true); s.mouseMove(3, 3);
   s.reset();
-  assert.deepEqual(s.take(), { ev: [], actions: [], look: { x: 0, y: 0 }, move: { x: 0, y: 0 }, fire: false, shield: false, holds: { shield: false } });
+  assert.deepEqual(s.take(), { ev: [], actions: [], look: { x: 0, y: 0 }, move: { x: 0, y: 0 }, fire: false, shield: false, aim: false, holds: { shield: false, aim: false } });
   assert.equal(calls, 1);
   off(); s.reset();
   assert.equal(calls, 1);
@@ -189,7 +189,7 @@ test('shield: hold Shift or the shield button; held while any of them is down', 
   assert.equal(s.held('shield'), true);
   let t = s.take();
   assert.equal(t.shield, true);
-  assert.deepEqual(t.holds, { shield: true });
+  assert.deepEqual(t.holds, { shield: true, aim: false });
   assert.deepEqual(t.ev, [], 'holding is not an action');
   s.button('shield', true);   // phone button too
   s.key('shift', false);
@@ -218,5 +218,62 @@ test('held actions are configurable', () => {
   s.key('b', true);
   assert.equal(s.held('block'), true);
   s.button('guard', true);
-  assert.deepEqual(s.take().holds, { block: true, guard: true });
+  assert.deepEqual(s.take().holds, { block: true, guard: true, aim: false }, 'the right mouse button still aims (holdMouse)');
+});
+
+test('aim (#37): hold the aim button or the right mouse button', () => {
+  const s = createInputState();
+  assert.equal(s.shown('aim'), false, 'the aim button starts hidden');
+  s.button('aim', true);
+  assert.equal(s.aim, false, 'a hidden button cannot be pressed');
+  s.mouseButton(2, true);
+  assert.equal(s.aim, true, 'right mouse button');
+  assert.equal(s.fire, false, 'aiming is not shooting');
+  let t = s.take();
+  assert.equal(t.aim, true);
+  assert.equal(t.holds.aim, true);
+  assert.deepEqual(t.ev, []);
+  s.mouseButton(2, false);
+  assert.equal(s.aim, false, 'let go = stop aiming');
+
+  // show the button (e.g. holding the Shootbm), hold it, then hide it (switched to the Gun): it lets go
+  const seen = [];
+  const stop = s.onShow((name, visible) => seen.push(`${name}:${visible}`));
+  s.show('aim', true);
+  s.show('aim', true); // no change, no call
+  assert.equal(s.shown('aim'), true);
+  s.button('aim', true);
+  assert.equal(s.take().aim, true);
+  s.show('aim', false);
+  assert.equal(s.aim, false, 'hiding the button lets go of it');
+  assert.deepEqual(seen, ['aim:true', 'aim:false']);
+  stop();
+  s.show('aim', true);
+  assert.equal(seen.length, 2, 'listener removed');
+
+  // disabled: no new aiming, but letting go works; blur and reset let go
+  s.mouseButton(2, true);
+  s.enabled = false;
+  s.button('aim', true);
+  s.mouseButton(2, false);
+  assert.equal(s.aim, false);
+  s.enabled = true;
+  s.button('aim', true);
+  s.blur();
+  assert.equal(s.aim, false, 'blur lets go');
+  s.mouseButton(2, true);
+  s.reset();
+  assert.equal(s.aim, false, 'reset lets go');
+  assert.equal(s.shown('aim'), true, 'reset keeps what is shown');
+});
+
+test('hiddenButtons and holdMouse are configurable', () => {
+  const s = createInputState({ hiddenButtons: [], holdMouse: { 1: 'zoom' } });
+  assert.equal(s.shown('aim'), true);
+  s.mouseButton(2, true);
+  assert.equal(s.aim, false, 'right button not bound any more');
+  s.mouseButton(1, true);
+  assert.equal(s.held('zoom'), true);
+  assert.deepEqual(DEFAULT_CONFIG.holdMouse, { 2: 'aim' });
+  assert.deepEqual(DEFAULT_CONFIG.hiddenButtons, ['aim']);
 });

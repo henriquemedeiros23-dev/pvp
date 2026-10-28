@@ -116,3 +116,39 @@ test('touch adapter: the shield button is held (and you can aim by dragging on i
   shield.fire('pointerup', { pointerId: 5 });
   assert.equal(s.shield, false);
 });
+
+test('touch adapter: the aim button is hidden until shown, then held (#37)', () => {
+  const s = createInputState();
+  const canvas = fakeEl(), aim = fakeEl();
+  const detach = attachTouchControls(s, { canvas, buttons: { aim } });
+  assert.ok(aim.classList.has('hidden'), 'hidden at the start');
+  s.show('aim', true);
+  assert.ok(!aim.classList.has('hidden'));
+  aim.fire('pointerdown', { pointerId: 2, clientX: 0, clientY: 0 });
+  assert.equal(s.aim, true);
+  aim.fire('pointerup', { pointerId: 2 });
+  assert.equal(s.aim, false, 'let go = stop aiming');
+  aim.fire('pointerdown', { pointerId: 3, clientX: 0, clientY: 0 });
+  s.show('aim', false);
+  assert.ok(aim.classList.has('hidden') && !aim.classList.has('pressed'));
+  assert.equal(s.aim, false);
+  detach();
+  s.show('aim', true);
+  assert.ok(aim.classList.has('hidden'), 'detached: the element is not changed any more');
+});
+
+test('desktop adapter: the right mouse button aims, no context menu (#37)', () => {
+  const s = createInputState();
+  const canvas = fakeEl();
+  const doc = { pointerLockElement: canvas };
+  const win = fakeEl();
+  attachDesktopControls(s, { canvas, target: win, doc });
+  canvas.fire('mousedown', { button: 2 });
+  assert.equal(s.aim, true);
+  assert.equal(s.fire, false);
+  win.fire('mouseup', { button: 2 });
+  assert.equal(s.aim, false);
+  let prevented = false;
+  canvas.fire('contextmenu', { preventDefault() { prevented = true; } });
+  assert.ok(prevented);
+});

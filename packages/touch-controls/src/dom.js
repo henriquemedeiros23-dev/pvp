@@ -92,6 +92,16 @@ export function attachTouchControls(state, { canvas, stick, knob, buttons = {} }
     for (const el of pressedEls) el.classList.remove('pressed');
   }));
 
+  // state.show(name, visible): the button's element gets (or loses) the 'hidden' class (e.g. the aim button, #37)
+  const showEl = (name, visible) => {
+    const el = buttons[name];
+    if (!el) return;
+    if (visible) el.classList.remove('hidden');
+    else { el.classList.add('hidden'); el.classList.remove('pressed'); }
+  };
+  for (const name of Object.keys(buttons)) if (!state.shown(name)) showEl(name, false);
+  off.push(state.onShow(showEl));
+
   return function detach() { while (off.length) off.pop()(); };
 }
 
@@ -110,6 +120,8 @@ export function attachDesktopControls(state, { canvas, target = globalThis.windo
       if (!locked()) { canvas.requestPointerLock?.(); return; }
       state.mouseButton(e.button, true);
     });
+    // the right mouse button aims (#37): no browser menu on the game
+    listen(off, canvas, 'contextmenu', e => e.preventDefault());
   }
   listen(off, target, 'mouseup', e => state.mouseButton(e.button, false));
   listen(off, target, 'mousemove', e => { if (locked()) state.mouseMove(e.movementX || 0, e.movementY || 0); });
