@@ -131,7 +131,8 @@ Decided by the boss through 22 questions.
 ## Look
 - **Camera:** behind your character, like Fortnite.
 - **Characters:** stickmen with clean, sharp graphics.
-- **Skins:** colors and patterns, plus outfits (hats, masks, capes, clothes).
+- **Skins:** colors and patterns, plus outfits (hats, masks, capes, clothes). Pattern prices (#44): Zebra Stripes 50 coins,
+  Shiny Gold 75, Rainbow 100.
 - **Map:** a big island of ruins with buildings, towers and hiding spots, for up to 100 players.
 
 ## Other

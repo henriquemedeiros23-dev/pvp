@@ -1,17 +1,18 @@
 // Skins: one color/pattern plus one item per outfit slot.
 import { deepFreeze } from './freeze.js';
 
+// Prices (#44, the boss's change): Zebra Stripes 50, Shiny Gold 75, Rainbow 100. Sorted by price (the shop shows them in this order).
 export const COLORS = deepFreeze({
   black:  { name: 'Classic Black', price: 0,   color: '#1b1b1f' },
   red:    { name: 'Red',           price: 50,  color: '#e0342f' },
   blue:   { name: 'Blue',          price: 50,  color: '#2f6fe0' },
   green:  { name: 'Green',         price: 50,  color: '#2fae4a' },
+  zebra:  { name: 'Zebra Stripes', price: 50,  color: '#ffffff', pattern: 'stripes' },
   purple: { name: 'Purple',        price: 75,  color: '#8b3fe0' },
   orange: { name: 'Orange',        price: 75,  color: '#f08a1c' },
+  gold:   { name: 'Shiny Gold',    price: 75,  color: '#ffc531', pattern: 'gold' },
   white:  { name: 'Snow White',    price: 100, color: '#f2f2f2' },
-  zebra:  { name: 'Zebra Stripes', price: 150, color: '#ffffff', pattern: 'stripes' },
-  gold:   { name: 'Shiny Gold',    price: 250, color: '#ffc531', pattern: 'gold' },
-  rainbow:{ name: 'Rainbow',       price: 400, color: '#ff0000', pattern: 'rainbow' },
+  rainbow:{ name: 'Rainbow',       price: 100, color: '#ff0000', pattern: 'rainbow' },
 });
 
 export const OUTFITS = deepFreeze({

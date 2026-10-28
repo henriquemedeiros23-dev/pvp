@@ -113,15 +113,16 @@ test('coins never go negative or NaN', () => {
 test('buy a skin item, buying it twice fails, not enough coins fails', () => {
   const { accounts } = setup();
   const { account } = accounts.signup('Bob', 'pass');
-  accounts.addCoins(account, 500);
+  const start = skinPrice('hat', 'crown') + skinPrice('color', 'rainbow') - 1; // after the crown, 1 coin short of the rainbow
+  accounts.addCoins(account, start);
   const view = accounts.buy(account, 'hat', 'crown');
-  assert.equal(view.coins, 500 - skinPrice('hat', 'crown'));
+  assert.equal(view.coins, start - skinPrice('hat', 'crown'));
   assert.ok(view.owned.includes('hat:crown'));
   rejects(() => accounts.buy(account, 'hat', 'crown'), 'ALREADY_OWNED');
   rejects(() => accounts.buy(account, 'color', 'black'), 'ALREADY_OWNED');
   rejects(() => accounts.buy(account, 'color', 'rainbow'), 'NOT_ENOUGH_COINS');
   assert.throws(() => accounts.buy(account, 'color', 'rainbow'), { message: 'Not enough coins' });
-  assert.equal(account.coins, 200);
+  assert.equal(account.coins, skinPrice('color', 'rainbow') - 1);
   assert.ok(!account.owned.includes('color:rainbow'));
 });
 
