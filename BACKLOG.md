@@ -74,6 +74,7 @@ The live list is on GitHub Issues: https://github.com/henriquemedeiros23-dev/pvp
 | 37 | ✅ | **Aim button for the Shootbm and DM Gun** | Hold AIM to zoom in through the sight for better aim. |
 | 38 | ✅ | **New charging rules** | Charge per weapon; sword misses don't charge; attacking while charging does 25% damage. |
 | 39 | 🔲 | **Inventory screen and fast bar** | Menu Inventory with your bought items (space for 2 of each); pick what goes in your 5-slot bar for the arena. |
+| 40 | 🔲 | **Aim button stays on** | Tap AIM once to keep aiming, tap again to stop. |
 
 ## Later ideas
 - Sounds and music
