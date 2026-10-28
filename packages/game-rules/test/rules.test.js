@@ -26,11 +26,16 @@ const REMOVED_IN_28 = ['HEALS', 'MAX_BANDAGES', 'MAX_MEDKITS', 'BANDAGE_HEAL', '
 const CHANGED_IN_36 = { CHEST_RESPAWN_MS: 120000 };
 // #42 added the Demon Horns hat; everything else in OUTFITS stays the same.
 const ADDED_IN_42 = { OUTFITS: o => { const c = structuredClone(o); delete c.hat.horns; return c; } };
+// #44: the boss made Zebra Stripes 50 (was 150), Shiny Gold 75 (was 250) and Rainbow 100 (was 400); the rest of COLORS stays.
+const CHANGED_IN_44 = {
+  COLORS: o => { const c = structuredClone(o); c.zebra.price = 150; c.gold.price = 250; c.rainbow.price = 400; return c; },
+};
 
-test('same named exports and values as the old apps/game/shared/config.js (except the #25/#26/#28/#36/#42 changes)', () => {
+test('same named exports and values as the old apps/game/shared/config.js (except the #25/#26/#28/#36/#42/#44 changes)', () => {
   for (const [name, value] of Object.entries(oldConfig)) {
     if (CHANGED.includes(name)) continue;
     if (name in CHANGED_IN_36) { assert.equal(rules[name], CHANGED_IN_36[name], `${name} changed in #36`); continue; }
+    if (name in CHANGED_IN_44) { assert.deepEqual(CHANGED_IN_44[name](rules[name]), value, `export ${name} differs (beyond #44)`); continue; }
     if (name in ADDED_IN_42) { assert.deepEqual(ADDED_IN_42[name](rules[name]), value, `export ${name} differs (beyond #42)`); continue; }
     if (REMOVED_IN_28.includes(name)) { assert.ok(!(name in rules), `${name} should be gone (#28)`); continue; }
     assert.ok(name in rules, `missing export ${name}`);
@@ -246,7 +251,9 @@ test('weaponPrice', () => {
 });
 
 test('skinPrice', () => {
-  assert.equal(skinPrice('color', 'rainbow'), 400);
+  assert.equal(skinPrice('color', 'rainbow'), 100);
+  assert.equal(skinPrice('color', 'gold'), 75);
+  assert.equal(skinPrice('color', 'zebra'), 50);
   assert.equal(skinPrice('color', 'black'), 0);
   assert.equal(skinPrice('hat', 'crown'), 300);
   assert.equal(skinPrice('hat', 'horns'), 50);

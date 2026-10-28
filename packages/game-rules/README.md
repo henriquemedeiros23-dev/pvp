@@ -103,6 +103,7 @@ Legendary Bomb 10 damage, 5x5 m, 15 m, never hurts you, max 3, pack of 3 for 60 
 `validateRules` also checks `BOMBS` (optional in a rules object).
 
 Prices (#32, the boss's change): Mega Shield 100 coins, Supersword 250 coins.
+Color prices (#44, the boss's change): Zebra Stripes 50 coins, Shiny Gold 75, Rainbow 100. `COLORS` is sorted by price (the shop shows colors in this order).
 
 Files: `src/player.js` (limits, timers, movement), `src/weapons.js` (weapons, loot), `src/potion.js` (the Healing Potion), `src/bombs.js` (the bombs), `src/skins.js` (colors, outfits, default skin), `src/validate.js`, all re-exported from `src/index.js`.
 
