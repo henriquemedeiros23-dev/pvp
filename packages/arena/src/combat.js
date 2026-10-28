@@ -7,6 +7,7 @@ import { at, send, sendNear, tellServer, weaponDef, heightOf, wearOf, chargeLeft
 import { removePlayer, inventoryMsg } from './players.js';
 import { dropItem } from './loot.js';
 import { strike, isFrozen } from './effects.js';
+import { aimState } from './aim.js';
 
 const round2 = v => +v.toFixed(2);
 
@@ -83,7 +84,8 @@ function melee(A, p, w, def, full) {
 }
 
 function gun(A, p, w, def, o, dir, full) {
-  const R = A.rules, r = A.rnd.combat, spread = def.spread || 0;
+  // aiming (#37) with a weapon that can aim: a smaller spread (more accurate)
+  const R = A.rules, r = A.rnd.combat, spread = (def.spread || 0) * aimState(A, p).spreadMul;
   const radius = R.PLAYER_RADIUS + A.tune.hitRadiusExtra;
   const tracers = [];
   for (let i = 0; i < (def.pellets || 1); i++) {

@@ -47,9 +47,14 @@ export function rarityStyle(rarity, colors = RARITY_COLORS) {
 //   knockout: true                 any hit knocks the target out at once (Supersword)
 //   shieldWear: n                  durability a raised shield loses when it blocks this weapon (default 1)
 //   reflect: 0..1                  shields only: part of a blocked hit's damage sent back to the attacker
+//   aim: { zoom, spreadMul, moveMul }  guns only (#37): the weapon can aim (hold the AIM button / right mouse).
+//                                  zoom: how much the camera zooms in (2 = twice as close); spreadMul: the
+//                                  spread is multiplied by this while aiming (0.3 = much more accurate);
+//                                  moveMul: walking speed is multiplied by this while aiming (0.6 = slower).
 export const WEAPONS = deepFreeze({
   gun:          { name: 'Gun',            type: 'gun', dmg: 2, range: 60, rate: 2, spread: 0.01, pellets: 1, rarity: 'common', price: 3, durability: 15, chestChance: 15 },
-  shootbm:      { name: 'Shootbm',        type: 'gun', dmg: 5, range: 90, rate: 3, spread: 0.004, pellets: 1, rarity: 'common', price: 7, durability: 20, chestChance: 15 },
+  shootbm:      { name: 'Shootbm',        type: 'gun', dmg: 5, range: 90, rate: 3, spread: 0.004, pellets: 1, rarity: 'common', price: 7, durability: 20, chestChance: 15,
+    aim: { zoom: 2, spreadMul: 0.3, moveMul: 0.6 } },
   electricsword: { name: 'Electric Sword', type: 'melee', dmg: 15, range: 3, rate: 2, rarity: 'epic', price: 30, durability: 50, chestChance: 5,
     shock: { dmg: 1, everyMs: 5000, forMs: 15000 } },
   icesword:     { name: 'Ice Sword',      type: 'melee', dmg: 10, range: 3, rate: 3, rarity: 'epic', price: 35, durability: 50, chestChance: 4, freezeMs: 2000 },
@@ -58,7 +63,8 @@ export const WEAPONS = deepFreeze({
   supersword:   { name: 'Supersword',     type: 'melee', dmg: 100, range: 3.6, rate: 1.5, rarity: 'megalegend', price: 250, durability: 40, chestChance: 0.3,
     knockout: true, shieldWear: 5 },
   // Batch 2 (#32): the boss's numbers from the issue (the numbers written on these two cards are wrong).
-  dmgun:        { name: 'DM Gun',         type: 'gun', dmg: 15, range: 90, rate: 3, spread: 0.004, pellets: 1, rarity: 'epic', price: 20, durability: 30, chestChance: 7 },
+  dmgun:        { name: 'DM Gun',         type: 'gun', dmg: 15, range: 90, rate: 3, spread: 0.004, pellets: 1, rarity: 'epic', price: 20, durability: 30, chestChance: 7,
+    aim: { zoom: 2, spreadMul: 0.3, moveMul: 0.6 } },
   supergun:     { name: 'Supergun',       type: 'gun', dmg: 25, range: 80, rate: 2, spread: 0.006, pellets: 1, rarity: 'legendary', price: 70, durability: 30, chestChance: 1.5 },
 });
 
@@ -119,4 +125,35 @@ export const LOOT_TABLE = deepFreeze(Object.fromEntries(RARITIES.map(r => [r, we
 /** Shop price of a weapon; undefined for an unknown id. */
 export function weaponPrice(id) {
   return own(WEAPONS, id)?.price;
+}
+
+// ---------------------------------------------------------------- aiming (#37)
+const isNum = v => typeof v === 'number' && Number.isFinite(v);
+
+/**
+ * The aim numbers of a weapon (a weapon id, or the weapon's rules object): { zoom, spreadMul, moveMul },
+ * or null if it cannot aim (no `aim`, not a gun, unknown id or bad numbers).
+ * Only the Shootbm and the DM Gun can aim today.
+ */
+export function aimDef(weapon, weapons = WEAPONS) {
+  const w = typeof weapon === 'string' ? own(weapons, weapon) : weapon;
+  const a = w && typeof w === 'object' && w.type === 'gun' ? w.aim : undefined;
+  if (!a || typeof a !== 'object') return null;
+  if (!(isNum(a.zoom) && a.zoom >= 1 && isNum(a.spreadMul) && a.spreadMul >= 0 && a.spreadMul <= 1
+    && isNum(a.moveMul) && a.moveMul > 0 && a.moveMul <= 1)) return null;
+  return a;
+}
+
+/** True if this weapon id can aim (it has good `aim` numbers). */
+export function canAim(id, weapons = WEAPONS) {
+  return aimDef(id, weapons) !== null;
+}
+
+/**
+ * The multipliers to use right now: { zoom, spreadMul, moveMul } from the weapon's `aim` while aiming
+ * with a weapon that can aim, otherwise all 1 (no change). weapon: an id or a weapon's rules object.
+ */
+export function aimMultipliers(weapon, aiming, weapons = WEAPONS) {
+  const a = aiming ? aimDef(weapon, weapons) : null;
+  return a ? { zoom: a.zoom, spreadMul: a.spreadMul, moveMul: a.moveMul } : { zoom: 1, spreadMul: 1, moveMul: 1 };
 }

@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   PROTOCOL_VERSION, MAX_MESSAGE_SIZE, CLIENT_MESSAGES, SERVER_MESSAGES, SNAP, SNAP_LENGTH,
-  FLAG_CROUCH, FLAG_SLIDE, FLAG_MOVING, FLAG_AIR, MAX_NUMBER,
+  FLAG_CROUCH, FLAG_SLIDE, FLAG_MOVING, FLAG_AIR, FLAG_AIM, FLAGS_MASK, MAX_NUMBER,
   parseClientMessage, decodeServerMessage, encode, encodeClient, serverMessage, clientMessage,
   packSnapshotPlayer, unpackSnapshotPlayer, makeFlags, readFlags, makeStatus, readStatus, isValid, setEncodeChecks,
   STATUS_SHIELD_UP, STATUS_SHOCKED, STATUS_FROZEN,
@@ -70,9 +70,9 @@ const rejected = (raw) => {
 };
 
 test('constants', () => {
-  assert.equal(PROTOCOL_VERSION, 5);
+  assert.equal(PROTOCOL_VERSION, 6);
   assert.equal(MAX_MESSAGE_SIZE, 4096);
-  assert.deepEqual([FLAG_CROUCH, FLAG_SLIDE, FLAG_MOVING, FLAG_AIR], [1, 2, 4, 8]);
+  assert.deepEqual([FLAG_CROUCH, FLAG_SLIDE, FLAG_MOVING, FLAG_AIR, FLAG_AIM], [1, 2, 4, 8, 16]);
   assert.equal(SNAP_LENGTH, 12);
   assert.deepEqual([STATUS_SHIELD_UP, STATUS_SHOCKED, STATUS_FROZEN], [1, 2, 4]);
   for (const gone of ['proj', 'proj-', 'mine+', 'mine-']) assert.ok(!(gone in SERVER_MESSAGES), `${gone} is gone (old explosives)`);
@@ -279,8 +279,13 @@ test('inv.charge (#38): ms until each slot is charged, optional, whole numbers >
 test('flags helpers', () => {
   assert.equal(makeFlags({ crouch: true, air: true }), 9);
   assert.equal(makeFlags(), 0);
-  assert.deepEqual(readFlags(6), { crouch: false, slide: true, moving: true, air: false });
-  for (let f = 0; f < 16; f++) assert.equal(makeFlags(readFlags(f)), f);
+  assert.deepEqual(readFlags(6), { crouch: false, slide: true, moving: true, air: false, aim: false });
+  // aiming (#37)
+  assert.equal(makeFlags({ aim: true, moving: true }), FLAG_AIM | FLAG_MOVING);
+  assert.equal(readFlags(16).aim, true);
+  for (let f = 0; f < 32; f++) assert.equal(makeFlags(readFlags(f)), f);
+  assert.equal(FLAGS_MASK, 31);
+  assert.equal(parseClientMessage(J({ t: 'state', x: 1, y: 0, z: 2, ry: 0, pitch: 0, f: FLAG_AIM })).ok, true);
 });
 
 test('durability fields: optional (old messages still work), null = never breaks, bad values rejected', () => {

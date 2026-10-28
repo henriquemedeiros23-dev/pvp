@@ -4,6 +4,7 @@ import { itemMsg } from './loot.js';
 import { playerInfo } from './players.js';
 import { isFrozen } from './effects.js';
 import { bombMsg } from './bombs.js';
+import { shownFlags } from './aim.js';
 
 const round2 = v => +v.toFixed(2);
 
@@ -31,7 +32,7 @@ export function snapshotFor(A, id) {
     if (o !== p && Math.hypot(o.x - p.x, o.z - p.z) > A.tune.snapshotRadius) continue;
     // status bits (see @pvp/net-protocol STATUS_*): 1 shield up, 2 shocked, 4 frozen
     const status = (o.shieldUp ? 1 : 0) | (o.shock ? 2 : 0) | (isFrozen(A, o) ? 4 : 0);
-    near.push([o.id, round2(o.x), round2(o.y), round2(o.z), round2(o.ry), round2(o.pitch), o.flags, o.weapons[o.slot] ?? '',
+    near.push([o.id, round2(o.x), round2(o.y), round2(o.z), round2(o.ry), round2(o.pitch), shownFlags(A, o), o.weapons[o.slot] ?? '',
       o.hp, A.now < o.protectUntil ? 1 : 0, o.shield ? o.shield.id : '', status]);
   }
   return { t: 'snap', p: near, n: A.players.size };

@@ -68,6 +68,16 @@ export function validateRules(rules) {
       if (w.freezeMs !== undefined && !isPosNum(w.freezeMs)) problems.push(`weapon ${id}: freezeMs must be a number > 0`);
       if (w.knockout !== undefined && typeof w.knockout !== 'boolean') problems.push(`weapon ${id}: knockout must be true or false`);
       if (w.shieldWear !== undefined && !isPosInt(w.shieldWear)) problems.push(`weapon ${id}: shieldWear must be a whole number > 0`);
+      if (w.aim !== undefined) { // #37: only guns can aim
+        const a = w.aim;
+        if (w.type !== 'gun') problems.push(`weapon ${id}: only a gun can have aim`);
+        if (!isObject(a)) problems.push(`weapon ${id}: aim must be { zoom, spreadMul, moveMul }`);
+        else {
+          if (!(typeof a.zoom === 'number' && Number.isFinite(a.zoom) && a.zoom >= 1)) problems.push(`weapon ${id}: aim.zoom must be a number >= 1`);
+          if (!(typeof a.spreadMul === 'number' && a.spreadMul >= 0 && a.spreadMul <= 1)) problems.push(`weapon ${id}: aim.spreadMul must be a number from 0 to 1`);
+          if (!(typeof a.moveMul === 'number' && a.moveMul > 0 && a.moveMul <= 1)) problems.push(`weapon ${id}: aim.moveMul must be a number above 0, at most 1`);
+        }
+      }
       if (w.type !== undefined && !WEAPON_TYPES.includes(w.type)) problems.push(`weapon ${id}: unknown type "${w.type}"`);
       if (w.rarity !== undefined && !rarities.includes(w.rarity)) problems.push(`weapon ${id}: unknown rarity "${w.rarity}"`);
       if (w.price !== undefined && !isPrice(w.price)) problems.push(`weapon ${id}: price must be a number >= 0`);
