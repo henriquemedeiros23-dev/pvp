@@ -399,3 +399,31 @@ test('bad charging numbers are reported', () => {
   delete without.MIN_FIRE_GAP_MS;
   assert.deepEqual(validateRules(without), [], 'optional');
 });
+
+test('aiming (#37): only the Shootbm and the DM Gun can aim', () => {
+  const aimers = Object.keys(WEAPONS).filter(id => rules.canAim(id));
+  assert.deepEqual(aimers, ['shootbm', 'dmgun']);
+  assert.deepEqual(rules.aimDef('shootbm'), { zoom: 2, spreadMul: 0.3, moveMul: 0.6 });
+  assert.deepEqual(rules.aimDef(WEAPONS.dmgun), { zoom: 2, spreadMul: 0.3, moveMul: 0.6 }, 'a weapon object works too');
+  for (const id of ['gun', 'supergun', 'electricsword', 'shield', 'nope', undefined, null]) assert.equal(rules.aimDef(id), null, String(id));
+  assert.equal(rules.canAim('gun'), false);
+  assert.equal(rules.aimDef({ type: 'melee', aim: { zoom: 2, spreadMul: 0.3, moveMul: 0.6 } }), null, 'a sword cannot aim');
+  assert.equal(rules.aimDef({ type: 'gun', aim: { zoom: 0.5, spreadMul: 0.3, moveMul: 0.6 } }), null, 'bad numbers: cannot aim');
+  assert.deepEqual(rules.aimMultipliers('shootbm', true), { zoom: 2, spreadMul: 0.3, moveMul: 0.6 });
+  assert.deepEqual(rules.aimMultipliers('shootbm', false), { zoom: 1, spreadMul: 1, moveMul: 1 }, 'not aiming');
+  assert.deepEqual(rules.aimMultipliers('gun', true), { zoom: 1, spreadMul: 1, moveMul: 1 }, 'the Gun ignores aiming');
+});
+
+test('bad aim numbers are reported', () => {
+  const r = copy();
+  r.WEAPONS.shootbm.aim = { zoom: 0.5, spreadMul: 2, moveMul: 0 };
+  r.WEAPONS.icesword.aim = { zoom: 2, spreadMul: 0.3, moveMul: 0.6 };
+  r.WEAPONS.dmgun.aim = 'yes';
+  assert.deepEqual(validateRules(r), [
+    'weapon shootbm: aim.zoom must be a number >= 1',
+    'weapon shootbm: aim.spreadMul must be a number from 0 to 1',
+    'weapon shootbm: aim.moveMul must be a number above 0, at most 1',
+    'weapon icesword: only a gun can have aim',
+    'weapon dmgun: aim must be { zoom, spreadMul, moveMul }',
+  ]);
+});

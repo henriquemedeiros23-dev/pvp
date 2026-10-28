@@ -109,6 +109,27 @@ document.documentElement.style.setProperty('--coin-icon', `url("${coinIconDataUr
 coinsToast(3);                                      // { amount: 3, text: '+3 coins' }  (1 -> '+1 coin')
 ```
 
+**Aiming** (`src/aim.js`, #37, #40): only the Shootbm and the DM Gun can aim (their `aim` in `@pvp/game-rules`). Tap the
+🎯 AIM button (phone) or right click (computer) to switch aiming on, again to switch it off: the camera zooms in by
+`aim.zoom` and comes closer over the shoulder, a round scope ring shows, the crosshair gets smaller and you walk at
+`aim.moveMul`. Aiming switches off when the weapon in hand changes (`aimHandKey`), and is paused (no zoom) while
+`blocked` (shield up, drinking, frozen). Time is passed in.
+
+```js
+import { aimView, aimBlend, aimButtonView, aimHandKey, zoomedFov, AIM_TIME_MS, AIM_CAMERA, AIM_BUTTON } from '@pvp/hud-model';
+
+let amount = 0;                                     // how far the zoom is in, 0..1
+const hand = aimHandKey(inv);                       // '1:shootbm' or null: when it changes, switch aiming off
+if (hand !== lastHand) { lastHand = hand; input.setToggle('aim', false); }
+const state = { on: input.aim, blocked: shieldUp || drinking || frozen }; // `held` works the same as `on`
+amount = aimBlend(amount, aimView(weaponId, state).aiming, dtMs); // goes in / out over AIM_TIME_MS (160 ms)
+const v = aimView(weaponId, { ...state, blend: amount });
+// { canAim (show the AIM button), aiming (send the aim flag), blend, zoom (1 .. aim.zoom), moveMul,
+//   cameraDistance, shoulder (camera multipliers, AIM_CAMERA), crosshairScale (1 .. 0.6), scope, scopeOpacity }
+camera.fov = zoomedFov(70, v.zoom);                 // 2 = things look twice as big
+aimButtonView(input.aim, { paused: !v.aiming });    // { on, paused, icon: '🎯', label: 'AIM' / 'AIM ON', title }
+```
+
 ## Determinism
 
 Fully deterministic: pure functions of their inputs. No randomness, no clock, no DOM, no I/O.

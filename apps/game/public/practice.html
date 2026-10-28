@@ -111,7 +111,9 @@
 
   <!-- In-game HUD -->
   <section id="hud" class="hidden">
-    <div class="crosshair"><i></i><i></i><i></i><i></i></div>
+    <!-- Aiming with the Shootbm / DM Gun (#37): a round scope ring; the crosshair gets smaller -->
+    <div id="scope" class="scope hidden" aria-hidden="true"></div>
+    <div id="crosshair" class="crosshair"><i></i><i></i><i></i><i></i></div>
     <div id="hitmark" class="hitmark">✕</div>
     <!-- After a shot or swing: "Charging 1.4s" and a small ring just under the crosshair (#35) -->
     <div id="charge" class="charge hidden" role="status"><span class="cring"></span><span id="chargeText" class="ctext"></span><span id="chargeHint" class="chint hidden"></span></div>
@@ -173,8 +175,9 @@
       <button id="btnJump" class="tbtn jump">⤒</button>
       <button id="btnCrouch" class="tbtn crouch">⤓</button>
       <button id="btnShield" class="tbtn shieldbtn hidden" aria-label="Hold to raise your shield">🛡️</button>
+      <button id="btnAim" class="tbtn aimbtn hidden" aria-label="Tap to aim" title="Tap to aim" aria-pressed="false">🎯<small>AIM</small></button>
     </div>
-    <p id="keysHelp" class="keys hidden">WASD move · hold Shift shield · Space jump · C crouch/slide · Click shoot · E open · G drop weapon · 1-5 weapons · Q drink potion · B / N throw bomb · Esc free mouse</p>
+    <p id="keysHelp" class="keys hidden">WASD move · hold Shift shield · right click aim on/off (Shootbm, DM Gun) · Space jump · C crouch/slide · Click shoot · E open · G drop weapon · 1-5 weapons · Q drink potion · B / N throw bomb · Esc free mouse</p>
   </section>
 
   <!-- Knocked out -->

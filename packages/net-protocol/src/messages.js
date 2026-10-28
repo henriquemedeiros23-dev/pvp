@@ -5,7 +5,7 @@
 import { deepFreeze } from './freeze.js';
 
 /** Bump when a message changes in a way old phones or servers would not understand. */
-export const PROTOCOL_VERSION = 5; // 2: shields and status effects (#26), explosives removed; 3: 'dmg' damage numbers (#33); 4: bombs (#32); 5: inv.charge per slot (#38)
+export const PROTOCOL_VERSION = 6; // 2: shields and status effects (#26), explosives removed; 3: 'dmg' damage numbers (#33); 4: bombs (#32); 5: inv.charge per slot (#38); 6: aim flag 16 in state.f and snapshot flags (#37)
 
 /** Longest raw message a client may send (bytes). Same as the server's WebSocket maxPayload. */
 export const MAX_CLIENT_MESSAGE_SIZE = 4096;
@@ -31,7 +31,9 @@ export const FLAG_CROUCH = 1;
 export const FLAG_SLIDE = 2;
 export const FLAG_MOVING = 4;
 export const FLAG_AIR = 8;
-export const FLAGS_MASK = FLAG_CROUCH | FLAG_SLIDE | FLAG_MOVING | FLAG_AIR;
+/** Aiming (#37): the AIM button / right mouse is held (the server only uses it with a weapon that can aim). */
+export const FLAG_AIM = 16;
+export const FLAGS_MASK = FLAG_CROUCH | FLAG_SLIDE | FLAG_MOVING | FLAG_AIR | FLAG_AIM;
 
 const ITEM_KINDS = ['weapon', 'potion', 'bomb'];
 const DRINK_STATES = ['start', 'done', 'cancel'];
@@ -83,7 +85,7 @@ export const CLIENT_MESSAGES = deepFreeze({
     z: ['number', 'Z position (meters)'],
     ry: [ANGLE, 'Body turn around the up axis (radians)'],
     pitch: [ANGLE, 'Look up/down (radians)'],
-    f: [FLAGS, 'Movement flags: 1 crouch, 2 slide, 4 moving, 8 in air'],
+    f: [FLAGS, 'Movement flags: 1 crouch, 2 slide, 4 moving, 8 in air, 16 aiming'],
   }),
   fire: m('Use the weapon in my hand.', {
     d: ['vec3', 'Aim direction [x, y, z] (server normalizes it)'],

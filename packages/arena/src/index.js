@@ -10,8 +10,10 @@ import { fire, dropWeapon } from './combat.js';
 import { setShield, tickEffects, isFrozen, isShocked } from './effects.js';
 import { snapshotFor, welcomeFor } from './snapshot.js';
 import { throwBomb, tickBombs } from './bombs.js';
+import { aimState } from './aim.js';
 
 export { ARENA_DEFAULTS } from './tuning.js';
+export { AIM_FLAG } from './aim.js';
 
 const copyPlayer = p => p && {
   id: p.id, key: p.key, name: p.name, skin: { ...p.skin }, coins: p.coins,
@@ -49,6 +51,8 @@ export function createArena(o = {}) {
     /** Is this player frozen (stuck) / shocked (losing HP over time) right now? */
     isFrozen: id => isFrozen(A, A.players.get(id)),
     isShocked: id => isShocked(A, A.players.get(id)),
+    /** Aiming (#37): { aiming, zoom, spreadMul, moveMul } for this player right now (all 1 when not aiming). */
+    aimState: id => ({ ...aimState(A, A.players.get(id)) }),
     selectSlot: (id, i) => players.selectSlot(A, id, i),
     /** Drop the weapon in hand on the ground with its exact durability (#34). Returns the item id or null. */
     dropWeapon: (id, now) => dropWeapon(A, id, now),

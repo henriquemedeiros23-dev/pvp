@@ -12,6 +12,14 @@ export const DEFAULT_CONFIG = Object.freeze({
   // Shift (computer) or the shield button (phone) raises the shield.
   holdKeys: Object.freeze({ shield: Object.freeze(['shift']) }),
   holdButtons: Object.freeze(['shield']),
+  holdMouse: Object.freeze({}), // mouse button number -> held action (0 is always fire)
+  // Toggled actions: a press switches them on, the next press switches them off (letting go does nothing).
+  // The aim button (phone) or the right mouse button (computer) toggles aiming (#37, #40).
+  toggleButtons: Object.freeze(['aim']),
+  toggleMouse: Object.freeze({ 2: 'aim' }), // mouse button number -> toggled action
+  // On-screen buttons hidden at the start (show them with state.show(name, true)), e.g. aim only with a weapon that can aim.
+  // A hidden toggle is switched off and cannot be switched on (not even with the mouse).
+  hiddenButtons: Object.freeze(['aim']),
   wheelUp: 'slot:-',          // action for wheel dy < 0
   wheelDown: 'slot:+',        // action for wheel dy > 0
   moveKeys: Object.freeze({
@@ -50,6 +58,10 @@ export function createInputState(config = {}) {
     buttonActions: { ...DEFAULT_CONFIG.buttonActions, ...(config.buttonActions || {}) },
     holdKeys: { ...(config.holdKeys || DEFAULT_CONFIG.holdKeys) },
     holdButtons: [...(config.holdButtons || DEFAULT_CONFIG.holdButtons)],
+    holdMouse: { ...(config.holdMouse || DEFAULT_CONFIG.holdMouse) },
+    toggleButtons: [...(config.toggleButtons || DEFAULT_CONFIG.toggleButtons)],
+    toggleMouse: { ...(config.toggleMouse || DEFAULT_CONFIG.toggleMouse) },
+    hiddenButtons: [...(config.hiddenButtons || DEFAULT_CONFIG.hiddenButtons)],
   };
   const actionKeys = new Map(Object.entries(cfg.actionKeys).map(([k, a]) => [lower(k), a]));
   const moveKeys = {};
@@ -57,13 +69,31 @@ export function createInputState(config = {}) {
   const holdKeys = new Map(); // key -> held action name
   for (const [name, list] of Object.entries(cfg.holdKeys)) for (const k of list) holdKeys.set(lower(k), name);
   const holdButtons = new Set(cfg.holdButtons);
-  const holding = new Map(); // held action name -> Set of sources ('key:shift', 'button')
+  const holdMouse = new Map(Object.entries(cfg.holdMouse).map(([b, n]) => [Number(b), n]));
+  const holding = new Map(); // held action name -> Set of sources ('key:shift', 'button', 'mouse:2')
   const hold = (name, source, down) => {
     if (!holding.has(name)) holding.set(name, new Set());
     if (down) holding.get(name).add(source); else holding.get(name).delete(source);
   };
-  const isHeld = name => (holding.get(name)?.size ?? 0) > 0;
-  const holds = () => Object.fromEntries([...new Set([...holdKeys.values(), ...holdButtons])].map(n => [n, isHeld(n)]));
+  const toggleButtons = new Set(cfg.toggleButtons);
+  const toggleMouse = new Map(Object.entries(cfg.toggleMouse).map(([b, n]) => [Number(b), n]));
+  const toggleNames = [...new Set([...toggleButtons, ...toggleMouse.values()])];
+  const toggledOn = new Set(); // toggled action names switched on right now
+  const toggleListeners = new Set();
+  const hidden = new Set(cfg.hiddenButtons); // on-screen buttons hidden right now
+  const showListeners = new Set();
+  const setToggle = (name, on) => {
+    on = !!on && enabled && !hidden.has(name);
+    if (toggledOn.has(name) === on) return;
+    if (on) toggledOn.add(name); else toggledOn.delete(name);
+    for (const fn of [...toggleListeners]) fn(name, on);
+  };
+  const toggleOffAll = () => { for (const n of [...toggledOn]) setToggle(n, false); };
+  // an action is on while any of its keys / buttons is held, or while it is toggled on
+  const isHeld = name => (holding.get(name)?.size ?? 0) > 0 || toggledOn.has(name);
+  const holdNames = [...new Set([...holdKeys.values(), ...holdButtons, ...holdMouse.values(), ...toggleNames])];
+  const holds = () => Object.fromEntries(holdNames.map(n => [n, isHeld(n)]));
+  const toggles = () => Object.fromEntries(toggleNames.map(n => [n, toggledOn.has(n)]));
 
   let enabled = !!cfg.enabled;
   const keys = new Set();
@@ -107,9 +137,20 @@ export function createInputState(config = {}) {
     config: cfg,
     move, look, knob,
     get fire() { return held.size > 0; },
-    /** Is a held action (e.g. 'shield') held down right now? */
+    /** Is a held action (e.g. 'shield') held down right now, or a toggled one (e.g. 'aim') switched on? */
     held: isHeld,
     get shield() { return isHeld('shield'); },
+    /** Aiming (#37, #40): switched on by a tap on the aim button or a right click, off by the next one. */
+    get aim() { return isHeld('aim'); },
+    /** Is a toggled action (e.g. 'aim') switched on? */
+    toggled: name => toggledOn.has(name),
+    /**
+     * Switch a toggled action on or off from the game (e.g. off when the weapon breaks). It cannot be switched on
+     * while disabled or while its button is hidden.
+     */
+    setToggle,
+    /** Call fn(name, on) whenever a toggled action is switched on or off. Returns a function that stops it. */
+    onToggle(fn) { toggleListeners.add(fn); return () => toggleListeners.delete(fn); },
     get enabled() { return enabled; },
     set enabled(v) { enabled = !!v; },
 
@@ -145,22 +186,56 @@ export function createInputState(config = {}) {
     },
     lookEnd(id) { lookers.delete(id); },
 
-    // --- on-screen buttons: the fire button and holdButtons are held, the rest are tapped ---
+    // --- on-screen buttons: the fire button and holdButtons are held, toggleButtons switch on / off, the rest are tapped ---
     button(name, down) {
+      if (toggleButtons.has(name)) {
+        if (down) setToggle(name, !toggledOn.has(name));
+        return;
+      }
       if (name === cfg.fireButton) {
         if (!down) held.delete('button');
         else if (enabled) held.add('button');
         return;
       }
       if (holdButtons.has(name)) {
-        if (!down || enabled) hold(name, 'button', down);
+        if (!down || (enabled && !hidden.has(name))) hold(name, 'button', down);
         return;
       }
       if (down && enabled) actions.push(cfg.buttonActions[name] ?? name);
     },
 
-    // --- mouse: button 0 fires, movement looks (only while pointer is locked) ---
+    /**
+     * Show or hide an on-screen button (the DOM adapter hides its element). Hiding a held button lets go of it,
+     * and a hidden button cannot be pressed. Keys and holdMouse still work. Hiding a toggle switches it off, and it
+     * cannot be switched on while hidden (not with the mouse either: e.g. no aiming with a weapon that cannot aim).
+     */
+    show(name, visible = true) {
+      const was = !hidden.has(name);
+      if (visible) hidden.delete(name); else hidden.add(name);
+      if (!visible) {
+        if (holdButtons.has(name)) hold(name, 'button', false);
+        setToggle(name, false);
+        if (name === cfg.fireButton) held.delete('button');
+      }
+      if (was !== !!visible) for (const fn of [...showListeners]) fn(name, !!visible);
+    },
+    /** Is this on-screen button shown? */
+    shown: name => !hidden.has(name),
+    /** Call fn(name, visible) whenever a button is shown or hidden. Returns a function that stops it. */
+    onShow(fn) { showListeners.add(fn); return () => showListeners.delete(fn); },
+
+    // --- mouse: button 0 fires, holdMouse buttons are held, toggleMouse buttons switch on / off (2 = right button aims),
+    //     movement looks (only while pointer is locked) ---
     mouseButton(button, down) {
+      if (toggleMouse.has(button)) {
+        const name = toggleMouse.get(button);
+        if (down) setToggle(name, !toggledOn.has(name));
+        return;
+      }
+      if (holdMouse.has(button)) {
+        if (!down || enabled) hold(holdMouse.get(button), 'mouse:' + button, down);
+        return;
+      }
       if (button !== 0) return;
       if (!down) held.delete('mouse');
       else if (enabled) held.add('mouse');
@@ -186,7 +261,7 @@ export function createInputState(config = {}) {
       updateKeys();
     },
 
-    // window lost focus: let go of everything that is held
+    // window lost focus: let go of everything that is held (toggles stay on: nothing is held down)
     blur() {
       keys.clear(); held.clear(); holding.clear();
       updateKeys();
@@ -196,12 +271,13 @@ export function createInputState(config = {}) {
     take() {
       const ev = actions; actions = [];
       const l = { x: look.x, y: look.y }; look.x = look.y = 0;
-      return { ev, actions: ev, look: l, move: { x: move.x, y: move.y }, fire: held.size > 0, shield: isHeld('shield'), holds: holds() };
+      return { ev, actions: ev, look: l, move: { x: move.x, y: move.y }, fire: held.size > 0, shield: isHeld('shield'), aim: isHeld('aim'), holds: holds(), toggles: toggles() };
     },
 
-    // drop all input (e.g. when a match ends)
+    // drop all input (e.g. when a match ends): also switches every toggle off
     reset() {
       keys.clear(); held.clear(); holding.clear(); lookers.clear(); actions = [];
+      toggleOffAll();
       look.x = look.y = 0;
       stick.active = false; stick.x = stick.y = 0; knob.x = knob.y = 0;
       keyMove.x = keyMove.y = 0;

@@ -18,7 +18,9 @@ const capture = (el, e) => { try { el.setPointerCapture?.(e.pointerId); } catch 
  * Touch screen: joystick on the left, drag on the canvas / fire button to aim,
  * tap buttons for actions. `buttons` maps a button name to its element;
  * the fire button (state.config.fireButton, 'fire') and the hold buttons (state.config.holdButtons,
- * e.g. 'shield') are held (and you can drag on them to aim), every other one is tapped.
+ * e.g. 'shield') are held (and you can drag on them to aim), the toggle buttons (state.config.toggleButtons, e.g. 'aim')
+ * switch on / off with each tap (they keep the 'pressed' and 'on' classes while on; drag on them to aim too),
+ * every other one is tapped.
  */
 export function attachTouchControls(state, { canvas, stick, knob, buttons = {} } = {}) {
   const off = [];
@@ -63,7 +65,18 @@ export function attachTouchControls(state, { canvas, stick, knob, buttons = {} }
   for (const [name, el] of Object.entries(buttons)) {
     if (!el) continue;
     pressedEls.push(el);
-    if (name === state.config.fireButton || state.config.holdButtons.includes(name)) {
+    if (state.config.toggleButtons.includes(name)) {
+      // tap to switch on, tap again to switch off (the look follows state.onToggle below); drag on it to aim
+      listen(off, el, 'pointerdown', e => {
+        e.preventDefault();
+        state.button(name, true);
+        if (state.lookStart(e.pointerId, e.clientX, e.clientY)) capture(el, e);
+      });
+      listen(off, el, 'pointermove', lookMove);
+      const end = e => { state.button(name, false); lookEnd(e); };
+      listen(off, el, 'pointerup', end);
+      listen(off, el, 'pointercancel', end);
+    } else if (name === state.config.fireButton || state.config.holdButtons.includes(name)) {
       // hold to shoot (or to keep the shield up), and drag on it to aim at the same time
       listen(off, el, 'pointerdown', e => {
         e.preventDefault();
@@ -87,10 +100,30 @@ export function attachTouchControls(state, { canvas, stick, knob, buttons = {} }
     }
   }
 
+  // a toggle button looks pressed (classes 'pressed' and 'on', aria-pressed) while it is switched on
+  const toggleEl = (name, on) => {
+    const el = buttons[name];
+    if (!el || !state.config.toggleButtons.includes(name)) return;
+    if (on) { el.classList.add('pressed'); el.classList.add('on'); } else { el.classList.remove('pressed'); el.classList.remove('on'); }
+    el.setAttribute?.('aria-pressed', on ? 'true' : 'false');
+  };
+  for (const name of Object.keys(buttons)) toggleEl(name, state.toggled(name));
+  off.push(state.onToggle(toggleEl));
+
   off.push(state.onReset(() => {
     setKnob({ x: 0, y: 0 });
     for (const el of pressedEls) el.classList.remove('pressed');
   }));
+
+  // state.show(name, visible): the button's element gets (or loses) the 'hidden' class (e.g. the aim button, #37)
+  const showEl = (name, visible) => {
+    const el = buttons[name];
+    if (!el) return;
+    if (visible) el.classList.remove('hidden');
+    else { el.classList.add('hidden'); el.classList.remove('pressed'); el.classList.remove('on'); }
+  };
+  for (const name of Object.keys(buttons)) if (!state.shown(name)) showEl(name, false);
+  off.push(state.onShow(showEl));
 
   return function detach() { while (off.length) off.pop()(); };
 }
@@ -110,6 +143,8 @@ export function attachDesktopControls(state, { canvas, target = globalThis.windo
       if (!locked()) { canvas.requestPointerLock?.(); return; }
       state.mouseButton(e.button, true);
     });
+    // the right mouse button switches aiming on / off (#37, #40): no browser menu on the game
+    listen(off, canvas, 'contextmenu', e => e.preventDefault());
   }
   listen(off, target, 'mouseup', e => state.mouseButton(e.button, false));
   listen(off, target, 'mousemove', e => { if (locked()) state.mouseMove(e.movementX || 0, e.movementY || 0); });

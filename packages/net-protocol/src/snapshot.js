@@ -2,7 +2,7 @@
 // Slot order (see SNAP): [id, x, y, z, ry, pitch, flags, weapon, hp, protected, shield, status]
 
 import {
-  SNAP, SNAP_LENGTH, FLAG_CROUCH, FLAG_SLIDE, FLAG_MOVING, FLAG_AIR, STATUS_SHIELD_UP, STATUS_SHOCKED, STATUS_FROZEN,
+  SNAP, SNAP_LENGTH, FLAG_CROUCH, FLAG_SLIDE, FLAG_MOVING, FLAG_AIR, FLAG_AIM, STATUS_SHIELD_UP, STATUS_SHOCKED, STATUS_FROZEN,
 } from './messages.js';
 
 const r2 = v => Math.round(v * 100) / 100;
@@ -56,12 +56,12 @@ export function readStatus(s) {
   return { shieldUp: !!(s & STATUS_SHIELD_UP), shocked: !!(s & STATUS_SHOCKED), frozen: !!(s & STATUS_FROZEN) };
 }
 
-/** Build movement flags from { crouch, slide, moving, air } booleans. */
-export function makeFlags({ crouch = false, slide = false, moving = false, air = false } = {}) {
-  return (crouch ? FLAG_CROUCH : 0) | (slide ? FLAG_SLIDE : 0) | (moving ? FLAG_MOVING : 0) | (air ? FLAG_AIR : 0);
+/** Build movement flags from { crouch, slide, moving, air, aim } booleans (aim: the AIM button is held, #37). */
+export function makeFlags({ crouch = false, slide = false, moving = false, air = false, aim = false } = {}) {
+  return (crouch ? FLAG_CROUCH : 0) | (slide ? FLAG_SLIDE : 0) | (moving ? FLAG_MOVING : 0) | (air ? FLAG_AIR : 0) | (aim ? FLAG_AIM : 0);
 }
 
-/** Read movement flags into { crouch, slide, moving, air } booleans. */
+/** Read movement flags into { crouch, slide, moving, air, aim } booleans. */
 export function readFlags(f) {
-  return { crouch: !!(f & FLAG_CROUCH), slide: !!(f & FLAG_SLIDE), moving: !!(f & FLAG_MOVING), air: !!(f & FLAG_AIR) };
+  return { crouch: !!(f & FLAG_CROUCH), slide: !!(f & FLAG_SLIDE), moving: !!(f & FLAG_MOVING), air: !!(f & FLAG_AIR), aim: !!(f & FLAG_AIM) };
 }

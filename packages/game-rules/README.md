@@ -14,6 +14,7 @@ import {
   weaponPrice, skinPrice, isBuyable, weaponsByRarity, weaponDurability, weaponWear,
   chestChance, droppedDurability, rarityStyle, isShield, rarityRank, validateRules, POTION, MAX_POTIONS, potionHeal, itemPrice,
   BOMBS, isBomb, bombPrice, bombMaxCarry, bombCounts, inBombArea, CHARGING_DAMAGE, MIN_FIRE_GAP_MS, chargingDamage,
+  aimDef, canAim, aimMultipliers,
 } from '@pvp/game-rules';
 // In the browser without a bundler: import from '/path/to/packages/game-rules/src/index.js'
 
@@ -44,6 +45,9 @@ inBombArea('bomb', 10, 10, 11, 9); // true: inside the 2x2 m square around (10, 
 CHARGING_DAMAGE;                // 0.25: a hit with a weapon that is still charging does 25% (#38; tune it here)
 chargingDamage(15);             // 4: 15 * 0.25 rounded, at least 1 (chargingDamage(100) = 25: no knockout)
 MIN_FIRE_GAP_MS;                // 150: anti-spam, at most one use every 150 ms whatever the weapon
+aimDef('shootbm');              // { zoom: 2, spreadMul: 0.3, moveMul: 0.6 }: this gun can aim (#37); null for others
+canAim('gun');                  // false: only the Shootbm and the DM Gun can aim
+aimMultipliers('dmgun', true);  // { zoom: 2, spreadMul: 0.3, moveMul: 0.6 } (all 1 when not aiming or it cannot aim)
 
 validateRules(RULES);           // [] — empty means valid
 validateRules({ ...RULES, STARTING_WEAPON: 'laser' });
@@ -67,6 +71,11 @@ exactly one weapon, picked with these numbers as **weights**, so they do not hav
 chance = number / sum of all numbers. Today: gun 15, shootbm 15, dmgun 7, shield 6, electricsword 5, icesword 4,
 supergun 1.5, megashield 1, supersword 0.3 (sum 54.8, so a Gun comes out of about 27 in 100 chests). The golden chest
 multiplies them by `GOLDEN_CHEST_BOOST` (Epic, Legendary and Megalegend x2, Common stays).
+
+**Aiming (#37):** a gun may have `aim: { zoom, spreadMul, moveMul }`: hold the AIM button (phone) or the right mouse
+button (computer) to aim. Today only the **Shootbm** and the **DM Gun** have it (`zoom` 2 = the camera zooms in twice,
+`spreadMul` 0.3 = the spread is 30% while aiming, `moveMul` 0.6 = you walk at 60%). `validateRules` checks it (guns
+only, zoom >= 1, spreadMul 0..1, moveMul above 0 up to 1).
 
 **Durability:** every weapon has `durability` = how many uses (swing or shot; for a shield: blocked hits) it
 lasts before it breaks and disappears, or `null` = never breaks. An optional `wearPerUse` (whole number,

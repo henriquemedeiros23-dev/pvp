@@ -12,7 +12,7 @@ export * from './player.js';
 export {
   STARTING_WEAPON, WEAPON_TYPES, RARITIES, RARITY_COLORS, WEAPONS, LOOT_TABLE, GOLDEN_CHEST_BOOST,
   weaponsByRarity, weaponPrice, weaponDurability, weaponWear, droppedDurability, chestChance, rarityStyle,
-  isShield, rarityRank,
+  isShield, rarityRank, aimDef, canAim, aimMultipliers,
 } from './weapons.js';
 export { MAX_POTIONS, POTION, potionPrice, potionHeal } from './potion.js';
 export { CHARGING_DAMAGE, MIN_FIRE_GAP_MS, chargingDamage } from './charge.js';

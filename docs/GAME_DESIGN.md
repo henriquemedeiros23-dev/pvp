@@ -122,6 +122,11 @@ Decided by the boss through 22 questions.
 - Walk, run, jump, slide and crouch. No climbing, no vehicles.
 - **Phone:** joystick on the left, buttons on the right, you aim yourself. Hold 🛡️ to raise your shield.
 - **Computer:** WASD to move, mouse to aim and shoot, **hold Shift to raise your shield**.
+- **Aim (Shootbm and DM Gun only):** tap the 🎯 AIM button (phone) or right click (computer) to start aiming; it keeps
+  aiming (the button glows and says **AIM ON**) until you tap / right click again. The camera zooms in (2x) with a round
+  scope, your shots are much more accurate, and you walk slower. Not with the Gun or the Supergun.
+  Aiming stops by itself when you switch weapons, your weapon breaks or you drop it, you leave the arena or get knocked
+  out, or a new game starts. With the shield up, while drinking or frozen aiming is paused (no zoom) and comes back after.
 
 ## Look
 - **Camera:** behind your character, like Fortnite.

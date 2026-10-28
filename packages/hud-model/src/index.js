@@ -9,6 +9,8 @@ export { POTION_ICON_SVG, drinkState, drinkMessage, potionView } from './potion.
 export { BOMB_KEYS, bombIconSvg, bombView } from './bombs.js';
 // The coin from the boss's drawing (#29): menu, shop, HUD and the "+3 coins" pop-up.
 export { COIN_COLORS, COIN_ICON_SVG, coinIconSvg, coinIconDataUrl, coinsToast } from './coin.js';
+// Aiming with the Shootbm and the DM Gun (#37): zoom, scope ring, smaller crosshair, the AIM button.
+export { AIM_TIME_MS, AIM_CAMERA, AIM_BUTTON, aimBlend, aimView, aimButtonView, aimHandKey, zoomedFov } from './aim.js';
 // The "Charging 1.4s" text under the crosshair (#35) and the damage numbers above heads (#33).
 export {
   chargeView, chargeStarts, damageNumber, damageFloat, READY_FLASH_MS, DAMAGE_NUMBER_MS, DAMAGE_NUMBER_RISE, DAMAGE_COLORS,
