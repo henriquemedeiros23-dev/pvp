@@ -83,17 +83,17 @@ test('custom rules are used when passed in', () => {
   assert.deepEqual(shopItems('color', { coins: 5 }, rules).map(c => [c.id, c.canAfford]), [['pink', true]]);
   assert.deepEqual(shopWeaponIds(rules), ['z', 'a', 'b', 'q']);
   assert.equal(shopItems('weapon', {}, rules).at(-1).rarityName, 'weird');
-  assert.equal(backpackSummary({ stash: { b: 1, z: 3 } }, rules), 'Backpack: 3× Z, 1× B');
+  assert.equal(backpackSummary({ stash: { b: 1, z: 3 } }, rules), 'Inventory: 3× Z, 1× B');
 });
 
 test('backpackSummary text', () => {
-  assert.equal(backpackSummary(fresh()), 'Backpack is empty. Buy weapons in the shop!');
-  assert.equal(backpackSummary({ stash: { supersword: 1, shootbm: 2, icesword: 0 } }), 'Backpack: 2× Shootbm, 1× Supersword');
-  assert.equal(backpackSummary(undefined), 'Backpack is empty. Buy weapons in the shop!');
-  assert.equal(backpackSummary({ stash: { shootbm: 1 }, potions: 2 }), 'Backpack: 1× Shootbm, 2× Healing Potion');
-  assert.equal(backpackSummary({ stash: {}, potions: 1 }), 'Backpack: 1× Healing Potion');
-  assert.equal(backpackSummary({ stash: { dmgun: 1 }, potions: 1, bombs: { bomb: 4, legendarybomb: 0 } }), 'Backpack: 1× DM Gun, 1× Healing Potion, 4× Bomb');
-  assert.equal(backpackSummary({ bombs: { legendarybomb: 3 } }), 'Backpack: 3× Legendary Bomb');
+  assert.equal(backpackSummary(fresh()), 'Inventory is empty. Buy weapons in the shop!');
+  assert.equal(backpackSummary({ stash: { supersword: 1, shootbm: 2, icesword: 0 } }), 'Inventory: 2× Shootbm, 1× Supersword');
+  assert.equal(backpackSummary(undefined), 'Inventory is empty. Buy weapons in the shop!');
+  assert.equal(backpackSummary({ stash: { shootbm: 1 }, potions: 2 }), 'Inventory: 1× Shootbm, 2× Healing Potion');
+  assert.equal(backpackSummary({ stash: {}, potions: 1 }), 'Inventory: 1× Healing Potion');
+  assert.equal(backpackSummary({ stash: { dmgun: 1 }, potions: 1, bombs: { bomb: 4, legendarybomb: 0 } }), 'Inventory: 1× DM Gun, 1× Healing Potion, 4× Bomb');
+  assert.equal(backpackSummary({ bombs: { legendarybomb: 3 } }), 'Inventory: 3× Legendary Bomb');
 });
 
 test('swatchBackground gives a CSS value for every color', () => {

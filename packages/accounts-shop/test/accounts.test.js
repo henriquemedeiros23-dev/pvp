@@ -137,7 +137,7 @@ test('weapons can be bought many times into the stash', () => {
   rejects(() => accounts.buy(account, 'weapon', 'supersword'), 'NOT_ENOUGH_COINS');
 });
 
-test('unknown items cannot be bought; the starting Gun can (into the backpack)', () => {
+test('unknown items cannot be bought; the starting Gun can (into the Inventory)', () => {
   const { accounts } = setup();
   const { account } = accounts.signup('Bob', 'pass');
   accounts.addCoins(account, 1003);
@@ -220,7 +220,7 @@ test('old accounts with weapons no longer in the game (wooden sword, Pistol, Roc
   assert.deepEqual(again.takeBar(acc).loadout, [], 'nothing in the bar (it has a bar already)');
 });
 
-test('Healing Potions: buy for 10 coins (many times) into the backpack; take up to 3 into the arena, return the rest', () => {
+test('Healing Potions: buy for 10 coins (many times) into the Inventory; up to 3 in the fast bar go into the arena, the rest comes back', () => {
   const { accounts } = setup();
   const { account } = accounts.signup('Potty', 'secret');
   rejects(() => accounts.buy(account, 'potion', 'potion'), 'NOT_ENOUGH_COINS');

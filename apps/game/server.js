@@ -145,7 +145,7 @@ function pump() {
         const total = accounts.addCoins(conn.acc, ev.amount);
         if (total !== ev.total) arena.setCoins(ev.playerId, total);
       }
-      // Knocked out: the weapons and potions are lost (dropped on the island), nothing goes back to the backpack.
+      // Knocked out: what came from the fast bar is lost (dropped on the island); the Inventory stays safe.
       if (ev.kind === 'knockedOut') gone.push(ev.playerId);
       continue;
     }
@@ -165,7 +165,7 @@ function pump() {
   }
 }
 
-// Leave the arena alive (no connection needed): carried weapons and unused Healing Potions and bombs go back into the backpack.
+// Leave the arena alive (no connection needed): what survived goes back into its fast bar slots (#39), loot into the Inventory.
 function leaveArenaAlive(acc, id) {
   if (!arena.hasPlayer(id)) return;
   const { potions, bombs } = arena.getPlayer(id);
@@ -183,7 +183,7 @@ function leaveAlive(conn) {
 function join(conn, now) {
   const acc = conn.acc;
   // Same account already in (another tab or device): that player leaves alive first,
-  // so its weapons are back in the backpack before the new loadout is taken.
+  // so its things are back in the account before the new fast bar is taken.
   const oldId = arena.idOf(playerKey(acc));
   if (oldId !== undefined) {
     const old = conns.get(oldId);

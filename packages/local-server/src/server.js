@@ -156,7 +156,7 @@ export function createLocalServer({
     }
   }
 
-  // Leave alive: carried weapons and unused Healing Potions and bombs go back into the backpack.
+  // Leave alive: what survived goes back into its fast bar slots (#39), loot into the Inventory.
   function leaveArenaAlive(acc, id) {
     if (!arena.hasPlayer(id)) return;
     const { potions, bombs } = arena.getPlayer(id);

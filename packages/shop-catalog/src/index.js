@@ -2,6 +2,9 @@
 // what the shop screen shows. Plain ES module: works in Node and in the browser.
 import { RULES, rarityStyle } from '@pvp/game-rules';
 
+// The Inventory screen and the fast bar (#39)
+export { MIN_SPACES, inventoryItemKinds, spaceSize, itemLook, inventoryCount, inventoryCards, barSlots, barSummary } from './inventory.js';
+
 const TABS = Object.freeze([
   Object.freeze({ id: 'color', label: 'Colors', hint: 'Pick the color of your stickman.' }),
   Object.freeze({ id: 'hat', label: 'Hats', hint: 'Something cool for your head.' }),
@@ -10,15 +13,15 @@ const TABS = Object.freeze([
   Object.freeze({ id: 'shirt', label: 'Clothes', hint: 'Dress up your stickman.' }),
   Object.freeze({
     id: 'weapon', label: 'Weapons',
-    hint: 'Weapons go into your backpack and come with you into the arena. Shields go on your other arm. Get knocked out and you drop them!',
+    hint: 'Weapons go to your Inventory. Put them in your fast bar to take them into the arena. Shields go on your other arm. Get knocked out and you drop what you carry!',
   }),
   Object.freeze({
     id: 'potion', label: 'Potions',
-    hint: 'A Healing Potion gives you full H.P in 5 seconds. Take up to 3 into the arena. Switch weapons while drinking and it is wasted!',
+    hint: 'A Healing Potion gives you full H.P in 5 seconds. It goes to your Inventory: put up to 3 in your fast bar to take them along. Switch weapons while drinking and it is wasted!',
   }),
   Object.freeze({
     id: 'bomb', label: 'Bombs',
-    hint: 'Throw a bomb (B or N, or the bomb buttons): a red square shows where it lands, and 3 seconds after the throw it explodes. A Bomb hurts you too!',
+    hint: 'Bombs go to your Inventory: put them in your fast bar to take them along. Throw one (B or N, or the bomb buttons): a red square shows where it lands, and 3 seconds after the throw it explodes. A Bomb hurts you too!',
   }),
 ]);
 
@@ -102,7 +105,7 @@ export function shopItems(tab, account, rules = RULES) {
 
 /**
  * The Healing Potion card: { kind: 'potion', id: 'potion', name, price, rarity, rarityName, rarityColor,
- * rarityBackground, stashCount (potions in the backpack), owned, equipped: false, canAfford, action: 'buy',
+ * rarityBackground, stashCount (potions in the Inventory), owned, equipped: false, canAfford, action: 'buy',
  * healPercent, drinkSeconds, chestChance, maxCarry }. Buy it with api.buy('potion', 'potion').
  */
 export function potionCard(account, rules = RULES) {
@@ -127,7 +130,7 @@ const bombCount = (account, id) => {
 
 /**
  * The bomb cards (#32), in rules order: { kind: 'bomb', id, name, price (for one pack), pack (how many one buy
- * gives: Legendary Bomb 3), rarity, rarityName, rarityColor, rarityBackground, stashCount (bombs in the backpack),
+ * gives: Legendary Bomb 3), rarity, rarityName, rarityColor, rarityBackground, stashCount (bombs in the Inventory),
  * owned, equipped: false, canAfford, action: 'buy', dmg, area, maxThrow, fuseSeconds, hurtsThrower, chestChance,
  * maxCarry }. Buy one pack with api.buy('bomb', id).
  */
@@ -158,16 +161,19 @@ export function swatchBackground(card) {
 }
 
 /**
- * One line of text about the weapons (then Healing Potions, then bombs) in the backpack, e.g.
- * "Backpack: 2× Shootbm, 1× Supersword" or "Backpack is empty. Buy weapons in the shop!"
+ * One line of text about the weapons (then Healing Potions, then bombs) in the Inventory (not the fast bar), e.g.
+ * "Inventory: 2× Shootbm, 1× Supersword" or "Inventory is empty. Buy weapons in the shop!"
  * Weapons are listed in shop order.
  */
-export function backpackSummary(account, rules = RULES) {
+export function inventorySummary(account, rules = RULES) {
   const parts = shopWeaponIds(rules)
     .filter(id => stashOf(account, id) > 0)
     .map(id => `${stashOf(account, id)}× ${rules.WEAPONS[id].name}`);
   const potions = account && Number.isFinite(account.potions) && account.potions > 0 ? Math.floor(account.potions) : 0;
   if (potions && rules.POTION) parts.push(`${potions}× ${rules.POTION.name}`);
   for (const [id, b] of Object.entries(rules.BOMBS ?? {})) if (bombCount(account, id)) parts.push(`${bombCount(account, id)}× ${b.name}`);
-  return parts.length ? `Backpack: ${parts.join(', ')}` : 'Backpack is empty. Buy weapons in the shop!';
+  return parts.length ? `Inventory: ${parts.join(', ')}` : 'Inventory is empty. Buy weapons in the shop!';
 }
+
+/** The old name of inventorySummary (the Inventory used to be called the backpack). */
+export const backpackSummary = inventorySummary;

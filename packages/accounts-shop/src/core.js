@@ -70,12 +70,12 @@ export function createAccounts({
     rec.owned ??= freeItems();
     rec.skin ??= { ...DEFAULT_SKIN };
     rec.stash ??= {};
-    // Healing Potions in the backpack (older accounts have none: 0).
+    // Healing Potions in the Inventory (older accounts have none: 0).
     rec.potions = safeCount(rec.potions);
-    // Bombs in the backpack, one count per bomb (older accounts have none: 0 each).
+    // Bombs in the Inventory, one count per bomb (older accounts have none: 0 each).
     rec.bombs = bombCounts(rec.bombs);
     // Weapons that are no longer in the game (e.g. the old wooden sword, or the Pistol and the others removed
-    // in #26) are dropped from the backpack.
+    // in #26) are dropped from the Inventory.
     for (const id of Object.keys(rec.stash)) if (!Object.hasOwn(WEAPONS, id)) delete rec.stash[id];
     // The fast bar (#39). Accounts saved before it existed get a bar filled like the old automatic pick
     // (so their first match feels the same); a saved bar is checked (anything that does not fit goes back

@@ -198,7 +198,7 @@ test('sign up, shop, join the arena, leave: no errors', { skip: !RUN && 'set E2E
   await page.locator('#menu').waitFor({ state: 'visible' });
   assert.equal(await page.textContent('#menuName'), name);
   assert.equal(await page.textContent('#menuCoins'), '0');
-  assert.match(await page.textContent('#menuBackpack'), /Backpack is empty/);
+  assert.match(await page.textContent('#menuBackpack'), /Fast bar is empty/);
   assert.equal((await page.textContent('#menu .logo')).trim(), 'PvP ISLAND');
   // every coin is the coin from the boss's drawing (#29): an SVG picture, not a round CSS dot
   const coinBg = await page.$eval('#menu .coins .coin', e => getComputedStyle(e).backgroundImage);
@@ -276,7 +276,7 @@ test('sign up, shop, join the arena, leave: no errors', { skip: !RUN && 'set E2E
   assert.equal(await isVisible('#hud'), false);
   assert.equal((await page.evaluate(() => window.pvpDebug())).mode, 'menu');
   assert.equal((await (await meAfterLeave).json()).online, 0); // already out of the arena
-  assert.match(await page.textContent('#menuBackpack'), /Backpack is empty/);
+  assert.match(await page.textContent('#menuBackpack'), /Fast bar is empty/);
 
   // log out and back in with the saved account
   await page.click('#btnLogout');
