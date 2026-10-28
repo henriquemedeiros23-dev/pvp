@@ -17,6 +17,7 @@ export const COLORS = deepFreeze({
 export const OUTFITS = deepFreeze({
   hat: {
     none:    { name: 'No Hat', price: 0 },
+    horns:   { name: 'Demon Horns', price: 50 },
     cap:     { name: 'Baseball Cap', price: 100 },
     tophat:  { name: 'Top Hat', price: 150 },
     wizard:  { name: 'Wizard Hat', price: 200 },

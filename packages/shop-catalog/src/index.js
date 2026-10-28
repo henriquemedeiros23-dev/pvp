@@ -24,7 +24,7 @@ const TABS = Object.freeze([
 
 /** Simple emoji for outfit items (weapons have their own icons in the game). */
 export const OUTFIT_ICONS = Object.freeze({
-  hat: Object.freeze({ none: '🚫', cap: '🧢', tophat: '🎩', wizard: '🧙', crown: '👑' }),
+  hat: Object.freeze({ none: '🚫', horns: '😈', cap: '🧢', tophat: '🎩', wizard: '🧙', crown: '👑' }),
   face: Object.freeze({ none: '🚫', shades: '🕶️', ninja: '🥷', hero: '🦸' }),
   back: Object.freeze({ none: '🚫', redcape: '🟥', bluecape: '🟦', backpack: '🎒' }),
   shirt: Object.freeze({ none: '🚫', tshirt: '👕', vest: '🦺', armor: '🛡️' }),

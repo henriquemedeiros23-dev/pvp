@@ -2,7 +2,7 @@
 
 ## What it does
 
-A three.js stickman character: body in a skin color or pattern (gold, zebra stripes, rainbow), outfits (hats, face items, capes, shirts), a weapon in the right hand, a shield on the left arm (raised in front or lowered), frozen and shocked looks, and walk / crouch / slide / jump / aim / swing animation. Weapon models follow the boss's cards. The animation math is a pure function, `computePose()`, that can be tested without three.js.
+A three.js stickman character: body in a skin color or pattern (gold, zebra stripes, rainbow), outfits (hats like the Demon Horns, face items, capes, shirts), a weapon in the right hand, a shield on the left arm (raised in front or lowered), frozen and shocked looks, and walk / crouch / slide / jump / aim / swing animation. Weapon models follow the boss's cards. The animation math is a pure function, `computePose()`, that can be tested without three.js.
 
 ## How to use
 

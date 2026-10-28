@@ -272,6 +272,17 @@ test('rainbow skin changes color over time', () => {
   assert.ok(rainbowHue(-1) >= 0 && rainbowHue(-1) < 1);
 });
 
+test('demon horns: two red horns with darker tips on the head', () => {
+  const plain = new Stickman(DEFAULT_SKIN);
+  const sm = new Stickman({ ...DEFAULT_SKIN, hat: 'horns' });
+  const count = s => { let n = 0; s.root.traverse(o => { if (o.isMesh) n++; }); return n; };
+  assert.equal(count(sm) - count(plain), 6);
+  const hexes = [];
+  sm.root.traverse(o => { if (o.isMesh) hexes.push(o.material.color.getHexString()); });
+  assert.equal(hexes.filter(h => h === 'e01b1b').length, 4); // bright red horns
+  assert.equal(hexes.filter(h => h === '7a0a0a').length, 2); // darker tips
+});
+
 test('dispose frees geometries and materials it made, but not things added later', () => {
   const sm = new Stickman({ color: 'gold', hat: 'crown', face: 'ninja', back: 'redcape', shirt: 'armor' });
   sm.setWeapon('electricsword');

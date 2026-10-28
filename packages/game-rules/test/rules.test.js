@@ -24,11 +24,14 @@ const CHANGED = ['BASIC_WEAPON', 'RARITIES', 'LOOT_TABLE', 'WEAPONS'];
 const REMOVED_IN_28 = ['HEALS', 'MAX_BANDAGES', 'MAX_MEDKITS', 'BANDAGE_HEAL', 'MEDKIT_HEAL'];
 // #36: an opened chest now comes back after 2 minutes (was 15 s).
 const CHANGED_IN_36 = { CHEST_RESPAWN_MS: 120000 };
+// #42 added the Demon Horns hat; everything else in OUTFITS stays the same.
+const ADDED_IN_42 = { OUTFITS: o => { const c = structuredClone(o); delete c.hat.horns; return c; } };
 
-test('same named exports and values as the old apps/game/shared/config.js (except the #25/#26/#28/#36 changes)', () => {
+test('same named exports and values as the old apps/game/shared/config.js (except the #25/#26/#28/#36/#42 changes)', () => {
   for (const [name, value] of Object.entries(oldConfig)) {
     if (CHANGED.includes(name)) continue;
     if (name in CHANGED_IN_36) { assert.equal(rules[name], CHANGED_IN_36[name], `${name} changed in #36`); continue; }
+    if (name in ADDED_IN_42) { assert.deepEqual(ADDED_IN_42[name](rules[name]), value, `export ${name} differs (beyond #42)`); continue; }
     if (REMOVED_IN_28.includes(name)) { assert.ok(!(name in rules), `${name} should be gone (#28)`); continue; }
     assert.ok(name in rules, `missing export ${name}`);
     assert.deepEqual(rules[name], value, `export ${name} differs`);
@@ -246,6 +249,8 @@ test('skinPrice', () => {
   assert.equal(skinPrice('color', 'rainbow'), 400);
   assert.equal(skinPrice('color', 'black'), 0);
   assert.equal(skinPrice('hat', 'crown'), 300);
+  assert.equal(skinPrice('hat', 'horns'), 50);
+  assert.equal(OUTFITS.hat.horns.name, 'Demon Horns');
   assert.equal(skinPrice('face', 'none'), 0);
   assert.equal(skinPrice('back', 'redcape'), 150);
   assert.equal(skinPrice('shirt', 'armor'), 220);

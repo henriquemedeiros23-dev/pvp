@@ -4,7 +4,7 @@ import { std } from './materials.js';
 
 /** Outfit ids that have a model, per slot. */
 export const OUTFIT_MODELS = Object.freeze({
-  hat: Object.freeze(['cap', 'tophat', 'wizard', 'crown']),
+  hat: Object.freeze(['horns', 'cap', 'tophat', 'wizard', 'crown']),
   face: Object.freeze(['shades', 'ninja', 'hero']),
   back: Object.freeze(['redcape', 'bluecape', 'backpack']),
   shirt: Object.freeze(['tshirt', 'vest', 'armor']),
@@ -17,6 +17,19 @@ export const OUTFIT_MODELS = Object.freeze({
 export function buildOutfit(slot, id, { head, torso, back }, castShadow = true) {
   const add = (parent, mesh, x, y, z) => { mesh.position.set(x, y, z); mesh.castShadow = castShadow; parent.add(mesh); return mesh; };
   if (slot === 'hat') {
+    if (id === 'horns') {
+      // Two curved red horns: a cone base plus a thinner, darker tip bent inwards. 3 cheap meshes each.
+      const red = std('#e01b1b', { roughness: 0.4 });
+      const tip = std('#7a0a0a', { roughness: 0.4 });
+      for (const side of [-1, 1]) {
+        const base = add(head, new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.055, 0.12, 8), red), side * 0.13, 0.19, 0.03);
+        base.rotation.z = -side * 0.55;
+        const mid = add(head, new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.031, 0.09, 8), red), side * 0.18, 0.27, 0.03);
+        mid.rotation.z = -side * 0.15;
+        const end = add(head, new THREE.Mesh(new THREE.ConeGeometry(0.019, 0.08, 8), tip), side * 0.175, 0.345, 0.03);
+        end.rotation.z = side * 0.35;
+      }
+    }
     if (id === 'cap') {
       const m = std('#d8322d');
       add(head, new THREE.Mesh(new THREE.SphereGeometry(0.235, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), m), 0, 0.03, 0);

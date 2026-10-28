@@ -47,6 +47,13 @@ test('outfit cards have icons and follow rules order', () => {
   assert.equal(hats.find(c => c.id === 'none').action, 'equip');
 });
 
+test('demon horns are a cheap red hat with a devil icon', () => {
+  const horns = shopItems('hat', fresh()).find(c => c.id === 'horns');
+  assert.equal(horns.icon, '😈');
+  assert.equal(horns.price, 50);
+  assert.equal(horns.action, 'buy');
+});
+
 test('weapons are sorted by rarity then price, include the starting Gun, and show the stash', () => {
   const acc = { ...fresh(), coins: 100, stash: { shootbm: 2, supersword: 1, icesword: 0 } };
   const cards = shopItems('weapon', acc);
