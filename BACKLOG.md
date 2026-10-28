@@ -71,7 +71,7 @@ The live list is on GitHub Issues: https://github.com/henriquemedeiros23-dev/pvp
 | 34 | ✅ | **Sword misses keep durability + drop weapon button** | Missing with a melee weapon costs nothing; a button drops the weapon in your hand. |
 | 35 | ✅ | **Show 'Charging' with the time left** | After shooting, 'Charging 1.4s' counts down near the crosshair. |
 | 36 | ✅ | **Chests come back after 2 minutes** | An opened chest refills after 2 min instead of 15 s. |
-| 37 | 🔲 | **Aim button for the Shootbm** | Hold AIM to zoom in through the sight for better aim. |
+| 37 | 🔲 | **Aim button for the Shootbm and DM Gun** | Hold AIM to zoom in through the sight for better aim. |
 | 38 | ✅ | **New charging rules** | Charge per weapon; sword misses don't charge; attacking while charging does 25% damage. |
 
 ## Later ideas
