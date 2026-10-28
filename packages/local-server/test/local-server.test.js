@@ -147,6 +147,39 @@ test('a shop buy during a match sends the new coins to the game', async () => {
   assert.equal(c.of('inv').at(-1).coins, 10 - 3);
 });
 
+test('the fast bar (#39): only the bar comes into the arena; the Inventory stays; survivors go back into the bar', async () => {
+  const { server } = setup();
+  const api = server.createApi();
+  const { token } = await api.signup('Barry_1', 'secret');
+  server.accounts.addCoins(server.accounts.byToken(token), 100);
+  await api.buy('weapon', 'shootbm');
+  await api.buy('weapon', 'icesword');
+  await api.buy('potion', 'potion');
+  assert.deepEqual((await api.inventory()).account.bar, [null, null, null, null, null]);
+  await api.toBar('weapon', 'shootbm');
+  await assert.rejects(api.toBar('weapon', 'shootbm'), /don't have that/);
+  const c = await open(server, token);
+  c.send('join');
+  await settle();
+  const inv = c.of('inv')[0];
+  assert.deepEqual(inv.weapons, ['shootbm'], 'only the bar weapon, no free Gun');
+  assert.equal(inv.potions, 0, 'the potion was not in the bar');
+  const during = (await api.inventory()).account;
+  assert.deepEqual(during.stash, { icesword: 1 });
+  assert.equal(during.potions, 1);
+  c.send('leave');
+  await settle();
+  const after = (await api.me()).account;
+  assert.deepEqual(after.bar, [{ kind: 'weapon', id: 'shootbm', n: 1 }, null, null, null, null], 'back in its slot');
+  assert.deepEqual(after.stash, { icesword: 1 });
+  // an empty bar: the free Gun comes like before
+  await api.fromBar(0);
+  const c2 = await open(server, token);
+  c2.send('join');
+  await settle();
+  assert.deepEqual(c2.of('inv')[0].weapons, ['gun']);
+});
+
 test('rename: changes the name, but not while in the arena', async () => {
   const { server } = setup();
   const api = server.createApi();
@@ -207,11 +240,15 @@ test('bombs (#32): bought bombs come along, "throw" throws one, it explodes afte
   for (let i = 0; i < 6; i++) await api.buy('bomb', 'bomb');
   const bought = await api.buy('bomb', 'legendarybomb');
   assert.deepEqual(bought.account.bombs, { bomb: 6, legendarybomb: 3 });
+  // into the fast bar (#39): only what is in the bar comes along
+  await api.toBar('bomb', 'bomb');
+  const inBar = await api.toBar('bomb', 'legendarybomb');
+  assert.deepEqual(inBar.account.bar.slice(0, 2), [{ kind: 'bomb', id: 'bomb', n: 5 }, { kind: 'bomb', id: 'legendarybomb', n: 3 }]);
   const c = await open(server, token);
   c.send('join');
   await settle();
   assert.deepEqual(c.of('inv')[0].bombs, [{ id: 'bomb', n: 5 }, { id: 'legendarybomb', n: 3 }], 'carry max 5 Bombs');
-  assert.deepEqual((await api.me()).account.bombs, { bomb: 1, legendarybomb: 0 }, 'one Bomb stays in the backpack');
+  assert.deepEqual((await api.me()).account.bombs, { bomb: 1, legendarybomb: 0 }, 'one Bomb stays in the Inventory');
   await run(3200); // spawn protection over
   c.send('throw', { b: 'bomb', d: [0, -0.3, 1] });
   await settle();
@@ -228,7 +265,9 @@ test('bombs (#32): bought bombs come along, "throw" throws one, it explodes afte
   assert.deepEqual(c.of('dmg').filter(m => m.id === me), [{ t: 'dmg', id: me, amount: 3 }]);
   c.send('leave');
   await settle();
-  assert.deepEqual((await api.me()).account.bombs, { bomb: 4, legendarybomb: 3 }, 'unused bombs go back');
+  const back = (await api.me()).account;
+  assert.deepEqual(back.bar.slice(0, 2), [{ kind: 'bomb', id: 'bomb', n: 3 }, { kind: 'bomb', id: 'legendarybomb', n: 3 }], 'unused bombs go back into the bar');
+  assert.deepEqual(back.bombs, { bomb: 1, legendarybomb: 0 }, 'the Inventory was never touched');
 });
 
 test('damage numbers (#33): a hit sends "dmg" to the players near the victim, not to far ones', async () => {

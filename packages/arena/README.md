@@ -20,7 +20,8 @@ const arena = createArena({ island: generateIsland(), rules: RULES, random: crea
 
 const r = arena.join('alice', { name: 'Alice', skin, loadout: ['icesword', 'shootbm', 'shield'], coins: 120, potions: 2,
   bombs: { bomb: 4, legendarybomb: 3 } }, Date.now());
-// The player gets the rules' STARTING_WEAPON (the Gun) free in slot 1, then the loadout in its order
+// The player gets the rules' STARTING_WEAPON (the Gun) free in slot 1 (unless `starter: false`, used when the
+// player's fast bar already has weapons, #39), then the loadout in its order
 // (copies of the same weapon too, each with its own durability). The first shield goes on the left arm.
 // { ok: true, id, weapons: ['icesword', 'shootbm', 'shield'] (taken from the loadout: remove them from the
 //   backpack; loadout weapons that do not fit in MAX_SLOTS, and extra shields, are not taken),

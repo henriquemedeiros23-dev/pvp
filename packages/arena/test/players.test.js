@@ -102,3 +102,14 @@ test('join works with rules that have no starting weapon', () => {
   assert.deepEqual(arena.getPlayer(a.id).weapons, ['shootbm']);
   assert.deepEqual(arena.leave(a.id, { alive: true }), ['shootbm']);
 });
+
+test('starter: false (#39, the fast bar has weapons): no free Gun, the loadout fills all slots and all goes back', () => {
+  const arena = makeArena();
+  const a = arena.join('ann', { loadout: ['shootbm', 'icesword', 'gun', 'dmgun', 'supergun', 'shield'], starter: false });
+  assert.deepEqual(arena.getPlayer(a.id).weapons, ['shootbm', 'icesword', 'gun', 'dmgun', 'supergun']);
+  assert.deepEqual(a.weapons, ['shootbm', 'icesword', 'gun', 'dmgun', 'supergun', 'shield']);
+  assert.deepEqual(arena.leave(a.id, { alive: true }), ['shootbm', 'icesword', 'gun', 'dmgun', 'supergun', 'shield'], 'a bought Gun goes back');
+  // starter: true (the default) still gives the free Gun first
+  const b = arena.join('bob', { loadout: ['shootbm'] });
+  assert.deepEqual(arena.getPlayer(b.id).weapons, ['gun', 'shootbm']);
+});

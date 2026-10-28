@@ -65,6 +65,10 @@ function handleApi(req, res, body) {
       return send(200, { account });
     }
     if (url === '/api/equip') return send(200, { account: accounts.equip(acc, body.kind, body.id) });
+    // The Inventory and the fast bar (#39): read it, put an item into a bar slot, take a slot back.
+    if (url === '/api/inventory') return send(200, { account: accounts.publicView(acc) });
+    if (url === '/api/bar/put') return send(200, { account: accounts.toBar(acc, body.kind, body.id, { slot: body.slot, n: body.n }) });
+    if (url === '/api/bar/take') return send(200, { account: accounts.fromBar(acc, body.slot) });
     return send(404, { error: 'Not found' });
   } catch (e) {
     if (e instanceof AccountError) return send(400, { error: e.message });
@@ -165,9 +169,7 @@ function pump() {
 function leaveArenaAlive(acc, id) {
   if (!arena.hasPlayer(id)) return;
   const { potions, bombs } = arena.getPlayer(id);
-  accounts.returnLoadout(acc, arena.leave(id, { alive: true }));
-  if (potions) accounts.returnPotions(acc, potions);
-  accounts.returnBombs(acc, bombs);
+  accounts.returnFromArena(acc, { weapons: arena.leave(id, { alive: true }), potions, bombs });
 }
 
 function leaveAlive(conn) {
@@ -189,29 +191,23 @@ function join(conn, now) {
     else leaveArenaAlive(acc, oldId);
   }
 
-  const loadout = accounts.takeLoadout(acc);
-  const potions = accounts.takePotions(acc); // up to 3 Healing Potions come along
-  const bombs = accounts.takeBombs(acc);     // bombs too, up to each bomb's max (#32)
-  const r = arena.join(playerKey(acc), { name: acc.name, skin: { ...acc.skin }, loadout, coins: acc.coins, potions, bombs }, now);
+  // Only what is in the fast bar comes along (#39); the rest of the Inventory stays safe in the account.
+  const { loadout, potions, bombs, starter } = accounts.takeBar(acc);
+  const r = arena.join(playerKey(acc), { name: acc.name, skin: { ...acc.skin }, loadout, starter, coins: acc.coins, potions, bombs }, now);
   if (!r.ok) {
-    accounts.returnLoadout(acc, loadout);
-    accounts.returnPotions(acc, potions);
-    accounts.returnBombs(acc, bombs);
+    accounts.returnFromArena(acc, { weapons: loadout, potions, bombs });
     sendRaw(conn, encode('full'));
     return;
   }
-  // Give back any loadout weapons the arena didn't take.
+  // Give back anything the arena didn't take (it goes back into its bar slot).
   const rest = [...loadout];
   for (const w of r.weapons) { const i = rest.indexOf(w); if (i >= 0) rest.splice(i, 1); }
-  if (rest.length) accounts.returnLoadout(acc, rest);
-  if (r.potions < potions) accounts.returnPotions(acc, potions - r.potions);
-  accounts.returnBombs(acc, Object.fromEntries(Object.keys(bombs).map(b => [b, bombs[b] - (r.bombs[b] ?? 0)])));
+  const bombsBack = Object.fromEntries(Object.keys(bombs).map(b => [b, bombs[b] - (r.bombs[b] ?? 0)]));
+  accounts.returnFromArena(acc, { weapons: rest, potions: potions - r.potions, bombs: bombsBack });
   if (r.replaced) {
     const old = conns.get(r.replaced.id);
     if (old) { old.playerId = null; conns.delete(r.replaced.id); }
-    accounts.returnLoadout(acc, r.replaced.weapons);
-    if (r.replaced.potions) accounts.returnPotions(acc, r.replaced.potions);
-    accounts.returnBombs(acc, r.replaced.bombs);
+    accounts.returnFromArena(acc, { weapons: r.replaced.weapons, potions: r.replaced.potions, bombs: r.replaced.bombs }, { refill: false });
   }
   conn.playerId = r.id;
   conns.set(r.id, conn);
