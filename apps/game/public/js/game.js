@@ -10,7 +10,7 @@ import { createInputState, attachTouchControls, attachDesktopControls, isTouchDe
 import { decodeServerMessage, encodeClient, unpackSnapshotPlayer, makeFlags, readFlags } from '@pvp/net-protocol';
 import { slotBar, heldDurabilityView, healthView, pickSlot, brokeMessage, shieldView, WEAPON_ICONS } from '@pvp/hud-model';
 import { potionView, drinkState, drinkMessage, POTION_ICON_SVG, bombView } from '@pvp/hud-model';
-import { chargeView, chargeStarts } from '@pvp/hud-model';
+import { chargeView, chargeStarts, hitMarker } from '@pvp/hud-model';
 import { aimView, aimBlend, aimButtonView, aimHandKey, zoomedFov } from '@pvp/hud-model';
 import { coinsToast } from '@pvp/hud-model';
 import { DamageNumbers } from './damage-numbers.js';
@@ -305,6 +305,7 @@ export class Game {
       charge: play ? $('charge').classList.contains('hidden') ? '' : $('chargeText').textContent : '',
       chargeHint: play && !$('charge').classList.contains('hidden') ? $('chargeHint').textContent : '', // '25%' while charging (#38)
       damageNumbers: play ? this.dmgNums.shown() : [],
+      hitmark: this.lastHitmark ?? null, // the last hit marker's kind: 'hit' | 'head' | 'ko' | 'blocked' (#45)
     };
   }
 
@@ -326,7 +327,7 @@ export class Game {
       case 'swing': { const r = this.remotes.get(m.id); if (r) r.sm.swing = 1; return; }
       case 'block': return this.onBlock(m);
       case 'shieldbroke': this.shieldUp = false; return this.toast(brokeMessage(m.weapon)); // an 'inv' follows
-      case 'hitmark': return this.hitmark(m.dead, m.blocked);
+      case 'hitmark': return this.hitmark(m);
       case 'dmg': return this.dmgNums.add(m, this.playerPos(m.id), performance.now());
       case 'hurt': return this.onHurt(m);
       case 'drink': return this.onDrink(m);
@@ -853,13 +854,18 @@ export class Game {
     }
   }
 
-  hitmark(ko, blocked) {
+  // the cross in the middle when you hit someone: how it looks comes from @pvp/hud-model hitMarker
+  // (a headshot, #45: bigger and orange, and it stays a little longer)
+  hitmark(m) {
+    const v = hitMarker(m);
+    if (!v) return;
     const h = $('hitmark');
-    h.classList.toggle('ko', !!ko);
-    h.classList.toggle('blocked', !!blocked);
+    for (const k of ['ko', 'blocked', 'head']) h.classList.toggle(k, v.kind === k);
+    h.style.setProperty('--hm-scale', v.scale);
     h.classList.add('show');
+    this.lastHitmark = v.kind; // for tests (pvpDebug)
     clearTimeout(this.hmTimer);
-    this.hmTimer = setTimeout(() => h.classList.remove('show'), 90);
+    this.hmTimer = setTimeout(() => h.classList.remove('show'), v.scale > 1 ? 220 : 90);
   }
 
   toast(text, { coin = false } = {}) {

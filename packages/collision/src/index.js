@@ -295,19 +295,30 @@ export function rayBoxes(grid, origin, dir, maxDist = Infinity) {
  * Distances are in units of dir: pass a unit dir to get meters.
  */
 export function rayCylinder(origin, dir, cyl) {
+  const hit = rayCylinderHit(origin, dir, cyl);
+  return hit ? hit.t : Infinity;
+}
+
+/**
+ * Same test as rayCylinder, but also says WHERE on the cylinder the ray hit:
+ * { t (distance, in units of dir), y (world height of the hit point), h (height of the hit
+ * above the cylinder's bottom, 0..height) }, or null on a miss.
+ * E.g. a player's feet are at cyl.y, so h tells head (near height) from legs (near 0).
+ */
+export function rayCylinderHit(origin, dir, cyl) {
   const fx = origin.x - cyl.x, fz = origin.z - cyl.z;
   const a = dir.x * dir.x + dir.z * dir.z;
-  if (a < EPS) return Infinity;
+  if (a < EPS) return null;
   const b = 2 * (fx * dir.x + fz * dir.z);
   const c = fx * fx + fz * fz - cyl.radius * cyl.radius;
   const disc = b * b - 4 * a * c;
-  if (disc < 0) return Infinity;
+  if (disc < 0) return null;
   const sq = Math.sqrt(disc);
   const ts = [(-b - sq) / (2 * a), (-b + sq) / (2 * a)];
   for (const t of ts) {
     if (t < 0) continue;
     const y = origin.y + dir.y * t;
-    if (y >= cyl.y && y <= cyl.y + cyl.height) return t;
+    if (y >= cyl.y && y <= cyl.y + cyl.height) return { t, y, h: y - cyl.y };
   }
-  return Infinity;
+  return null;
 }

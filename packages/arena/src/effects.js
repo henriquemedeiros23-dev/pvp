@@ -3,8 +3,8 @@
 // a shield is a weapon with type 'shield' (durability = blocked hits, optional reflect), and a
 // weapon may have shock / freezeMs / knockout / shieldWear. Time is passed in.
 
-import { chargingDamage } from '@pvp/game-rules';
-import { at, send, sendNear, weaponDef, maxDurability, chargingFactor } from './state.js';
+import { chargingDamage, headshotDamage } from '@pvp/game-rules';
+import { at, send, sendNear, weaponDef, maxDurability, chargingFactor, headshotBonus } from './state.js';
 import { inventoryMsg } from './players.js';
 import { damage } from './combat.js';
 
@@ -47,16 +47,20 @@ function facesAttacker(A, victim, attacker) {
  * full = false (#38): the weapon was still charging: the hit does only chargingDamage(dmg) (CHARGING_DAMAGE of
  * the rules, 25%, at least 1) and has NO specials: no knockout, no shock, no freeze. A blocked weak hit
  * still costs the shield its shieldWear; a Mega Shield sends back its part of the weak damage.
+ * head = true (#45, only gun bullets, see gun() in combat.js): a headshot does HEADSHOT_BONUS (3) more, added
+ * after the charging cut (a charging DM Gun: 4 + 3 = 7). A raised shield still blocks a headshot completely,
+ * and a Mega Shield reflects its part of the normal damage only (the shield took the hit, not the head).
  */
-export function strike(A, attacker, victim, w, def, kx = 0, kz = 0, full = true) {
+export function strike(A, attacker, victim, w, def, kx = 0, kz = 0, full = true, head = false) {
   if (!A.players.has(victim.id) || victim.hp <= 0 || A.now < victim.protectUntil) return;
   const dmg = full ? (def.dmg || 0) : chargingDamage(def.dmg || 0, chargingFactor(A));
   if (victim.shield && victim.shieldUp && facesAttacker(A, victim, attacker)) {
     block(A, attacker, victim, def, dmg);
     return;
   }
-  const amount = full && def.knockout ? Math.max(dmg, victim.hp) : dmg;
-  if (!damage(A, victim, amount, attacker, w, kx, kz)) return;
+  const hurt = head ? headshotDamage(dmg, headshotBonus(A)) : dmg;
+  const amount = full && def.knockout ? Math.max(hurt, victim.hp) : hurt;
+  if (!damage(A, victim, amount, attacker, w, kx, kz, { head })) return;
   if (victim.hp <= 0 || !full) return; // specials only on a fully charged hit
   if (def.shock) {
     // a new shock starts over: forMs / everyMs more ticks, the first one everyMs from now

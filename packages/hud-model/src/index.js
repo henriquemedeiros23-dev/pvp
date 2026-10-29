@@ -13,7 +13,7 @@ export { COIN_COLORS, COIN_ICON_SVG, coinIconSvg, coinIconDataUrl, coinsToast } 
 export { AIM_TIME_MS, AIM_CAMERA, AIM_BUTTON, aimBlend, aimView, aimButtonView, aimHandKey, zoomedFov } from './aim.js';
 // The "Charging 1.4s" text under the crosshair (#35) and the damage numbers above heads (#33).
 export {
-  chargeView, chargeStarts, damageNumber, damageFloat, READY_FLASH_MS, DAMAGE_NUMBER_MS, DAMAGE_NUMBER_RISE, DAMAGE_COLORS,
+  chargeView, chargeStarts, damageNumber, damageFloat, hitMarker, HEADSHOT_MARKER_SCALE, READY_FLASH_MS, DAMAGE_NUMBER_MS, DAMAGE_NUMBER_RISE, DAMAGE_COLORS,
 } from './feedback.js';
 
 /** One emoji per weapon id, for slots, the kill feed and the shop (bombs too: they can knock out). */

@@ -39,6 +39,14 @@ Decided by the boss through 22 questions.
   - Tapping super fast does not help: at most one attack every **0.15 s**.
   - Holding the fire button attacks again only when the weapon is charged; a new tap always attacks.
   - The 25% is one number in the rules (`CHARGING_DAMAGE`), easy to change.
+- **Headshots (#45):** a **gun** bullet that hits the **head** (the top 0.35 m of a player; a crouching player's
+  head is lower too) does **3 more damage**: a Gun headshot does 2 + 3 = **5**, a DM Gun 15 + 3 = 18.
+  - A weak shot while the gun is charging: first 25%, then + 3 (a charging DM Gun headshot: 4 + 3 = 7).
+  - Swords, bombs and shock never headshot. A raised shield still blocks a headshot completely
+    (a Mega Shield sends back 25% of the normal damage, without the + 3: the shield took the hit, not the head).
+  - The number above the head is **orange** with **HEADSHOT** under it (e.g. "-5 HEADSHOT"), and the shooter's
+    hit marker (the cross in the middle) is orange and bigger.
+  - The + 3 and the head size are numbers in the rules (`HEADSHOT_BONUS`, `HEAD_ZONE`), easy to change.
 - **Shock (Electric Sword):** after the hit, 1 H.P is lost at 5 s, 10 s and 15 s (3 more). A new hit starts it over.
 - **Freeze (Ice Sword):** for 2 s you cannot move, turn, shoot, hit, switch weapons or raise your shield.
   You turn ice-blue inside an ice block.

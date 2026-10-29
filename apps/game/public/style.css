@@ -104,10 +104,11 @@ input:focus { border-color: var(--gold); }
 .crosshair i:nth-child(2) { left: 12px; bottom: 0; width: 2px; height: 8px; }
 .crosshair i:nth-child(3) { top: 12px; left: 0; height: 2px; width: 8px; }
 .crosshair i:nth-child(4) { top: 12px; right: 0; height: 2px; width: 8px; }
-.hitmark { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%) scale(1.4); color: #fff; font-size: 30px; font-weight: 900; opacity: 0; text-shadow: 0 0 4px #000; transition: opacity 0.25s; }
+.hitmark { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%) scale(calc(1.4 * var(--hm-scale, 1))); color: #fff; font-size: 30px; font-weight: 900; opacity: 0; text-shadow: 0 0 4px #000; transition: opacity 0.25s; }
 .hitmark.show { opacity: 1; transition: none; }
 .hitmark.ko { color: var(--gold); }
 .hitmark.blocked { color: #9cc4ff; }
+.hitmark.head { color: #ff8a1f; } /* headshot (#45): orange and bigger (--hm-scale from hitMarker) */
 
 .hud-top { position: absolute; top: 10px; left: calc(10px + var(--safe-l)); right: calc(10px + var(--safe-r)); display: flex; justify-content: space-between; align-items: flex-start; }
 .leave { background: rgba(0,0,0,0.5); border: 1px solid var(--line) !important; border-radius: 999px; padding: 8px 14px; font-weight: 700; font-size: 14px; }
@@ -267,9 +268,11 @@ body:not(.desktop) .bombbtn .bkey { display: none; }
 .dmgnum[data-kind="shock"] { font-size: 19px; }
 .dmgnum[data-kind="ko"] { font-size: 28px; }
 .dmgnum[data-kind="blocked"] { font-size: 18px; }
+.dmgnum[data-kind="head"] { font-size: 28px; } /* headshot (#45): orange '-5' with 'HEADSHOT' under it */
+.dmgnum[data-kind="head"] small { letter-spacing: 1px; }
 @media (max-height: 430px) {
   .dmgnum { font-size: 20px; }
-  .dmgnum[data-kind="ko"] { font-size: 23px; }
+  .dmgnum[data-kind="ko"], .dmgnum[data-kind="head"] { font-size: 23px; }
   .dmgnum[data-kind="shock"], .dmgnum[data-kind="blocked"] { font-size: 16px; }
 }
 .toast { position: absolute; left: 50%; top: 62%; transform: translateX(-50%); font-weight: 900; font-size: 18px; color: var(--gold); text-shadow: 0 2px 4px #000; opacity: 0; transition: opacity 0.4s; white-space: nowrap; }

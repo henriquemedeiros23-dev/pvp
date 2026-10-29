@@ -102,6 +102,12 @@ setInterval(() => {
   does not. A blocked weak hit still costs the shield its `shieldWear`; a Mega Shield sends back its part of the
   weak damage. A weapon dropped (or picked up) loses its charge: picked up it is ready; a broken weapon's charge
   goes with it. `inv.charge` = ms left per slot (0 = ready), so the phone can show the held weapon's charge.
+- **Headshots (#45):** a gun bullet whose hit point (`rayCylinderHit` from `@pvp/collision`) is in the top
+  `HEAD_ZONE` meters (rules, 0.35) of the target's body (standing `PLAYER_HEIGHT`, crouching `CROUCH_HEIGHT`) does
+  `HEADSHOT_BONUS` (rules, 3) more: `headshotDamage(dmg)`, added after the charging cut (a charging DM Gun: 4 + 3 = 7).
+  The 'dmg' message and the shooter's 'hitmark' get `head: true`. Melee, bombs and shock ticks never headshot.
+  A raised shield blocks a headshot like any hit; a Mega Shield reflects its part of the normal damage (no bonus).
+  Rules without these numbers use the defaults.
   **Anti-spam:** at most one use every `MIN_FIRE_GAP_MS` (rules, 150 ms) per player, whatever the weapon;
   faster fires are refused (`false`) and cost nothing.
 - **Drop (#34):** `dropWeapon(id)` puts the weapon in hand on the ground with exactly its durability (the half rule

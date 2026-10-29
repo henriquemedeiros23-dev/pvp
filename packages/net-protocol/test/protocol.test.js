@@ -70,7 +70,7 @@ const rejected = (raw) => {
 };
 
 test('constants', () => {
-  assert.equal(PROTOCOL_VERSION, 6);
+  assert.equal(PROTOCOL_VERSION, 7);
   assert.equal(MAX_MESSAGE_SIZE, 4096);
   assert.deepEqual([FLAG_CROUCH, FLAG_SLIDE, FLAG_MOVING, FLAG_AIR, FLAG_AIM], [1, 2, 4, 8, 16]);
   assert.equal(SNAP_LENGTH, 12);

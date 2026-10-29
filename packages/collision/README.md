@@ -11,7 +11,7 @@ dependencies, works in Node and directly in the browser.
 
 ```js
 import {
-  createBoxGrid, circleHitsBox, movePlayer, rayBoxes, rayBox, rayCylinder,
+  createBoxGrid, circleHitsBox, movePlayer, rayBoxes, rayBox, rayCylinder, rayCylinderHit,
 } from '@pvp/collision';
 // In the browser without a bundler, import the file directly:
 // import { createBoxGrid } from './packages/collision/src/index.js';
@@ -35,6 +35,7 @@ const origin = { x: 0, y: 1.5, z: 0 }, dir = { x: 1, y: 0, z: 0 };
 rayBoxes(grid, origin, dir, 120);   // nearest box or ground (y = 0), else Infinity
 rayBox(origin, dir, box);           // one box: distance, 0 if inside, or Infinity
 rayCylinder(origin, dir, { x, y, z, height: 1.85, radius: 0.55 }); // a player
+rayCylinderHit(origin, dir, cyl); // { t, y, h } or null: h = hit height above the feet (headshots, #45)
 ```
 
 Notes:

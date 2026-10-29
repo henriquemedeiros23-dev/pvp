@@ -198,5 +198,18 @@ export function validateRules(rules) {
   if (MIN_FIRE_GAP_MS !== undefined && !(Number.isInteger(MIN_FIRE_GAP_MS) && MIN_FIRE_GAP_MS >= 0)) {
     problems.push('MIN_FIRE_GAP_MS must be a whole number of ms >= 0');
   }
+
+  // Headshots (#45): optional, the arena uses the defaults when they are missing
+  const { HEADSHOT_BONUS, HEAD_ZONE, PLAYER_HEIGHT, CROUCH_HEIGHT } = rules;
+  if (HEADSHOT_BONUS !== undefined && !(Number.isInteger(HEADSHOT_BONUS) && HEADSHOT_BONUS >= 0)) {
+    problems.push('HEADSHOT_BONUS must be a whole number >= 0');
+  }
+  if (HEAD_ZONE !== undefined) {
+    if (!isPosNum(HEAD_ZONE)) problems.push('HEAD_ZONE must be a number > 0 (meters)');
+    else {
+      const smallest = Math.min(...[PLAYER_HEIGHT, CROUCH_HEIGHT].filter(isPosNum));
+      if (Number.isFinite(smallest) && HEAD_ZONE >= smallest) problems.push(`HEAD_ZONE must be smaller than the player (${smallest} m when crouching)`);
+    }
+  }
   return problems;
 }

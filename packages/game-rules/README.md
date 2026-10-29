@@ -14,6 +14,7 @@ import {
   weaponPrice, skinPrice, isBuyable, weaponsByRarity, weaponDurability, weaponWear,
   chestChance, droppedDurability, rarityStyle, isShield, rarityRank, validateRules, POTION, MAX_POTIONS, potionHeal, itemPrice,
   BOMBS, isBomb, bombPrice, bombMaxCarry, bombCounts, inBombArea, CHARGING_DAMAGE, MIN_FIRE_GAP_MS, chargingDamage,
+  HEADSHOT_BONUS, HEAD_ZONE, isHeadshot, headshotDamage,
   aimDef, canAim, aimMultipliers,
 } from '@pvp/game-rules';
 // In the browser without a bundler: import from '/path/to/packages/game-rules/src/index.js'
@@ -44,6 +45,10 @@ bombCounts({ bomb: 9 }, { cap: true }); // { bomb: 5, legendarybomb: 0 } (a clea
 inBombArea('bomb', 10, 10, 11, 9); // true: inside the 2x2 m square around (10, 10) (the edge counts)
 CHARGING_DAMAGE;                // 0.25: a hit with a weapon that is still charging does 25% (#38; tune it here)
 chargingDamage(15);             // 4: 15 * 0.25 rounded, at least 1 (chargingDamage(100) = 25: no knockout)
+HEADSHOT_BONUS;                 // 3: a gun bullet in the head does 3 more damage (#45; tune it here)
+HEAD_ZONE;                      // 0.35: the head = the top 0.35 m of the body (standing or crouching)
+isHeadshot(1.7, PLAYER_HEIGHT); // true: 1.7 m up on a 1.85 m player is in the head zone
+headshotDamage(2);              // 5 (Gun); headshotDamage(chargingDamage(15)) = 7 (a charging DM Gun)
 MIN_FIRE_GAP_MS;                // 150: anti-spam, at most one use every 150 ms whatever the weapon
 aimDef('shootbm');              // { zoom: 2, spreadMul: 0.3, moveMul: 0.6 }: this gun can aim (#37); null for others
 canAim('gun');                  // false: only the Shootbm and the DM Gun can aim

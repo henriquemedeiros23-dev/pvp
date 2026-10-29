@@ -97,6 +97,7 @@ graph LR
 | `isShield(id)`, `rarityRank(r)` | `isShield('megashield'); // true (worn on the arm, no slot)` |
 | `droppedDurability(id, usesLeft)` | `droppedDurability('gun', 3); // 8 (half, rounded up)` |
 | `CHARGING_DAMAGE`, `MIN_FIRE_GAP_MS`, `chargingDamage(dmg)` | `chargingDamage(15); // 4: a hit while the weapon still charges does 25% (#38)` |
+| `HEADSHOT_BONUS`, `HEAD_ZONE`, `isHeadshot(h, height)`, `headshotDamage(dmg)` | `headshotDamage(2); // 5: a gun bullet in the top 0.35 m of a player does +3 (#45)` |
 | `aimDef(weapon)`, `canAim(id)`, `aimMultipliers(weapon, aiming)` | `aimDef('shootbm'); // { zoom: 2, spreadMul: 0.3, moveMul: 0.6 }: only the Shootbm and the DM Gun can aim (#37)` |
 | `RULES` | `createArena({ rules: RULES, ... }) // everything in one object` |
 | `weaponPrice(id)` / `skinPrice(slot, id)` | `weaponPrice('gun'); // 3` |
@@ -119,6 +120,7 @@ graph LR
 | `rayBoxes(grid, origin, dir, maxDist)` | `rayBoxes(grid, eye, dir, 120); // nearest box or ground, else Infinity` |
 | `rayBox(origin, dir, box)` | `rayBox(eye, dir, box); // distance or Infinity` |
 | `rayCylinder(origin, dir, cyl)` | `rayCylinder(eye, dir, { x, y, z, height: 1.85, radius: 0.55 });` |
+| `rayCylinderHit(origin, dir, cyl)` | `rayCylinderHit(eye, dir, cyl); // { t, y, h } or null: h = hit height above the feet (headshots, #45)` |
 
 **Depends on:** nothing.
 **Determinism:** fully. Pure functions; `near()` returns boxes in input order, so walls are resolved in a fixed order.
@@ -183,7 +185,7 @@ graph LR
 |---|---|
 | `createArena(opts)` | `const arena = createArena({ island: generateIsland(), rules: RULES, random: createRandom(1234), now: 0 });` |
 | `arena.join` / `arena.leave` | `const r = arena.join('alice', { name: 'Alice', skin, loadout: ['shootbm', 'shield'] }, now);` |
-| `arena.setState` / `arena.fire` | `arena.fire(id, [dx, dy, dz], now); // each slot charges on its own; charging = 25% damage (#38)` |
+| `arena.setState` / `arena.fire` | `arena.fire(id, [dx, dy, dz], now); // each slot charges on its own; charging = 25% damage (#38); a gun headshot +3 (#45)` |
 | `arena.aimState(id)`, `AIM_FLAG` | `arena.aimState(id); // { aiming: true, zoom: 2, spreadMul: 0.3, moveMul: 0.6 } while state.f has 16 and a Shootbm / DM Gun is in hand (#37)` |
 | `arena.setShield` | `arena.setShield(id, true, now); // raise the shield (no firing while up)` |
 | `arena.dropWeapon` | `arena.dropWeapon(id, now); // drop the weapon in hand, exact durability (#34)` |
@@ -237,6 +239,7 @@ graph LR
 | `aimButtonView(on, { paused })`, `aimHandKey(inv)` | `aimButtonView(true).label; // 'AIM ON' (#40); aimHandKey(inv) // '1:shootbm': aiming switches off when it changes` |
 | `chargeStarts(inv, now, prev)` | `chargeStarts({ weapons: ['gun', 'shootbm'], charge: [0, 2700] }, now); // per slot lastFireAt for chargeView (#38)` |
 | `damageNumber(msg)` / `damageFloat(age)` | `damageNumber({ t: 'dmg', id: 3, amount: 15 }).text; // '-15'; damageFloat(1000) // { rise, opacity, scale, done }` |
+| `hitMarker(msg)`, `HEADSHOT_MARKER_SCALE` | `hitMarker({ t: 'hitmark', dead: false, head: true }); // { kind: 'head', scale: 1.6, color: orange } (#45; a headshot number: '-5' badge 'HEADSHOT')` |
 | `COIN_ICON_SVG` / `coinIconSvg(opts)` / `coinIconDataUrl()` | `el.innerHTML = COIN_ICON_SVG; coinIconSvg({ label: 'PvP', sparkle: false }); // CSS: url("${coinIconDataUrl()}")` |
 | `coinsToast(amount)` | `coinsToast(3).text; // '+3 coins'` |
 | `WEAPON_ICONS` | `WEAPON_ICONS.icesword; // '❄️'` |

@@ -5,7 +5,7 @@
 import { deepFreeze } from './freeze.js';
 
 /** Bump when a message changes in a way old phones or servers would not understand. */
-export const PROTOCOL_VERSION = 6; // 2: shields and status effects (#26), explosives removed; 3: 'dmg' damage numbers (#33); 4: bombs (#32); 5: inv.charge per slot (#38); 6: aim flag 16 in state.f and snapshot flags (#37)
+export const PROTOCOL_VERSION = 7; // 2: shields and status effects (#26), explosives removed; 3: 'dmg' damage numbers (#33); 4: bombs (#32); 5: inv.charge per slot (#38); 6: aim flag 16 in state.f and snapshot flags (#37); 7: headshots, 'dmg.head' and 'hitmark.head' (#45)
 
 /** Longest raw message a client may send (bytes). Same as the server's WebSocket maxPayload. */
 export const MAX_CLIENT_MESSAGE_SIZE = 4096;
@@ -197,6 +197,7 @@ export const SERVER_MESSAGES = deepFreeze({
   hitmark: m('You hit someone.', {
     dead: ['bool', 'true if that hit knocked them out'],
     blocked: ['bool?', 'true if their shield blocked it'],
+    head: ['bool?', 'true for a gun headshot (+3 damage, #45)'],
   }),
   dmg: m('A player near you lost health (or a shield blocked the hit): show the number above their head.', {
     id: ['uint', 'Player who got hurt (can be you)'],
@@ -204,6 +205,7 @@ export const SERVER_MESSAGES = deepFreeze({
     ko: ['bool?', 'true if it knocked them out'],
     blocked: ['bool?', 'true if their raised shield blocked it (amount 0)'],
     shock: ['bool?', 'true for a shock tick (Electric Sword)'],
+    head: ['bool?', 'true for a gun headshot (HEADSHOT_BONUS more damage, #45)'],
   }),
   hurt: m('You got hurt.', {
     hp: ['int', 'Your health now'], kx: ['number', 'Knockback X'], kz: ['number', 'Knockback Z'],

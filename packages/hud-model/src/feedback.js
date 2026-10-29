@@ -19,6 +19,7 @@ export const DAMAGE_COLORS = Object.freeze({
   shock: '#ffe14a',   // Electric Sword shock tick: yellow
   ko: '#ffc531',      // knockout: gold
   blocked: '#7fb6ff', // a raised shield took it: blue
+  head: '#ff8a1f',    // gun headshot (#45): orange, with a 'HEADSHOT' badge
 });
 
 const chargingPercent = factor => Math.round(clamp01(typeof factor === 'number' && Number.isFinite(factor) ? factor : 0.25) * 100);
@@ -72,19 +73,38 @@ export function chargeStarts(inv, now, prev = [], rules = RULES) {
 /**
  * What a 'dmg' message shows above the player's head: { id, text, badge, kind, color }.
  * '-15' (red), a shock tick '-1' (yellow), a knockout '-15' with badge 'KO!' (gold),
- * a blocked hit 'Blocked' (blue). null for something that is not a 'dmg' message.
+ * a blocked hit 'Blocked' (blue), a gun headshot (#45, head: true) '-8' with badge 'HEADSHOT' (orange;
+ * a headshot knockout stays gold with badge 'HEADSHOT KO!'). null for something that is not a 'dmg' message.
  */
 export function damageNumber(msg) {
   if (!msg || msg.t !== 'dmg' || !Number.isFinite(msg.id)) return null;
   const amount = Math.max(0, Math.round(Number(msg.amount) || 0));
-  const kind = msg.blocked ? 'blocked' : msg.ko ? 'ko' : msg.shock ? 'shock' : 'hit';
+  const head = !!msg.head && !msg.blocked;
+  const kind = msg.blocked ? 'blocked' : msg.ko ? 'ko' : head ? 'head' : msg.shock ? 'shock' : 'hit';
   return {
     id: msg.id,
     text: kind === 'blocked' ? 'Blocked' : `-${amount}`,
-    badge: kind === 'ko' ? 'KO!' : '',
+    badge: kind === 'ko' ? (head ? 'HEADSHOT KO!' : 'KO!') : kind === 'head' ? 'HEADSHOT' : '',
     kind,
     color: DAMAGE_COLORS[kind],
   };
+}
+
+/** How much bigger the hit marker (the cross in the middle) is for a headshot (#45). */
+export const HEADSHOT_MARKER_SCALE = 1.6;
+
+/**
+ * The attacker's hit marker for a 'hitmark' message: { kind, scale, color }.
+ * kind: 'ko' (knocked them out, gold) | 'blocked' (their shield took it, blue) | 'head' (a headshot, #45:
+ * orange and HEADSHOT_MARKER_SCALE times bigger) | 'hit' (white). A headshot knockout is 'ko', and bigger too.
+ * null for something that is not a 'hitmark' message.
+ */
+export function hitMarker(msg) {
+  if (!msg || msg.t !== 'hitmark') return null;
+  const head = !!msg.head && !msg.blocked;
+  const kind = msg.blocked ? 'blocked' : msg.dead ? 'ko' : head ? 'head' : 'hit';
+  const color = kind === 'hit' ? '#ffffff' : DAMAGE_COLORS[kind];
+  return { kind, scale: head ? HEADSHOT_MARKER_SCALE : 1, color };
 }
 
 /**

@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  createBoxGrid, circleHitsBox, movePlayer, rayBoxes, rayBox, rayCylinder,
+  createBoxGrid, circleHitsBox, movePlayer, rayBoxes, rayBox, rayCylinder, rayCylinderHit,
 } from '../src/index.js';
 
 const OPTS = { radius: 0.45, height: 1.85, stepHeight: 0.55, gravity: 24 };
@@ -203,6 +203,27 @@ test('rayCylinder hits the body and misses above the head', () => {
   assert.equal(rayCylinder({ x: 0, y: 1, z: 2 }, { x: 1, y: 0, z: 0 }, cyl), Infinity, 'passes beside');
   assert.equal(rayCylinder({ x: 0, y: 1, z: 0 }, { x: -1, y: 0, z: 0 }, cyl), Infinity, 'behind');
   assert.equal(rayCylinder({ x: 10, y: 5, z: 0 }, { x: 0, y: -1, z: 0 }, cyl), Infinity, 'vertical ray');
+});
+
+test('rayCylinderHit says where the ray hit: distance, world height and height above the feet', () => {
+  const cyl = { x: 10, y: 2, z: 0, height: 1.85, radius: 0.5 }; // standing on a 2 m box
+  const head = rayCylinderHit({ x: 0, y: 3.7, z: 0 }, { x: 1, y: 0, z: 0 }, cyl);
+  assert.ok(Math.abs(head.t - 9.5) < 1e-9);
+  assert.ok(Math.abs(head.y - 3.7) < 1e-9);
+  assert.ok(Math.abs(head.h - 1.7) < 1e-9, 'near the top: the head');
+  // a sloped ray: the height is taken where it enters the side
+  const d = { x: 1, y: -0.1, z: 0 }, l = Math.hypot(d.x, d.y);
+  const legs = rayCylinderHit({ x: 0, y: 3.2, z: 0 }, { x: d.x / l, y: d.y / l, z: 0 }, cyl);
+  assert.ok(Math.abs(legs.h - 0.25) < 1e-9, String(legs.h));
+  assert.equal(legs.t, rayCylinder({ x: 0, y: 3.2, z: 0 }, { x: d.x / l, y: d.y / l, z: 0 }, cyl), 'same distance as rayCylinder');
+  // misses are null
+  assert.equal(rayCylinderHit({ x: 0, y: 4, z: 0 }, { x: 1, y: 0, z: 0 }, cyl), null, 'over the head');
+  assert.equal(rayCylinderHit({ x: 0, y: 3, z: 2 }, { x: 1, y: 0, z: 0 }, cyl), null, 'beside');
+  assert.equal(rayCylinderHit({ x: 0, y: 3, z: 0 }, { x: -1, y: 0, z: 0 }, cyl), null, 'behind');
+  assert.equal(rayCylinderHit({ x: 10, y: 5, z: 0 }, { x: 0, y: -1, z: 0 }, cyl), null, 'vertical');
+  // from inside the cylinder: the exit point
+  const inside = rayCylinderHit({ x: 10, y: 3, z: 0 }, { x: 1, y: 0, z: 0 }, cyl);
+  assert.ok(Math.abs(inside.t - 0.5) < 1e-9 && Math.abs(inside.h - 1) < 1e-9);
 });
 
 // ---- determinism ----

@@ -55,7 +55,7 @@ button.innerHTML = POTION_ICON_SVG;                 // the flask from the boss's
 
 ```js
 import { RULES } from '@pvp/game-rules';
-import { chargeView, chargeStarts, damageNumber, damageFloat } from '@pvp/hud-model';
+import { chargeView, chargeStarts, damageNumber, damageFloat, hitMarker } from '@pvp/hud-model';
 
 // after you shoot or swing: the held weapon's `rate` (seconds between uses), from the moment of the last shot
 chargeView(RULES.WEAPONS.gun, lastFireAt, performance.now());
@@ -75,6 +75,11 @@ damageNumber({ t: 'dmg', id: 3, amount: 15 });               // { id: 3, text: '
 damageNumber({ t: 'dmg', id: 3, amount: 1, shock: true });   // text '-1', kind 'shock' (yellow)
 damageNumber({ t: 'dmg', id: 3, amount: 40, ko: true });     // text '-40', badge 'KO!', kind 'ko' (gold)
 damageNumber({ t: 'dmg', id: 3, amount: 0, blocked: true }); // text 'Blocked', kind 'blocked' (blue)
+damageNumber({ t: 'dmg', id: 3, amount: 5, head: true });    // text '-5', badge 'HEADSHOT', kind 'head' (orange, #45)
+damageNumber({ t: 'dmg', id: 3, amount: 9, ko: true, head: true }); // badge 'HEADSHOT KO!', kind 'ko' (gold)
+// the shooter's hit marker for a 'hitmark' message (#45: a headshot is orange and HEADSHOT_MARKER_SCALE = 1.6 times bigger)
+hitMarker({ t: 'hitmark', dead: false, head: true });          // { kind: 'head', scale: 1.6, color: '#ff8a1f' }
+hitMarker({ t: 'hitmark', dead: true });                       // { kind: 'ko', scale: 1, color: gold } ('hit' white, 'blocked' blue)
 damageFloat(msSinceItAppeared); // { rise (meters up), opacity, scale, done }: floats up and fades in DAMAGE_NUMBER_MS (2 s)
 ```
 

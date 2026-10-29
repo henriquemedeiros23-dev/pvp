@@ -55,6 +55,8 @@ and `boom` (exploded), `inv.bombs` (`[{ id, n }]`), `welcome.bombs` (bombs not e
 Charging (#38, protocol version 5): `inv.charge` (ms until each slot's weapon is fully charged, same order as `weapons`,
 0 = ready). Every weapon charges on its own; `fire` is allowed while charging (25% damage). The field is optional.
 
+Headshots (#45, protocol version 7): `dmg.head` and `hitmark.head` (optional, `true` for a gun headshot: +3 damage).
+
 Aiming (#37, protocol version 6): bit 16 (`FLAG_AIM`) in `state.f` while the AIM button (phone) or the right mouse button
 (computer) is held: `makeFlags({ aim: true })`, `readFlags(f).aim`. The server only uses it with a weapon that can aim
 (Shootbm, DM Gun) and shows the bit in snapshot `FLAGS` only while that player really aims.

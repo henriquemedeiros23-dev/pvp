@@ -1,6 +1,6 @@
 // The arena's inner state and the small helpers every part uses.
 
-import { RULES as defaultRules, weaponDurability, weaponWear, RARITIES, CHARGING_DAMAGE, MIN_FIRE_GAP_MS } from '@pvp/game-rules';
+import { RULES as defaultRules, weaponDurability, weaponWear, RARITIES, CHARGING_DAMAGE, MIN_FIRE_GAP_MS, HEADSHOT_BONUS, HEAD_ZONE } from '@pvp/game-rules';
 import { ARENA_DEFAULTS } from './tuning.js';
 
 // Accept a @pvp/seeded-random generator (or anything with next(), or a plain function).
@@ -114,3 +114,8 @@ export function chargeLeft(A, p, slot) {
 /** The rules' charging factor (CHARGING_DAMAGE, default 0.25) and anti-spam gap (MIN_FIRE_GAP_MS, default 150). */
 export const chargingFactor = A => (typeof A.rules.CHARGING_DAMAGE === 'number' ? A.rules.CHARGING_DAMAGE : CHARGING_DAMAGE);
 export const minFireGap = A => (Number.isFinite(A.rules.MIN_FIRE_GAP_MS) ? A.rules.MIN_FIRE_GAP_MS : MIN_FIRE_GAP_MS);
+
+// ---------------------------------------------------------------- headshots (#45)
+/** The rules' headshot bonus (HEADSHOT_BONUS, default 3) and head zone (HEAD_ZONE, default 0.35 m from the top). */
+export const headshotBonus = A => (Number.isFinite(A.rules.HEADSHOT_BONUS) ? A.rules.HEADSHOT_BONUS : HEADSHOT_BONUS);
+export const headZone = A => (Number.isFinite(A.rules.HEAD_ZONE) ? A.rules.HEAD_ZONE : HEAD_ZONE);

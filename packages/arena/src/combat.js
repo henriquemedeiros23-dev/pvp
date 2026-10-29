@@ -1,9 +1,9 @@
 // Damage, knockouts and firing. Weapon behaviour depends only on the weapon's `type`
 // (melee | gun) and its numbers in the rules; shields and effects are in effects.js.
 
-import { rayBoxes, rayCylinder } from '@pvp/collision';
-import { droppedDurability } from '@pvp/game-rules';
-import { at, send, sendNear, tellServer, weaponDef, heightOf, wearOf, chargeLeft, minFireGap } from './state.js';
+import { rayBoxes, rayCylinderHit } from '@pvp/collision';
+import { droppedDurability, isHeadshot } from '@pvp/game-rules';
+import { at, send, sendNear, tellServer, weaponDef, heightOf, wearOf, chargeLeft, minFireGap, headZone } from './state.js';
 import { removePlayer, inventoryMsg } from './players.js';
 import { dropItem } from './loot.js';
 import { strike, isFrozen } from './effects.js';
@@ -14,7 +14,7 @@ const round2 = v => +v.toFixed(2);
 /**
  * Hurt `victim` (no shield check: use strike() in effects.js for weapon hits).
  * `attacker` is a player object (may have left already) or null; opts.byName names an attacker who left.
- * opts.shock marks a shock tick (for the 'dmg' number).
+ * opts.shock marks a shock tick (for the 'dmg' number); opts.head a gun headshot (#45: 'dmg' and 'hitmark' get head: true).
  * Everyone near the victim (the victim too) gets a 'dmg' with the health lost (#33).
  * Returns true if the damage was done (false: not in the arena, already out, or spawn protection).
  */
@@ -23,12 +23,17 @@ export function damage(A, victim, amount, attacker, weapon, kx = 0, kz = 0, opts
   if (A.now < victim.protectUntil) return false;
   const before = victim.hp;
   victim.hp = Math.max(0, victim.hp - Math.round(amount));
-  if (attacker && A.players.has(attacker.id)) send(A, attacker.id, { t: 'hitmark', dead: victim.hp <= 0 });
+  if (attacker && A.players.has(attacker.id)) {
+    const mark = { t: 'hitmark', dead: victim.hp <= 0 };
+    if (opts.head) mark.head = true;
+    send(A, attacker.id, mark);
+  }
   send(A, victim.id, { t: 'hurt', hp: victim.hp, kx, kz, from: attacker ? [attacker.x, attacker.z] : null });
   if (before > victim.hp) {
     const dmg = { t: 'dmg', id: victim.id, amount: before - victim.hp };
     if (victim.hp <= 0) dmg.ko = true;
     if (opts.shock) dmg.shock = true;
+    if (opts.head) dmg.head = true;
     sendNear(A, victim, dmg); // before the knockout, so the victim gets it too
   }
   if (victim.hp <= 0) knockOut(A, victim, attacker, weapon, opts.byName);
@@ -95,13 +100,15 @@ function gun(A, p, w, def, o, dir, full) {
     const l = Math.hypot(sx, sy, sz) || 1; sx /= l; sy /= l; sz /= l;
     const sd = { x: sx, y: sy, z: sz };
     let dist = Math.min(def.range, rayBoxes(A.island.grid, o, sd, def.range));
-    let hit = null;
+    let hit = null, head = false;
     for (const v of A.players.values()) {
       if (v === p) continue;
-      const t = rayCylinder(o, sd, { x: v.x, y: v.y, z: v.z, height: heightOf(A, v), radius });
-      if (t < dist) { dist = t; hit = v; }
+      const height = heightOf(A, v);
+      const h = rayCylinderHit(o, sd, { x: v.x, y: v.y, z: v.z, height, radius });
+      if (h && h.t < dist) { dist = h.t; hit = v; head = isHeadshot(h.h, height, headZone(A)); }
     }
-    if (hit) strike(A, p, hit, w, def, 0, 0, full);
+    // headshot (#45): the bullet hit the top HEAD_ZONE meters of the player: HEADSHOT_BONUS more damage
+    if (hit) strike(A, p, hit, w, def, 0, 0, full, head);
     tracers.push([round2(o.x + sx * dist), round2(o.y + sy * dist), round2(o.z + sz * dist)]);
   }
   send(A, 'all', { t: 'shot', id: p.id, w, from: [round2(o.x), round2(o.y), round2(o.z)], to: tracers });
