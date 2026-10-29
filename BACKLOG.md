@@ -79,7 +79,7 @@ The live list is on GitHub Issues: https://github.com/henriquemedeiros23-dev/pvp
 | 42 | ✅ | **Demon Horns hat** | Red demon horns in the shop for 50 coins. |
 | 43 | ✅ | **Greener, more realistic island** | Lush grass, plants, soil paths, wet sand, nicer water and light; still fast on phones. |
 | 44 | ✅ | **Cheaper special colors** | Rainbow 100, Shiny Gold 75, Zebra 50 coins. |
-| 45 | 🔲 | **Headshots +3 damage** | A bullet in the head does 3 more damage, with a HEADSHOT sign. |
+| 45 | ✅ | **Headshots +3 damage** | A bullet in the head does 3 more damage, with a HEADSHOT sign. |
 
 ## Later ideas
 - Sounds and music
