@@ -19,7 +19,7 @@ export function inventoryMsg(A, p, picked) {
 
 export const playerInfo = p => ({ id: p.id, name: p.name, skin: { ...p.skin } });
 
-export function join(A, key, { name, skin, loadout = [], coins = 0, potions = 0, bombs } = {}, now) {
+export function join(A, key, { name, skin, loadout = [], coins = 0, potions = 0, bombs, starter = true } = {}, now) {
   now = at(A, now);
   const R = A.rules;
   const oldId = A.byKey.get(key);
@@ -38,7 +38,8 @@ export function join(A, key, { name, skin, loadout = [], coins = 0, potions = 0,
   // The starting weapon (free, slot 1), then weapons from the loadout in its order (best first is the
   // server's choice), copies of the same weapon too, as many as fit. Shields never take a slot:
   // the first shield in the loadout goes on the left arm, other shields are not taken.
-  const freeStart = Boolean(weaponDef(A, R.STARTING_WEAPON)) && !isShieldId(A, R.STARTING_WEAPON);
+  // starter: false skips the free starting weapon (the player's fast bar already has weapons, #39).
+  const freeStart = starter !== false && Boolean(weaponDef(A, R.STARTING_WEAPON)) && !isShieldId(A, R.STARTING_WEAPON);
   const weapons = freeStart ? [R.STARTING_WEAPON] : [];
   const taken = [];
   let shield = null;

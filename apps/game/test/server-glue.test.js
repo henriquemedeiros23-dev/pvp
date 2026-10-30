@@ -84,7 +84,18 @@ function messages(ws) {
 test('sign up, join the arena, bad messages are dropped, leave', async () => {
   const signup = await post('/api/signup', { name: NAME, password: 'secret1' });
   assert.equal(signup.status, 200);
-  assert.deepEqual(Object.keys(signup.body.account).sort(), ['bombs', 'coins', 'name', 'owned', 'potions', 'skin', 'stash']);
+  assert.deepEqual(Object.keys(signup.body.account).sort(), ['bar', 'bombs', 'coins', 'name', 'owned', 'potions', 'skin', 'stash']);
+
+  // the Inventory and the fast bar (#39): an empty bar; you can't put in what you don't own
+  const inv = await post('/api/inventory', {}, signup.body.token);
+  assert.equal(inv.status, 200);
+  assert.deepEqual(inv.body.account.bar, [null, null, null, null, null]);
+  const notOwned = await post('/api/bar/put', { kind: 'weapon', id: 'icesword' }, signup.body.token);
+  assert.equal(notOwned.status, 400);
+  assert.equal(notOwned.body.error, "You don't have that in your Inventory");
+  assert.equal((await post('/api/bar/put', { kind: 'hat', id: 'cap', slot: 'x' }, signup.body.token)).status, 400);
+  assert.equal((await post('/api/bar/take', { slot: 0 }, signup.body.token)).body.error, 'That bar slot is empty');
+  assert.equal((await post('/api/bar/take', { slot: 0 })).status, 401);
 
   const taken = await post('/api/signup', { name: NAME, password: 'secret1' });
   assert.equal(taken.status, 400);
@@ -100,12 +111,12 @@ test('sign up, join the arena, bad messages are dropped, leave', async () => {
   ws.send(JSON.stringify({ t: 'teleport', x: 0 }));
 
   const welcome = inbox.next('welcome');
-  const inv = inbox.next('inv');
+  const invMsg = inbox.next('inv');
   ws.send(JSON.stringify({ t: 'join' }));
   const w = await welcome;
   assert.equal(typeof w.id, 'number');
   assert.ok(w.players.some(p => p.id === w.id && p.name === NAME));
-  const firstInv = await inv;
+  const firstInv = await invMsg;
   assert.deepEqual(firstInv.weapons, ['gun']);
   assert.equal(firstInv.potions, 0, 'no free potions');
   ws.send(JSON.stringify({ t: 'drink' })); // no potion, full health: ignored

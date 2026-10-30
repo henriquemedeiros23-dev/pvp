@@ -75,9 +75,16 @@ test('bombs: buy in the shop, join, B throws one, red square, it explodes after 
     }
     await cards.nth(1).locator('button.buy').click();
     await page.waitForFunction(() => document.getElementById('shopCoins').textContent === '0');
-    assert.match(await cards.nth(1).locator('.tag').last().textContent(), /3 in backpack/);
+    assert.match(await cards.nth(1).locator('.tag').last().textContent(), /3 in Inventory/);
     await page.click('#btnShopBack');
-    assert.match(await page.textContent('#menuBackpack'), /2× Bomb, 3× Legendary Bomb/);
+    // into the fast bar (#39): only the bar comes into the arena
+    await page.click('#btnInventory');
+    await page.click('#invGrid .inv-card[data-id="bomb"][data-filled="1"]');
+    await page.locator('#invBar .slot[data-id="bomb"]').waitFor();
+    await page.click('#invGrid .inv-card[data-id="legendarybomb"][data-filled="1"]');
+    await page.locator('#invBar .slot[data-id="legendarybomb"]').waitFor();
+    await page.click('#btnInvBack');
+    assert.match(await page.textContent('#menuBackpack'), /Fast bar: 2× Bomb, 3× Legendary Bomb/);
 
     // join: the bombs come along, two buttons with their counts
     await page.click('#btnJoin');
@@ -123,8 +130,8 @@ test('bombs: buy in the shop, join, B throws one, red square, it explodes after 
 
     await page.click('#btnLeave');
     await page.locator('#menu').waitFor({ state: 'visible' });
-    // the unused bombs went back into the backpack
-    await page.waitForFunction(() => /1× Bomb, 3× Legendary Bomb/.test(document.getElementById('menuBackpack').textContent));
+    // the unused bombs went back into the fast bar
+    await page.waitForFunction(() => /Fast bar: Bomb, 3× Legendary Bomb/.test(document.getElementById('menuBackpack').textContent));
     assert.deepEqual(errors, []);
   } finally {
     await context.close();

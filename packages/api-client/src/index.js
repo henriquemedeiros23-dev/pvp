@@ -104,6 +104,16 @@ export function createApiClient({ baseUrl = '', fetch: fetchFn, storage, tokenKe
     buy: (kind, id) => post('/api/buy', { kind, id }, true),
     /** Wear a skin item you own. Resolves { account }. */
     equip: (kind, id) => post('/api/equip', { kind, id }, true),
+    /** The Inventory and the fast bar (#39): resolves { account } (account.stash/potions/bombs and account.bar). */
+    inventory: () => post('/api/inventory', {}, true),
+    /**
+     * Move an item from the Inventory into the fast bar. kind: 'weapon' (shields too), 'potion' or 'bomb'.
+     * opts.slot: bar slot 0..4 (default: its stack or the first empty one); opts.n: how many (default: as many as fit).
+     * Resolves { account }.
+     */
+    toBar: (kind, id, { slot, n } = {}) => post('/api/bar/put', { kind, id, slot, n }, true),
+    /** Move a bar slot (0..4) back into the Inventory. Resolves { account }. */
+    fromBar: slot => post('/api/bar/take', { slot }, true),
     /** Forget the token on this device (no server call). */
     logout() { store.remove(tokenKey); },
   };

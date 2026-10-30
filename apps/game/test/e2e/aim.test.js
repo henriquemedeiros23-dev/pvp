@@ -51,11 +51,12 @@ const post = async (url, body, token) => {
   return res.json();
 };
 
-// Sign up, get coins (test hook 'debugCoins' on a plain WebSocket) and buy a weapon. Returns the token.
-async function accountWith(prefix, weapon) {
+// Sign up, get coins (test hook 'debugCoins' on a plain WebSocket), buy weapons and put them in the fast bar
+// in this order (#39: only the fast bar comes into the arena). Returns the token.
+async function accountWith(prefix, ...weapons) {
   const name = prefix + Date.now().toString(36).slice(-7);
   const { token } = await post('/api/signup', { name, password: 'secret1' });
-  const price = RULES.WEAPONS[weapon].price;
+  const price = weapons.reduce((sum, w) => sum + RULES.WEAPONS[w].price, 0);
   const ws = new WebSocket(`ws://127.0.0.1:${server.port}/?token=${encodeURIComponent(token)}`);
   await new Promise((resolve, reject) => { ws.once('open', resolve); ws.once('error', reject); });
   ws.send(JSON.stringify({ t: 'debugCoins', n: price }));
@@ -65,7 +66,10 @@ async function accountWith(prefix, weapon) {
     coins = (await post('/api/me', {}, token)).account.coins;
   }
   ws.close();
-  await post('/api/buy', { kind: 'weapon', id: weapon }, token);
+  for (const weapon of weapons) {
+    await post('/api/buy', { kind: 'weapon', id: weapon }, token);
+    await post('/api/bar/put', { kind: 'weapon', id: weapon }, token);
+  }
   return token;
 }
 
@@ -103,14 +107,14 @@ test('phone: tap 🎯 AIM with the Shootbm to aim until tapped again; switching 
   });
   let target = null;
   try {
-    const token = await accountWith('aim_', 'shootbm');
+    const token = await accountWith('aim_', 'gun', 'shootbm');
     await page.addInitScript(t => localStorage.setItem('pvp.token', t), token);
     await page.goto(`${server.url}/?debug=1`);
     await page.locator('#menu').waitFor({ state: 'visible', timeout: SLOW });
     await page.click('#btnJoin');
     await page.locator('#hud').waitFor({ state: 'visible' });
     const joined = await waitDebug(page, s => s.mode === 'play' && s.inv, { what: 'joined' });
-    assert.deepEqual(joined.inv.weapons, ['gun', 'shootbm'], 'the free Gun and the bought Shootbm');
+    assert.deepEqual(joined.inv.weapons, ['gun', 'shootbm'], 'a Gun and a Shootbm from the fast bar');
 
     // the Gun in hand: no AIM button
     assert.equal(joined.inv.slot, 0);
