@@ -83,6 +83,7 @@ The live list is on GitHub Issues: https://github.com/henriquemedeiros23-dev/pvp
 | 46 | ✅ | **Login every time + password twice** | The Account screen always shows before the menu; Create account asks for the password twice. |
 | 47 | ✅ | **Ranking top 50** | A RANKING button in the menu: the 50 players with the most knockouts. |
 | 48 | ✅ | **Get back your old practice player** | Old practice players (no password) can be claimed by creating an account with that name, keeping everything. |
+| 49 | 🔲 | **Right mouse = shield, Shift = aim** | Swap the computer controls for shield and aim. |
 
 ## Later ideas
 - Sounds and music
