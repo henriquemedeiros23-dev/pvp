@@ -81,6 +81,7 @@ The live list is on GitHub Issues: https://github.com/henriquemedeiros23-dev/pvp
 | 44 | ✅ | **Cheaper special colors** | Rainbow 100, Shiny Gold 75, Zebra 50 coins. |
 | 45 | ✅ | **Headshots +3 damage** | A bullet in the head does 3 more damage, with a HEADSHOT sign. |
 | 46 | 🔲 | **Login every time + password twice** | The Account screen always shows before the menu; Create account asks for the password twice. |
+| 47 | 🔲 | **Ranking top 50** | A RANKING button in the menu: the 50 players with the most knockouts. |
 
 ## Later ideas
 - Sounds and music
