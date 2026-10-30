@@ -16,7 +16,7 @@ import WebSocket from 'ws';
 import { generateIsland } from '@pvp/world-gen';
 import { RULES } from '@pvp/game-rules';
 import { encode } from '@pvp/net-protocol';
-import { RUN, SKIP, SLOW, startServer, launchBrowser, debug, waitDebug } from './helpers.js';
+import { RUN, SKIP, SLOW, startServer, launchBrowser, debug, waitDebug, openAndLogIn } from './helpers.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const SHOTS = path.join(HERE, '..', '..', '..', '..', 'docs', 'screenshots');
@@ -74,9 +74,7 @@ async function signedInWithTwoGuns(page, prefix) {
   }
   ws.close();
   await post('/api/buy', { kind: 'weapon', id: 'gun' }, token);
-  await page.addInitScript(t => localStorage.setItem('pvp.token', t), token);
-  await page.goto(`${server.url}/?debug=1`);
-  await page.locator('#menu').waitFor({ state: 'visible', timeout: SLOW });
+  await openAndLogIn(page, server.url, name); // the Account screen (#46)
 }
 
 // A player on a plain WebSocket (no browser): joins, can teleport (test hook) and shoot.

@@ -1,6 +1,8 @@
-// Glue for the screens: login, menu, shop, loading, death screen.
-// The real work lives in packages: @pvp/api-client (server calls), @pvp/shop-catalog (what the shop shows).
+// Glue for the screens: Account screen (log in / create an account), menu, shop, loading, death screen.
+// The real work lives in packages: @pvp/api-client (server calls), @pvp/account-form (the Account screen's checks),
+// @pvp/shop-catalog (what the shop shows).
 import { createApiClient } from '@pvp/api-client';
+import { checkLoginForm, checkSignupForm } from '@pvp/account-form';
 import { shopTabs, shopItems, backpackSummary, swatchBackground } from '@pvp/shop-catalog';
 import { WEAPONS, BOMBS } from '@pvp/game-rules';
 import { WEAPON_ICONS, POTION_ICON_SVG, bombIconSvg, coinIconDataUrl } from '@pvp/hud-model';
@@ -86,36 +88,50 @@ async function refresh() {
   return res;
 }
 
-// ------------------------------------------------------------ login
+// ------------------------------------------------------------ account screen (#46)
+// Always shown first (a saved token does not skip it). "Log in" keeps everything; "Create an account" needs the
+// password typed twice. @pvp/account-form checks the forms first; the server decides (wrong password, name taken).
 function goLogin(message = '') {
   account = null;
   closeRename();
+  refreshSeq++; // an answer still on its way must not open the menu again
+  for (const id of ['loginPass', 'signupPass', 'signupPass2']) $(id).value = ''; // never keep a password
+  $('signupError').textContent = '';
   $('loginError').textContent = message;
+  if (!$('loginName').value) $('loginName').value = api.lastName || ''; // the last name used here, never the password
   show('login');
 }
 
 async function enter(kind) {
   if (busy) return;
-  const name = $('loginName').value, pass = $('loginPass').value;
-  if (!name.trim() || !pass) { $('loginError').textContent = 'Type a name and a password'; return; }
-  busy = true;
+  const signup = kind === 'signup';
+  const errorBox = $(signup ? 'signupError' : 'loginError');
+  const form = signup
+    ? checkSignupForm({ name: $('signupName').value, password: $('signupPass').value, repeat: $('signupPass2').value })
+    : checkLoginForm({ name: $('loginName').value, password: $('loginPass').value });
   $('loginError').textContent = '';
+  $('signupError').textContent = '';
+  if (!form.ok) {
+    errorBox.textContent = form.message;
+    if (form.field === 'repeat') { $('signupPass2').value = ''; $('signupPass2').focus(); }
+    return;
+  }
+  busy = true;
   try {
-    const res = kind === 'signup' ? await api.signup(name, pass) : await api.login(name, pass);
+    const res = signup ? await api.signup(form.name, form.password) : await api.login(form.name, form.password);
     setAccount(res.account);
-    $('loginPass').value = '';
+    for (const id of ['loginPass', 'signupName', 'signupPass', 'signupPass2']) $(id).value = '';
+    $('loginName').value = res.account.name;
     showMenu();
   } catch (e) {
-    $('loginError').textContent = e.message;
+    errorBox.textContent = e.message;
   } finally {
     busy = false;
   }
 }
 
-$('btnLogin').addEventListener('click', () => enter('login'));
-$('btnSignup').addEventListener('click', () => enter('signup'));
-$('loginPass').addEventListener('keydown', e => { if (e.key === 'Enter') enter('login'); });
-$('loginName').addEventListener('keydown', e => { if (e.key === 'Enter') $('loginPass').focus(); });
+$('loginForm').addEventListener('submit', e => { e.preventDefault(); enter('login'); });
+$('signupForm').addEventListener('submit', e => { e.preventDefault(); enter('signup'); });
 
 // ------------------------------------------------------------ menu
 function showMenu(message = '', { refresh: doRefresh = true } = {}) {
@@ -167,7 +183,7 @@ $('renamePanel').addEventListener('submit', async e => {
     busy = false;
   }
 });
-$('btnLogout').addEventListener('click', () => { api.logout(); goLogin(); });
+$('btnLogout').addEventListener('click', () => { api.logout(); goLogin(); }); // back to the Account screen
 
 $('btnJoin').addEventListener('click', async () => {
   if (!game) { showMenu('Your browser cannot show 3D graphics, so the game cannot start.'); return; }
@@ -288,11 +304,6 @@ async function shopAction(call) {
 }
 
 // ------------------------------------------------------------ start
-if (api.hasToken()) {
-  loading(true, 'Loading…');
-  api.me()
-    .then(res => { setAccount(res.account); $('menuOnline').textContent = res.online ?? 0; showMenu(); })
-    .catch(e => goLogin(e.status === 401 ? '' : e.message));
-} else {
-  goLogin();
-}
+// Always the Account screen first (#46): the saved token is forgotten, so a password is needed every time.
+api.logout();
+goLogin();

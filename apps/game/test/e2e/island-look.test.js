@@ -12,7 +12,7 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { generateIsland } from '@pvp/world-gen';
 import { circleHitsBox } from '@pvp/collision';
-import { RUN, SKIP, launchBrowser, waitDebug, debug } from './helpers.js';
+import { RUN, SKIP, launchBrowser, waitDebug, debug, signUpForm } from './helpers.js';
 import { build, THREE_CDN } from '../../../../scripts/build-practice.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '..');
@@ -45,6 +45,8 @@ test('island look: green ground on a phone in landscape', { skip: SKIP, timeout:
   });
   try {
     await page.goto(`${pathToFileURL(file).href}?debug=1&seed=island-look&bots=0`);
+    await page.locator('#login').waitFor({ state: 'visible', timeout: 60000 }); // the Account screen (#46)
+    await signUpForm(page, 'Look_Kid');
     await page.locator('#menu').waitFor({ state: 'visible', timeout: 60000 });
     await page.click('#btnJoin');
     await page.locator('#hud').waitFor({ state: 'visible', timeout: 60000 });

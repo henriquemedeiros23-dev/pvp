@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createApiClient, safeStorage, ApiError, TOKEN_KEY } from '../src/index.js';
+import { createApiClient, safeStorage, ApiError, TOKEN_KEY, LAST_NAME_KEY } from '../src/index.js';
 
 // A fake fetch that records calls and answers from a list of { status, body } (body may be a string = bad JSON).
 function fakeFetch(...answers) {
@@ -126,6 +126,30 @@ test('logout forgets the token locally', async () => {
   api.logout();
   assert.equal(api.token, null);
   assert.equal(storage.getItem(TOKEN_KEY), null);
+});
+
+test('lastName: remembers the last name used on this device (not the password), kept after logout', async () => {
+  const storage = memoryStorage();
+  const fetch = fakeFetch(
+    { status: 200, body: { token: 'z', account: ACCOUNT } },
+    { status: 400, body: { error: 'Wrong name or password' } },
+    { status: 200, body: { token: 'y', account: { ...ACCOUNT, name: 'Hero_7' } } },
+    { status: 200, body: { account: { ...ACCOUNT, name: 'Hero_8' } } },
+  );
+  const api = createApiClient({ fetch, storage });
+  assert.equal(api.lastName, '');
+  await api.signup('Bob', 'pass');
+  assert.equal(api.lastName, 'Bob');
+  await assert.rejects(api.login('Other', 'nope'));
+  assert.equal(api.lastName, 'Bob'); // a failed log in does not change it
+  await api.login('hero_7', 'pass');
+  assert.equal(api.lastName, 'Hero_7'); // the account's real spelling
+  await api.rename('Hero_8');
+  assert.equal(api.lastName, 'Hero_8');
+  api.logout();
+  assert.equal(api.lastName, 'Hero_8');
+  assert.equal(storage.getItem(LAST_NAME_KEY), 'Hero_8');
+  assert.ok(![...storage.m.values()].includes('pass'), 'the password is never saved');
 });
 
 test('safeStorage survives storage that throws (private mode) by keeping values in memory', () => {

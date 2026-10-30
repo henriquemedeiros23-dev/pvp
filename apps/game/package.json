@@ -9,6 +9,7 @@
     "test": "node --test"
   },
   "dependencies": {
+    "@pvp/account-form": "*",
     "@pvp/accounts-shop": "*",
     "@pvp/api-client": "*",
     "@pvp/arena": "*",

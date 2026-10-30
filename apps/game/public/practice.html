@@ -28,6 +28,7 @@
         "@pvp/touch-controls": "/packages/touch-controls/src/index.js",
         "@pvp/net-protocol": "/packages/net-protocol/src/index.js",
         "@pvp/name-filter": "/packages/name-filter/src/index.js",
+        "@pvp/account-form": "/packages/account-form/src/index.js",
         "@pvp/arena": "/packages/arena/src/index.js",
         "@pvp/accounts-shop/browser": "/packages/accounts-shop/src/browser.js",
         "@pvp/local-server": "/packages/local-server/src/index.js"
@@ -38,17 +39,29 @@
 <body>
   <canvas id="view"></canvas>
 
-  <!-- Login -->
+  <!-- Account screen (#46): always first. Log in (keep everything) or create an account (password typed twice). -->
   <section id="login" class="screen">
-    <div class="panel narrow">
+    <div class="panel account">
       <h1 class="logo">PvP<br><span>ISLAND</span></h1>
-      <input id="loginName" placeholder="Player name" maxlength="16" autocomplete="username">
-      <input id="loginPass" type="password" placeholder="Password" autocomplete="current-password">
-      <div class="row">
-        <button id="btnLogin" class="big">Log in</button>
-        <button id="btnSignup" class="big alt">Sign up</button>
+      <div class="account-parts">
+        <form id="loginForm" class="account-part" autocomplete="on">
+          <h2>Log in</h2>
+          <p class="muted">You keep your coins and everything you bought.</p>
+          <input id="loginName" placeholder="Player name" maxlength="16" autocomplete="username" spellcheck="false" autocapitalize="off">
+          <input id="loginPass" type="password" placeholder="Password" autocomplete="current-password">
+          <button id="btnLogin" type="submit" class="big">Log in</button>
+          <p id="loginError" class="error"></p>
+        </form>
+        <form id="signupForm" class="account-part" autocomplete="on">
+          <h2>Create an account</h2>
+          <p class="muted">New here? Pick a name and make a password.</p>
+          <input id="signupName" placeholder="Pick a player name" maxlength="16" autocomplete="off" spellcheck="false" autocapitalize="off">
+          <input id="signupPass" type="password" placeholder="Make a password" autocomplete="new-password">
+          <input id="signupPass2" type="password" placeholder="Type the password again" autocomplete="new-password">
+          <button id="btnSignup" type="submit" class="big alt">Create account</button>
+          <p id="signupError" class="error"></p>
+        </form>
       </div>
-      <p id="loginError" class="error"></p>
     </div>
   </section>
 

@@ -23,6 +23,7 @@ graph LR
   worldgen --> random
   accounts["@pvp/accounts-shop"] --> rules
   accounts --> names["@pvp/name-filter"]
+  accountform["@pvp/account-form"] --> names
   shop["@pvp/shop-catalog"] --> rules
   hud["@pvp/hud-model"] --> rules
   stickman["@pvp/stickman-3d"] --> rules
@@ -58,7 +59,8 @@ graph LR
 | `@pvp/arena` | The fight itself: players, chests, loot, weapons, shields, shock and freeze, drinking potions, aiming, thrown bombs, damage, knockouts, damage numbers for nearby players. | both | fully: time and seeded random are passed in (replay tests) | 123 |
 | `@pvp/shop-catalog` | Turns the rules and an account into the cards the shop screen shows. | both | fully: pure functions of their inputs | 12 |
 | `@pvp/hud-model` | Turns your inventory and health into the in-game HUD: Durability bar of the held weapon, H.P bar, 5 slots, shield pill, potion button with drinking ring, "Charging 1.4s" after a shot, damage numbers above heads, aiming (zoom, scope ring, AIM / AIM ON button), bomb buttons, the coin icon from the boss's drawing. | both | fully: pure functions of their inputs (time passed in) | 39 |
-| `@pvp/api-client` | Talks to the server's account and shop API (and rename) and keeps the login token. | both | fully: fetch and storage are passed in | 11 |
+| `@pvp/api-client` | Talks to the server's account and shop API (and rename), keeps the login token and the last name used. | both | fully: fetch and storage are passed in | 12 |
+| `@pvp/account-form` | Checks the Account screen: log in, and create an account with the password typed twice ("The passwords are not the same. Try again."). | both | fully: pure functions of the typed text | 6 |
 | `@pvp/stickman-3d` | A three.js stickman with skins, outfits, the boss's weapons and shields, the Healing Potion flask, bombs and their red area, frozen/shocked looks and animation. | browser (pose math also in Node) | partly: pose math is pure, how it looks depends on the renderer | 27 |
 | `@pvp/island-scene` | The 3D island: sky with clouds, warm sun, green grass ground with dirt paths, grass tufts, flowers, bushes, rocks, beach with wet sand, waves, palms, ruins and chests, and gold coins popping out of opened chests. A lighter version for phones. | browser (also builds in Node) | partly: all placement and colors from a seed, time passed in, how it looks depends on the renderer | 19 |
 | `@pvp/local-server` | The game server inside the page (practice mode): arena, accounts in localStorage, tick, fake WebSocket, bots. | browser (also Node) | partly: seeded arena and bots, time and timer passed in; tokens and localStorage are real | 16 |
@@ -268,7 +270,7 @@ graph LR
 
 ## `@pvp/api-client`
 
-**Purpose:** talks to the server's account and shop API (sign up, log in, me, buy, equip) and remembers the login token, with friendly error messages.
+**Purpose:** talks to the server's account and shop API (sign up, log in, me, buy, equip, rename) and remembers the login token (and the last name used on this device, to pre-fill the Account screen; never the password), with friendly error messages.
 
 | Export | Example |
 |---|---|
@@ -276,11 +278,26 @@ graph LR
 | `api.signup` / `api.login` | `const { account } = await api.login('Bob', 'secret');` |
 | `api.me` | `const { account, online } = await api.me();` |
 | `api.buy` / `api.equip` | `await api.buy('hat', 'crown');` |
+| `api.rename` | `await api.rename('Boss_Kid'); // a refused name throws with the kid-friendly message` |
+| `api.lastName` | `nameBox.value = api.lastName; // '' if nobody logged in here yet` |
 | `ApiError` | `catch (e) { show(e.message); /* e.status 0 = no connection */ }` |
 | `safeStorage(storage)` | `const s = safeStorage(localStorage); s.set('k', 'v');` |
 
 **Depends on:** nothing.
 **Determinism:** fully. No randomness and no clock; `fetch` and storage are passed in, so tests use fakes.
+
+## `@pvp/account-form`
+
+**Purpose:** checks the two parts of the Account screen (issue #46) before asking the server: "Log in" (name + password) and "Create an account" (name + password + the same password again). Says which box the message belongs to.
+
+| Export | Example |
+|---|---|
+| `checkSignupForm(form)` | `checkSignupForm({ name, password, repeat }); // { ok: false, field: 'repeat', reason: 'passwords-different', message: 'The passwords are not the same. Try again.' }` |
+| `checkLoginForm(form)` | `checkLoginForm({ name, password }); // { ok: true, name, password } (name trimmed)` |
+| `MIN_PASSWORD` / `PASSWORDS_DIFFERENT_MESSAGE` | `4` / `'The passwords are not the same. Try again.'` |
+
+**Depends on:** `@pvp/name-filter` (bad and wrong names get the same messages as on the server).
+**Determinism:** fully. Pure functions of the typed text.
 
 ## `@pvp/stickman-3d`
 
@@ -331,7 +348,7 @@ graph LR
 | Export | Example |
 |---|---|
 | `createLocalServer(opts)` | `const server = createLocalServer({ seed: 'abc', storage: localStorage, bots: 3 });` |
-| `server.createApi()` / `server.ensurePlayer()` | `const api = server.createApi(); server.ensurePlayer(); // a local player, no login` |
+| `server.createApi()` / `server.ensurePlayer()` | `const api = server.createApi(); server.ensurePlayer(); // optional local player (the practice page shows the Account screen instead)` |
 | `server.connect(token)` | `const ws = server.connect(api.token); ws.onmessage = e => ...; ws.send(text);` |
 | `server.rename` / `server.teleport` | `server.rename(api.token, 'Boss_Kid'); // or api.rename('Boss_Kid') (/api/rename)` |
 | `server.tick(now)` | `createLocalServer({ autoStart: false, now }); server.tick(); // tests` |

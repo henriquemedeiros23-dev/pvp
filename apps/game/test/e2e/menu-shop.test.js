@@ -111,16 +111,18 @@ async function newPage(contextOptions) {
   return { context, page: p, errors: errs };
 }
 
-// Sign up through the API and log the page in with the saved token.
+// Sign up through the API and log in through the Account screen (#46: it always comes first).
 async function signedIn(p, prefix) {
   const name = prefix + Date.now().toString(36).slice(-7);
   const res = await fetch(`http://127.0.0.1:${port}/api/signup`, {
     method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name, password: 'secret1' }),
   });
   assert.equal(res.status, 200);
-  const { token } = await res.json();
-  await p.addInitScript(t => localStorage.setItem('pvp.token', t), token);
   await p.goto(`http://127.0.0.1:${port}/?debug=1`);
+  await p.locator('#login').waitFor({ state: 'visible', timeout: 60000 });
+  await p.fill('#loginName', name);
+  await p.fill('#loginPass', 'secret1');
+  await p.click('#btnLogin');
   await p.locator('#menu').waitFor({ state: 'visible', timeout: 60000 });
   return name;
 }
@@ -192,8 +194,9 @@ test('sign up, shop, join the arena, leave: no errors', { skip: !RUN && 'set E2E
 
   // sign up
   const name = 'e2e_' + Date.now().toString(36).slice(-8);
-  await page.fill('#loginName', name);
-  await page.fill('#loginPass', 'secret1');
+  await page.fill('#signupName', name);
+  await page.fill('#signupPass', 'secret1');
+  await page.fill('#signupPass2', 'secret1');
   await page.click('#btnSignup');
   await page.locator('#menu').waitFor({ state: 'visible' });
   assert.equal(await page.textContent('#menuName'), name);
@@ -290,8 +293,13 @@ test('sign up, shop, join the arena, leave: no errors', { skip: !RUN && 'set E2E
   await page.click('#btnLogin');
   await page.locator('#menu').waitFor({ state: 'visible' });
 
-  // reload: the saved token logs in automatically
+  // reload: the Account screen again (#46), the name is filled in, the password is not
   await page.reload();
+  await page.locator('#login').waitFor({ state: 'visible' });
+  assert.equal(await page.inputValue('#loginName'), name);
+  assert.equal(await page.inputValue('#loginPass'), '');
+  await page.fill('#loginPass', 'secret1');
+  await page.click('#btnLogin');
   await page.locator('#menu').waitFor({ state: 'visible' });
   assert.equal(await page.textContent('#menuName'), name);
 

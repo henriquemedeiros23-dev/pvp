@@ -14,7 +14,7 @@ import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { generateIsland } from '@pvp/world-gen';
 import { circleHitsBox } from '@pvp/collision';
-import { RUN, SKIP, startServer, launchBrowser, newPage, signedIn, debug, waitDebug } from './helpers.js';
+import { RUN, SKIP, startServer, launchBrowser, newPage, signedIn, debug, waitDebug, signUpForm } from './helpers.js';
 
 let server, browser;
 const island = generateIsland(); // the same island the server and the game use
@@ -79,9 +79,7 @@ test('play: sign up, join, open a chest, pick up the loot, leave', { skip: SKIP,
     await page.goto(`${server.url}/?debug=1`);
     await page.locator('#login').waitFor({ state: 'visible' });
     const name = 'play_' + Date.now().toString(36).slice(-7);
-    await page.fill('#loginName', name);
-    await page.fill('#loginPass', 'secret1');
-    await page.click('#btnSignup');
+    await signUpForm(page, name); // "Create an account": the password twice (#46)
     await page.locator('#menu').waitFor({ state: 'visible' });
     assert.equal(await page.textContent('#menuCoins'), '0');
 

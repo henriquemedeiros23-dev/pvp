@@ -39,7 +39,7 @@ function defaultRandomBytes(fallback) {
  * @param {object} [o]
  * @param {string|number} [o.seed='practice']  seed for the arena (loot, spawns, gun spread) and the bots
  * @param {object} [o.storage]   localStorage-like; accounts and the token are kept there (memory if missing or blocked)
- * @param {string} [o.storagePrefix='pvp.practice']  storage keys: <prefix>.accounts and <prefix>.token
+ * @param {string} [o.storagePrefix='pvp.practice']  storage keys: <prefix>.accounts, <prefix>.token and <prefix>.lastName
  * @param {Function} [o.now]     clock in ms (default Date.now)
  * @param {object} [o.timer]     { setInterval, clearInterval } for the tick (default the global ones)
  * @param {boolean} [o.autoStart=true]  start the 50 ms tick right away (tests: false, then call tick(now))
@@ -282,7 +282,7 @@ export function createLocalServer({
     fetch: fetchFn,
     connect,
     /** An @pvp/api-client that talks to this server (token kept in <storagePrefix>.token). */
-    createApi: () => createApiClient({ fetch: fetchFn, storage: tokenStorage, tokenKey }),
+    createApi: () => createApiClient({ fetch: fetchFn, storage: tokenStorage, tokenKey, lastNameKey: `${storagePrefix}.lastName` }),
     /**
      * Make sure someone is logged in, right now (no waiting): keeps a saved, working token, or signs up
      * a new local player 'Player_1234' (random password: practice accounts never leave the page).

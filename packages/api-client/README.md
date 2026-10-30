@@ -16,7 +16,8 @@ const { account: me, online } = await api.me();
 await api.buy('hat', 'crown');       // kind: 'color' | 'hat' | 'face' | 'back' | 'shirt' | 'weapon'
 await api.equip('hat', 'crown');     // each resolves { account }
 await api.rename('Boss_Kid');        // { account }; a refused name throws with a kid-friendly message
-api.logout();                         // forgets the token on this device
+api.lastName;                         // the last name used on this device ('' if none): pre-fill the log in box
+api.logout();                         // forgets the token on this device (the last name stays; never the password)
 
 try { await api.buy('weapon', 'icesword'); }
 catch (e) { showError(e.message); }   // ApiError: e.message is friendly, e.status is the HTTP status (0 = no connection)

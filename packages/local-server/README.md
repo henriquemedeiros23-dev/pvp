@@ -16,8 +16,9 @@ import { createLocalServer } from '@pvp/local-server';
 const server = createLocalServer({ seed: 'abc', storage: localStorage, bots: 3 });
 // options: now (clock), timer ({ setInterval, clearInterval }), autoStart, defer, randomBytes, island, storagePrefix
 
-const api = server.createApi();          // an @pvp/api-client: signup/login/me/buy/equip, token in storage
-server.ensurePlayer();                   // no login screen: a local 'Player_1234' right away (kept on reload)
+const api = server.createApi();          // an @pvp/api-client: signup/login/me/buy/equip/rename, token and lastName in storage
+server.ensurePlayer();                   // optional: a local 'Player_1234' right away, no log in (kept on reload).
+                                         // The practice page does not use it: it shows the Account screen (#46).
 const ws = server.connect(api.token);    // like new WebSocket(url): send, close, readyState, onopen/onmessage/onclose
 ws.onopen = () => ws.send(encodeClient('join'));
 ws.onmessage = e => decodeServerMessage(e.data);

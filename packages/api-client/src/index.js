@@ -2,6 +2,7 @@
 // Plain ES module with no dependencies: works in Node and directly in the browser.
 
 export const TOKEN_KEY = 'pvp.token';
+export const LAST_NAME_KEY = 'pvp.lastName'; // the last name used on this device (#46: pre-filled, never the password)
 
 const FRIENDLY = {
   network: "Can't reach the server. Check your internet and try again.",
@@ -48,8 +49,9 @@ export function safeStorage(storage) {
  * @param {Function} [options.fetch] a fetch function (defaults to the global fetch)
  * @param {object} [options.storage] localStorage-like object where the token is kept (optional)
  * @param {string} [options.tokenKey] storage key for the token
+ * @param {string} [options.lastNameKey] storage key for the last name used on this device
  */
-export function createApiClient({ baseUrl = '', fetch: fetchFn, storage, tokenKey = TOKEN_KEY } = {}) {
+export function createApiClient({ baseUrl = '', fetch: fetchFn, storage, tokenKey = TOKEN_KEY, lastNameKey = LAST_NAME_KEY } = {}) {
   const store = safeStorage(storage);
   // Call the global fetch through a wrapper so it is never called with the wrong `this`.
   const doFetch = fetchFn || ((...args) => globalThis.fetch(...args));
@@ -86,7 +88,12 @@ export function createApiClient({ baseUrl = '', fetch: fetchFn, storage, tokenKe
     const data = await post(path, { name: String(name ?? '').trim(), password: String(password ?? '') }, false);
     if (typeof data.token !== 'string' || !data.account) throw new ApiError(FRIENDLY.badAnswer, 200);
     store.set(tokenKey, data.token);
+    rememberName(data.account);
     return data;
+  }
+
+  function rememberName(account) {
+    if (account && typeof account.name === 'string') store.set(lastNameKey, account.name);
   }
 
   return {
@@ -105,8 +112,14 @@ export function createApiClient({ baseUrl = '', fetch: fetchFn, storage, tokenKe
     /** Wear a skin item you own. Resolves { account }. */
     equip: (kind, id) => post('/api/equip', { kind, id }, true),
     /** Change your name (#41). The server checks it (no bad words, nobody has it). Resolves { account }. */
-    rename: name => post('/api/rename', { name: String(name ?? '').trim() }, true),
-    /** Forget the token on this device (no server call). */
+    async rename(name) {
+      const data = await post('/api/rename', { name: String(name ?? '').trim() }, true);
+      rememberName(data.account);
+      return data;
+    },
+    /** The name of the last account that logged in (or signed up, or renamed) on this device, or ''. Kept after logout. */
+    get lastName() { return store.get(lastNameKey) || ''; },
+    /** Forget the token on this device (no server call). The last name stays. */
     logout() { store.remove(tokenKey); },
   };
 }
