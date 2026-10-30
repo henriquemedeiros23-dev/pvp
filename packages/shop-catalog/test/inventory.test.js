@@ -169,3 +169,22 @@ test('other rules: a 3-slot bar, 1 space minimum', () => {
   const cards = inventoryCards(account({ stash: { gun: 1 } }), RULES, { minSpaces: 1 });
   assert.equal(cards.length, inventoryItemKinds().length);
 });
+
+test('durability (#51): worn copies show their uses left, full ones first; bar and extras too', () => {
+  const acc = account({
+    stash: { icesword: 3, shootbm: 1 }, wear: { icesword: [5, 30], shootbm: [99], nope: [1] },
+    bar: [{ kind: 'weapon', id: 'dmgun', n: 1, dur: 6 }, { kind: 'weapon', id: 'gun', n: 1 }, null, null, null],
+    extras: { ...EMPTY_EXTRAS, shield: { kind: 'weapon', id: 'shield', n: 1, dur: 15 } },
+  });
+  const ice = inventoryCards(acc).filter(c => c.id === 'icesword');
+  assert.deepEqual(ice.map(c => c.dur), [null, 30, 5], 'full first, then the worn ones, best first');
+  assert.deepEqual(ice.map(c => c.durability.label), ['50', '30', '5']);
+  assert.deepEqual(ice[2].durability, { uses: 5, max: 50, percent: 10, label: '5' });
+  const sb = inventoryCards(acc).find(c => c.id === 'shootbm' && c.filled);
+  assert.equal(sb.dur, null, 'a bad saved value is full');
+  const slots = barSlots(acc);
+  assert.deepEqual(slots[0].durability, { uses: 6, max: 30, percent: 20, label: '6' });
+  assert.equal(slots[1].durability.percent, 100);
+  assert.deepEqual(extrasSlots(acc)[0].durability, { uses: 15, max: 60, percent: 25, label: '15' });
+  assert.equal(inventoryCards(acc).find(c => c.id === 'potion').dur, null);
+});

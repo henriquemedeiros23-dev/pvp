@@ -222,11 +222,24 @@ test('chest loot starts full', () => {
   assert.equal(item.dur, RULES.WEAPONS[item.weapon].durability);
 });
 
-test('leaving alive returns worn weapons as plain ids (full again next join)', () => {
+test('leaving alive returns worn weapons with their uses left; joining with them keeps the durability (#51)', () => {
   const { arena, id } = holder('shootbm');
   arena.fire(id, [0, 0, 1], READY);
+  const max = RULES.WEAPONS.shootbm.durability;
   const back = arena.leave(id, { alive: true });
-  assert.deepEqual(back, ['shootbm']);
-  const again = arena.join('a', { loadout: back }).id;
-  assert.equal(durOf(arena, again)[1], RULES.WEAPONS.shootbm.durability);
+  assert.deepEqual(back, [{ id: 'shootbm', dur: max - 1 }]);
+  const r = arena.join('a', { loadout: back });
+  assert.equal(durOf(arena, r.id)[1], max - 1, 'not full again');
+  assert.equal(r.weapons[0], back[0], 'taken: the same entry that was given');
+  // a plain id is full; bad durs are full; too high is capped
+  const s = arena.join('b', { loadout: ['shootbm', { id: 'shootbm', dur: -3 }, { id: 'shootbm', dur: 999 }, { id: 'nope', dur: 1 }, { dur: 2 }] });
+  assert.deepEqual(durOf(arena, s.id).slice(1), [max, max, max]);
+  assert.equal(s.weapons.length, 3);
+  // shields too
+  const sh = arena.join('c', { loadout: [{ id: 'megashield', dur: 12 }] });
+  assert.deepEqual(arena.getPlayer(sh.id).shield, { id: 'megashield', dur: 12 });
+  assert.deepEqual(arena.leave(sh.id, { alive: true }), [{ id: 'megashield', dur: 12 }]);
+  // full ones come back as plain ids
+  const f = arena.join('d', { loadout: ['icesword', { id: 'shield', dur: RULES.WEAPONS.shield.durability }] });
+  assert.deepEqual(arena.leave(f.id, { alive: true }), ['icesword', 'shield']);
 });

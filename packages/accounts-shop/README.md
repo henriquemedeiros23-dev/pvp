@@ -44,6 +44,10 @@ arena.join(key, { loadout, potions, bombs, starter, ... });         // starter: 
                                                                     // (then the free starting Gun comes)
 accounts.returnFromArena(acc, { weapons, potions, bombs });         // left alive (or not taken by the arena):
                                                                     // back into the same bar slots, loot into the Inventory
+// Durability (#51): a worn weapon keeps its uses left. weapons may hold { id, dur } (what arena.leave gives);
+// bar entries then have `dur`, the loadout gives { id, dur } back to arena.join, and in the Inventory
+// account.wear = { icesword: [30, 10] } lists the worn copies (best first; the other copies are full).
+accounts.toBar(acc, 'weapon', 'icesword', { dur: 10 });             // move that worn copy (default: a full one)
 // knocked out: just don't call returnFromArena, the bar's things are lost; the Inventory never is
 
 accounts.rename(acc, 'New_Name');        // same name rules as sign up; tokens stay logged in

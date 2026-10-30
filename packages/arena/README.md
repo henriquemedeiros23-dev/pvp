@@ -40,7 +40,7 @@ arena.drink(id, now);                               // start drinking a Healing 
 arena.throwBomb(id, 'bomb', [dx, dy, dz], now);     // throw a bomb (#32): returns its id or null
 arena.setCoins(id, account.coins);                  // the account's coins changed (shop): queues an 'inv'
 const { potions, bombs } = arena.getPlayer(id);    // unused potions and bombs go back to the backpack too
-const back = arena.leave(id, { alive: true });      // weapons to put back in the backpack ([] if not alive)
+const back = arena.leave(id, { alive: true });      // weapons to put back: 'icesword' (full) or { id, dur } (worn, #51); [] if not alive
 
 setInterval(() => {
   arena.tick(Date.now());                           // potions, chests, golden chest, items, shock damage, snaps
@@ -142,9 +142,10 @@ setInterval(() => {
   do not stop it. Switching to another slot before that cancels it (`state: 'cancel'`): the potion is wasted.
   Leaving or being knocked out also ends it (that potion is gone). **Decisions:** drinking is refused at full health,
   with no potion or while already drinking; you cannot fire while drinking (switch slots to stop).
-- **Decision (the boss can change it):** `leave(id, { alive: true })` returns plain weapon ids (not the free
-  starting Gun from `join`), so weapons put back in the backpack are **full again** next time. Broken weapons are gone for good (they were taken out of
-  the backpack at `join` and are not returned).
+- **Durability is kept (#51):** `leave(id, { alive: true })` returns every carried weapon (not the free starting Gun
+  from `join`): a full one as its id, a worn one as `{ id, dur }` (uses left). A `join` loadout entry may be the same
+  `{ id, dur }`: the weapon (or shield) starts with those uses left, so going to the menu and back never makes a
+  weapon full again. Broken weapons are gone for good (they were taken out of the backpack at `join` and are not returned).
 - **Coins:** the account (e.g. `@pvp/accounts-shop`) is the single source of truth. The arena only keeps a copy
   (from `join`) for the 'coins' and 'inv' messages, and only chests add to it. Whenever the coins change outside
   the arena (a shop buy, maybe from another device during a match), the host calls

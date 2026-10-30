@@ -88,6 +88,8 @@ Decided by the boss through 22 questions.
   When you leave alive, every weapon except the free Gun goes back into your fast bar (or the Inventory).
 - **Durability:** every weapon wears out a little each time you use it: each shot, each sword hit on a player or a
   raised shield (a swing that hits only air costs nothing, #34), and a shield each time it blocks.
+  Going to the menu does **not** repair anything (#51): a worn weapon or shield keeps its uses left in your bars and
+  Inventory (a small bar under it shows how much), and comes back into the arena just as worn.
 - **Drop weapon (#34):** press **G** (computer) or the small **⬇️** button next to the slots (phone) to drop the weapon
   in your hand. It keeps exactly the durability it has, and anyone can pick it up (you too, after stepping away).
   The free Gun can be dropped too.

@@ -181,6 +181,39 @@ test('the fast bar (#39): only the bar comes into the arena; the Inventory stays
   assert.deepEqual(c2.of('inv')[0].weapons, ['gun']);
 });
 
+test('durability (#51): shoot, go to the menu, join again: the weapon keeps its uses left', async () => {
+  const { server, run } = setup();
+  const api = server.createApi();
+  const { token } = await api.signup('Wear_1', 'secret');
+  server.accounts.addCoins(server.accounts.byToken(token), 100);
+  await api.buy('weapon', 'shootbm');
+  await api.buy('weapon', 'shield');
+  await api.toBar('weapon', 'shootbm');
+  await api.toBar('weapon', 'shield');
+  const c = await open(server, token);
+  c.send('join');
+  await settle();
+  const max = c.of('inv')[0].dur[0];
+  await run(3200); // spawn protection over
+  for (let i = 0; i < 3; i++) { c.send('fire', { d: [0, 1, 0] }); await run(3000); }
+  const before = c.of('inv').at(-1).dur[0];
+  assert.equal(before, max - 3, '3 shots');
+  c.send('leave');
+  await settle();
+  const acc = (await api.me()).account;
+  assert.deepEqual(acc.bar[0], { kind: 'weapon', id: 'shootbm', n: 1, dur: before }, 'saved worn');
+  assert.deepEqual(acc.extras.shield, { kind: 'weapon', id: 'shield', n: 1 }, 'an unused shield is full');
+  // into the Inventory and back: still worn
+  await api.fromBar(0);
+  assert.deepEqual((await api.me()).account.wear, { shootbm: [before] });
+  await api.toBar('weapon', 'shootbm');
+  const c2 = await open(server, token);
+  c2.send('join');
+  await settle();
+  assert.deepEqual(c2.of('inv')[0].weapons, ['shootbm']);
+  assert.equal(c2.of('inv')[0].dur[0], before, 'not full again');
+});
+
 test('rename: changes the name, but not while in the arena', async () => {
   const { server } = setup();
   const api = server.createApi();

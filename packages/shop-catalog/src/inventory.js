@@ -91,10 +91,21 @@ export function extrasSpaceFor(kind, id, rules = RULES) {
   return s ? s.space : null;
 }
 
-// Durability shown for a weapon in a space or slot: the Inventory keeps no wear, so it is always full.
-const durabilityOf = look => (look.kind === 'weapon'
-  ? { uses: look.maxDurability, max: look.maxDurability, percent: 100, label: look.maxDurability == null ? '∞' : String(look.maxDurability) }
-  : null);
+// Durability shown for a weapon in a space or slot: its uses left (#51: worn weapons stay worn; dur left out = full).
+const durabilityOf = (look, dur) => {
+  if (look.kind !== 'weapon') return null;
+  const max = look.maxDurability;
+  if (max == null) return { uses: null, max: null, percent: 100, label: '∞' };
+  const uses = isPosInt(dur) && dur < max ? dur : max;
+  return { uses, max, percent: Math.round((uses / max) * 100), label: String(uses) };
+};
+
+// The uses left of each weapon copy in the Inventory, full ones first, then the worn ones (account.wear, best first).
+function copiesOf(account, id, owned, max) {
+  const list = own(account?.wear, id);
+  const worn = (Array.isArray(list) ? list : []).filter(d => isPosInt(d) && max != null && d < max).sort((a, b) => b - a).slice(0, owned);
+  return [...Array.from({ length: owned - worn.length }, () => null), ...worn];
+}
 
 /**
  * The Inventory grid: one card per SPACE. Every item kind gets at least MIN_SPACES (2) spaces, filled or
@@ -104,7 +115,8 @@ const durabilityOf = look => (look.kind === 'weapon'
  * Card: { key, kind, id, name, icon | iconSvg, rarity, rarityName, rarityColor, rarityBackground, isShield,
  *   filled, ghost, count (in this space, 0 for a ghost), label ('×3' for a stack, '' otherwise),
  *   owned (all of this item in the Inventory), inBar (how many are in the bar), durability ({ uses, max,
- *   percent, label } for a filled weapon space, else null), first (first space of its kind),
+ *   percent, label } for a filled weapon space, else null), dur (a worn weapon copy's uses left, to send with
+ *   toBar so this exact copy moves, #51; null when full or not a weapon), first (first space of its kind),
  *   place ('bar' for hand weapons, 'extras' for a shield, potions and bombs: where a tap puts it),
  *   action ('toBar' / 'toExtras' when filled, else null) }.
  * inBar counts both bars (the fast bar and the extras bar).
@@ -120,15 +132,17 @@ export function inventoryCards(account, rules = RULES, { minSpaces = MIN_SPACES 
     const place = isHandWeapon(kind, id, rules) ? 'bar' : 'extras';
     const inBar = carried.reduce((sum, e) => sum + (e && e.kind === kind && e.id === id ? e.n : 0), 0);
     const spaces = Math.max(minSpaces, Math.ceil(owned / size));
+    const copies = kind === 'weapon' ? copiesOf(account, id, owned, look.maxDurability) : [];
     let left = owned;
     for (let i = 0; i < spaces; i++) {
       const count = Math.min(size, left);
       left -= count;
       const filled = count > 0;
+      const dur = filled && kind === 'weapon' ? copies[i] : null;
       cards.push({
         key: `${kind}:${id}:${i}`, ...look, filled, ghost: !filled, count,
         label: filled && size > 1 ? `×${count}` : '',
-        owned, inBar, durability: filled ? durabilityOf(look) : null, first: i === 0,
+        owned, inBar, durability: filled ? durabilityOf(look, dur) : null, dur: dur ?? null, first: i === 0,
         place, action: filled ? (place === 'bar' ? 'toBar' : 'toExtras') : null,
       });
     }
@@ -148,7 +162,7 @@ export function barSlots(account, rules = RULES) {
     if (!look) return { index, key: String(index + 1), empty: true, kind: null, id: null, name: '', count: 0, label: '', durability: null, action: null };
     return {
       index, key: String(index + 1), empty: false, ...look, count: e.n,
-      label: spaceSize(e.kind, e.id, rules) > 1 ? `×${e.n}` : '', durability: durabilityOf(look), action: 'fromBar',
+      label: spaceSize(e.kind, e.id, rules) > 1 ? `×${e.n}` : '', durability: durabilityOf(look, e.dur), action: 'fromBar',
     };
   });
 }
@@ -186,7 +200,7 @@ export function extrasSlots(account, rules = RULES) {
     const count = Math.min(s.entry.n, s.max);
     return {
       ...base, ...look, empty: false, count, fill: s.max > 1 ? `${count}/${s.max}` : '',
-      label: s.max > 1 ? `×${count}` : '', durability: durabilityOf(look), action: 'fromExtras',
+      label: s.max > 1 ? `×${count}` : '', durability: durabilityOf(look, s.entry.dur), action: 'fromExtras',
     };
   });
 }

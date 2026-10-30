@@ -340,3 +340,78 @@ test('a smaller MAX_SLOTS makes a smaller bar', () => {
   rejects(() => accounts.toBar(account, 'weapon', 'gun'), 'BAR_FULL');
   assert.equal(accounts.publicView(account).bar.length, 2);
 });
+
+// #51: weapons keep their durability when you leave the arena and come back.
+const WD = (id, dur) => ({ kind: 'weapon', id, n: 1, dur });
+
+test('durability (#51): a worn weapon comes back worn, and joins again with the same uses left', () => {
+  const { accounts, account } = rich();
+  for (const id of ['shootbm', 'megashield']) accounts.buy(account, 'weapon', id);
+  accounts.toBar(account, 'weapon', 'shootbm');
+  accounts.toBar(account, 'weapon', 'megashield');
+  assert.deepEqual(accounts.takeBar(account).loadout, ['shootbm', 'megashield'], 'full: plain ids');
+  // the arena gives back worn weapons as { id, dur }
+  let v = accounts.returnFromArena(account, { weapons: [{ id: 'shootbm', dur: 17 }, { id: 'megashield', dur: 40 }] });
+  assert.deepEqual(v.bar[0], WD('shootbm', 17));
+  assert.deepEqual(v.extras.shield, WD('megashield', 40));
+  assert.deepEqual(accounts.takeBar(account).loadout, [{ id: 'shootbm', dur: 17 }, { id: 'megashield', dur: 40 }]);
+  // full durability, a bad dur or too high: full (no dur)
+  v = accounts.returnFromArena(account, { weapons: [{ id: 'shootbm', dur: 20 }, { id: 'megashield', dur: -1 }] });
+  assert.deepEqual([v.bar[0], v.extras.shield], [W('shootbm'), W('megashield')]);
+});
+
+test('durability (#51): the Inventory keeps worn copies; the fullest goes first, or the one asked for (dur)', () => {
+  const { accounts, account } = rich();
+  for (let i = 0; i < 3; i++) accounts.buy(account, 'weapon', 'icesword');
+  accounts.takeBar(account);
+  // loot: two worn Ice Swords into the Inventory (refill: false)
+  let v = accounts.returnFromArena(account, { weapons: [{ id: 'icesword', dur: 10 }, { id: 'icesword', dur: 30 }] }, { refill: false });
+  assert.deepEqual(v.stash, { icesword: 5 });
+  assert.deepEqual(v.wear, { icesword: [30, 10] }, 'best first; the other 3 are full');
+  v = accounts.toBar(account, 'weapon', 'icesword');
+  assert.deepEqual(v.bar[0], W('icesword'), 'a full copy first');
+  v = accounts.toBar(account, 'weapon', 'icesword', { dur: 10 });
+  assert.deepEqual(v.bar[1], WD('icesword', 10), 'the copy asked for');
+  assert.deepEqual(v.wear, { icesword: [30] });
+  v = accounts.fromBar(account, 1);
+  assert.deepEqual(v.wear, { icesword: [30, 10] }, 'back into the Inventory, still worn');
+  v = accounts.toBar(account, 'weapon', 'icesword', { dur: 99 }); // not there: a full one
+  assert.deepEqual(v.bar[1], W('icesword'));
+  accounts.toBar(account, 'weapon', 'icesword');
+  v = accounts.toBar(account, 'weapon', 'icesword'); // no full copies left: the best worn one
+  assert.deepEqual(v.bar[3], WD('icesword', 30));
+  v = accounts.toBar(account, 'weapon', 'icesword');
+  assert.deepEqual(v.bar[4], WD('icesword', 10));
+  assert.deepEqual([v.stash, v.wear], [{}, {}]);
+});
+
+test('durability (#51): saved and loaded; bad saved wear is cleaned; old saves are full', async () => {
+  const store = createMemoryStore();
+  const { accounts, account } = rich({ store });
+  accounts.buy(account, 'weapon', 'dmgun');
+  accounts.buy(account, 'weapon', 'dmgun');
+  accounts.returnFromArena(account, { weapons: [{ id: 'dmgun', dur: 3 }, { id: 'shield', dur: 5 }] }, { refill: false });
+  accounts.toBar(account, 'weapon', 'dmgun', { dur: 3, slot: 2 });
+  await accounts.flush();
+  const data = store.load();
+  const again = createAccounts({ store: createMemoryStore(JSON.parse(JSON.stringify(data))), now: fakeClock(), randomBytes: fakeRandom() });
+  const v = again.publicView(again.login('Bar_Kid', 'secret').account);
+  assert.deepEqual(v.bar[2], WD('dmgun', 3));
+  assert.deepEqual(v.wear, { shield: [5] });
+  assert.deepEqual(v.stash, { dmgun: 2, shield: 1 });
+  // broken saves
+  const rec = {
+    stash: { gun: 1, icesword: 2 }, potions: 0, bombs: {},
+    wear: { gun: [3, 3, 3], icesword: [0, 50, 'x', 20], pistol: [1], shootbm: [4] },
+    bar: [WD('supergun', 0), WD('supergun', 999), WD('supergun', 7)],
+    extras: { shield: WD('shield', 2.5) },
+  };
+  cleanBar(rec, gameRules);
+  assert.deepEqual(rec.wear, { gun: [3], icesword: [20] }, 'not more than the copies, only 1..max-1, known weapons');
+  assert.deepEqual(rec.bar, [W('supergun'), W('supergun'), WD('supergun', 7), null, null]);
+  assert.deepEqual(rec.extras.shield, W('shield'));
+  // old #50 saves without wear: all full
+  const old = { stash: { gun: 2 }, potions: 0, bombs: {}, bar: [W('gun'), null, null, null, null] };
+  cleanBar(old, gameRules);
+  assert.deepEqual(old.wear, {});
+});

@@ -10,6 +10,10 @@
 //   extras.potion          null or { kind: 'potion', id, n }      Healing Potions, n up to MAX_POTIONS (3)
 //   extras[bombId]         null or { kind: 'bomb', id, n }        that bomb, n up to its maxCarry (5 / 3)
 // Things in the bars are NOT in the Inventory any more (they were moved), so nothing is ever counted twice.
+//
+// Durability (#51): a worn weapon keeps the uses it has left. A weapon entry in a bar has `dur` when it is worn
+// (left out = full). In the Inventory, rec.stash[id] counts every copy and rec.wear[id] lists the uses left of
+// the WORN copies only (best first); the other copies are full. Old saves without wear: everything is full.
 import { extrasSpaces } from '@pvp/game-rules';
 
 /** A friendly error with a stable code (core.js turns it into an AccountError). */
@@ -66,6 +70,52 @@ export function stackMax(rules, kind, id) {
   return 0;
 }
 
+/** Full durability of a weapon (uses), or null (never breaks / unknown). */
+export function maxDur(rules, id) {
+  const d = weaponDef(rules, id)?.durability;
+  return isPosInt(d) ? d : null;
+}
+
+/** A worn weapon's uses left (a whole number from 1 to max - 1), or undefined (full, never breaks, or a bad value). */
+export function wornDur(rules, id, dur) {
+  const max = maxDur(rules, id);
+  return max != null && isPosInt(dur) && dur < max ? dur : undefined;
+}
+
+const weaponEntry = (rules, id, dur) => {
+  const d = wornDur(rules, id, dur);
+  return d === undefined ? { kind: 'weapon', id, n: 1 } : { kind: 'weapon', id, n: 1, dur: d };
+};
+
+// Worn copies of a weapon in the Inventory (best first), at most as many as there are copies.
+const wearList = (rec, id) => (rec.wear && Object.hasOwn(rec.wear, id) && Array.isArray(rec.wear[id]) ? rec.wear[id] : []);
+function addWear(rec, id, dur) {
+  rec.wear ??= {};
+  const list = [...wearList(rec, id), dur].sort((a, b) => b - a);
+  rec.wear[id] = list;
+}
+function removeWear(rec, id, i) {
+  const list = wearList(rec, id).filter((_, j) => j !== i);
+  if (list.length) rec.wear[id] = list; else if (rec.wear) delete rec.wear[id];
+}
+
+/**
+ * Make rec.wear safe (on load): known weapons that can break, whole numbers from 1 to max - 1, best first,
+ * no more than the copies in the stash.
+ */
+export function cleanWear(rec, rules) {
+  const old = rec.wear && typeof rec.wear === 'object' && !Array.isArray(rec.wear) ? rec.wear : {};
+  const wear = {};
+  for (const [id, list] of Object.entries(old)) {
+    if (!Array.isArray(list)) continue;
+    const ok = list.map(d => wornDur(rules, id, d)).filter(d => d !== undefined).sort((a, b) => b - a)
+      .slice(0, inventoryCount(rec, 'weapon', id));
+    if (ok.length) wear[id] = ok;
+  }
+  rec.wear = wear;
+  return wear;
+}
+
 /** How many of an item are in the Inventory (not counting the bars). */
 export function inventoryCount(rec, kind, id) {
   let n = 0;
@@ -75,21 +125,39 @@ export function inventoryCount(rec, kind, id) {
   return isPosInt(n) ? n : 0;
 }
 
-function inventoryAdd(rec, kind, id, n) {
+function inventoryAdd(rec, kind, id, n, dur) {
   if (!isPosInt(n)) return;
-  if (kind === 'weapon') rec.stash[id] = (rec.stash[id] || 0) + n;
+  if (kind === 'weapon') {
+    rec.stash[id] = (rec.stash[id] || 0) + n;
+    if (isPosInt(dur)) addWear(rec, id, dur); // only ever called with n = 1 for a worn copy
+  }
   else if (kind === 'potion') rec.potions = (rec.potions || 0) + n;
   else if (kind === 'bomb') rec.bombs[id] = (rec.bombs[id] || 0) + n;
 }
 
+// Take one weapon copy out of the Inventory: the one with these uses left (dur), else a full copy, else the best
+// worn one. Returns its uses left when worn, undefined when full.
+function takeWeaponCopy(rec, id, dur) {
+  const list = wearList(rec, id);
+  const count = inventoryCount(rec, 'weapon', id);
+  let i = isPosInt(dur) ? list.indexOf(dur) : -1;
+  if (i < 0 && count > list.length) i = -1; // a full copy
+  else if (i < 0) i = 0;
+  const got = i >= 0 ? list[i] : undefined;
+  if (i >= 0) removeWear(rec, id, i);
+  rec.stash[id] -= 1;
+  if (!rec.stash[id]) { delete rec.stash[id]; if (rec.wear) delete rec.wear[id]; }
+  return got;
+}
+
 function inventoryTake(rec, kind, id, n) {
-  if (kind === 'weapon') { rec.stash[id] -= n; if (!rec.stash[id]) delete rec.stash[id]; }
+  if (kind === 'weapon') { for (let i = 0; i < n; i++) takeWeaponCopy(rec, id); }
   else if (kind === 'potion') rec.potions -= n;
   else if (kind === 'bomb') rec.bombs[id] -= n;
 }
 
 const sameItem = (e, kind, id) => e != null && e.kind === kind && e.id === id;
-const copyEntry = e => (e ? { kind: e.kind, id: e.id, n: e.n } : null);
+const copyEntry = e => (e ? { kind: e.kind, id: e.id, n: e.n, ...(isPosInt(e.dur) ? { dur: e.dur } : {}) } : null);
 
 /** A copy of a fast bar (safe to send). */
 export const copyBar = bar => bar.map(copyEntry);
@@ -97,15 +165,18 @@ export const copyBar = bar => bar.map(copyEntry);
 /** A copy of an extras bar (safe to send). */
 export const copyExtras = extras => Object.fromEntries(Object.entries(extras ?? {}).map(([k, e]) => [k, copyEntry(e)]));
 
-// Put up to n of an item into its extras space (if it fits); returns how many did not fit.
-function fillSpace(rec, rules, kind, id, n) {
+/** A copy of the Inventory's worn weapons { id: [uses left, …] } (safe to send). */
+export const copyWear = wear => Object.fromEntries(Object.entries(wear ?? {}).map(([id, list]) => [id, [...list]]));
+
+// Put up to n of an item into its extras space (if it fits); returns how many did not fit. dur: a shield's uses left.
+function fillSpace(rec, rules, kind, id, n, dur) {
   const space = spaceOf(rules, kind, id);
   if (!space) return n;
   const cur = rec.extras[space];
   if (cur != null && !sameItem(cur, kind, id)) return n;
   const now = cur ? cur.n : 0;
   const k = Math.min(n, stackMax(rules, kind, id) - now);
-  if (k > 0) rec.extras[space] = { kind, id, n: now + k };
+  if (k > 0) rec.extras[space] = kind === 'weapon' ? weaponEntry(rules, id, dur) : { kind, id, n: now + k };
   return n - Math.max(0, k);
 }
 
@@ -118,6 +189,7 @@ function fillSpace(rec, rules, kind, id, n) {
 export function cleanBar(rec, rules) {
   const size = barSize(rules);
   const extra = [];
+  cleanWear(rec, rules);
   // the extras bar first (a saved one wins over old fast-bar items)
   const oldExtras = rec.extras && typeof rec.extras === 'object' && !Array.isArray(rec.extras) ? rec.extras : {};
   rec.extras = emptyExtras(rules);
@@ -128,8 +200,8 @@ export function cleanBar(rec, rules) {
     if (!max) continue;
     const n = isPosInt(e.n) ? e.n : (e.kind === 'weapon' ? 1 : 0);
     if (!n) continue;
-    const left = spaceOf(rules, e.kind, e.id) === s.space ? fillSpace(rec, rules, e.kind, e.id, n) : n;
-    if (left > 0) extra.push([e.kind, e.id, left]);
+    const left = spaceOf(rules, e.kind, e.id) === s.space ? fillSpace(rec, rules, e.kind, e.id, n, e.dur) : n;
+    if (left > 0) extra.push([e.kind, e.id, left, e.dur]);
   }
   // then the fast bar: hand weapons stay in their slot, extras move to their space
   const old = Array.isArray(rec.bar) ? rec.bar : [];
@@ -142,12 +214,15 @@ export function cleanBar(rec, rules) {
     let n = isPosInt(e.n) ? e.n : (kind === 'weapon' ? 1 : 0);
     if (!n) return;
     if (isHandWeapon(rules, kind, id)) {
-      if (i < size) { bar[i] = { kind, id, n: 1 }; n -= 1; }
-    } else n = fillSpace(rec, rules, kind, id, n);
-    if (n > 0) extra.push([kind, id, n]);
+      if (i < size) { bar[i] = weaponEntry(rules, id, e.dur); n -= 1; }
+    } else n = fillSpace(rec, rules, kind, id, n, e.dur);
+    if (n > 0) extra.push([kind, id, n, e.dur]);
   });
   rec.bar = bar;
-  for (const [kind, id, n] of extra) inventoryAdd(rec, kind, id, n);
+  for (const [kind, id, n, dur] of extra) {
+    if (kind === 'weapon') for (let k = 0; k < n; k++) inventoryAdd(rec, kind, id, 1, k === 0 ? wornDur(rules, id, dur) : undefined);
+    else inventoryAdd(rec, kind, id, n);
+  }
   // the remembered layouts (for refilling after a match): old extras plans move to lastExtras
   if (rec.lastBar !== undefined && !Array.isArray(rec.lastBar)) delete rec.lastBar;
   if (rec.lastExtras !== undefined && (!rec.lastExtras || typeof rec.lastExtras !== 'object' || Array.isArray(rec.lastExtras))) delete rec.lastExtras;
@@ -181,7 +256,7 @@ export function autoFillBar(rec, rules) {
   const hand = [];
   for (const id of weapons.filter(id => isHandWeapon(rules, 'weapon', id))) for (let i = 0; i < inventoryCount(rec, 'weapon', id); i++) hand.push(id);
   const bar = emptyBar(rules);
-  hand.slice(0, size).forEach((id, i) => { bar[i] = { kind: 'weapon', id, n: 1 }; inventoryTake(rec, 'weapon', id, 1); });
+  hand.slice(0, size).forEach((id, i) => { bar[i] = weaponEntry(rules, id, takeWeaponCopy(rec, id)); });
   rec.bar = bar;
   const shield = weapons.find(id => isShieldItem(rules, 'weapon', id));
   const extras = [];
@@ -193,6 +268,7 @@ export function autoFillBar(rec, rules) {
     const have = inventoryCount(rec, kind, id);
     if (!have || !spaceOf(rules, kind, id)) continue;
     const want = Math.min(have, stackMax(rules, kind, id));
+    if (kind === 'weapon') { fillSpace(rec, rules, kind, id, 1, takeWeaponCopy(rec, id)); continue; }
     const put = want - fillSpace(rec, rules, kind, id, want);
     if (put > 0) inventoryTake(rec, kind, id, put);
   }
@@ -206,13 +282,14 @@ function checkCount(n) {
 /**
  * Move an item from the Inventory into its bar: a hand weapon into the fast bar, a shield, potion or bomb
  * into its extras space (putInExtras). Hand weapons: opts.slot = the fast-bar slot (0-based; default the
- * first empty one). Returns the fast-bar slot (a number) or the extras space (a string).
+ * first empty one). Weapons and shields: opts.dur = which copy (the one with these uses left; default a full
+ * copy, else the best worn one, #51). Returns the fast-bar slot (a number) or the extras space (a string).
  * Throws BarError: UNKNOWN_ITEM, NOT_OWNED, BAD_SLOT, SLOT_TAKEN, BAR_FULL (and putInExtras' errors).
  */
 export function putInBar(rec, rules, kind, id, opts = {}) {
   if (!stackMax(rules, kind, id)) fail('UNKNOWN_ITEM', 'That item is not in the game');
   if (!isHandWeapon(rules, kind, id)) return putInExtras(rec, rules, kind, id, opts);
-  const { slot, n } = opts ?? {};
+  const { slot, n, dur } = opts ?? {};
   checkCount(n);
   if (inventoryCount(rec, kind, id) < 1) fail('NOT_OWNED', "You don't have that in your Inventory");
   const bar = rec.bar;
@@ -221,8 +298,7 @@ export function putInBar(rec, rules, kind, id, opts = {}) {
   let target = Number.isInteger(slot) ? slot : bar.findIndex(e => e == null);
   if (target < 0) fail('BAR_FULL', 'Your bar is full. Tap a bar slot to put it back first');
   if (bar[target] != null) fail('SLOT_TAKEN', 'That bar slot is taken. Tap it to empty it first');
-  inventoryTake(rec, kind, id, 1);
-  bar[target] = { kind, id, n: 1 };
+  bar[target] = weaponEntry(rules, id, takeWeaponCopy(rec, id, dur));
   return target;
 }
 
@@ -231,7 +307,7 @@ export function putInBar(rec, rules, kind, id, opts = {}) {
  * (default: as many as fit, so one tap fills the space). Returns the space ('shield', 'potion', a bomb id).
  * Throws BarError: UNKNOWN_ITEM, NOT_EXTRA (a hand weapon), NOT_OWNED, BAD_COUNT, ONE_SHIELD, STACK_FULL.
  */
-export function putInExtras(rec, rules, kind, id, { n } = {}) {
+export function putInExtras(rec, rules, kind, id, { n, dur } = {}) {
   const max = stackMax(rules, kind, id);
   if (!max) fail('UNKNOWN_ITEM', 'That item is not in the game');
   const space = spaceOf(rules, kind, id);
@@ -247,8 +323,11 @@ export function putInExtras(rec, rules, kind, id, { n } = {}) {
   const want = isPosInt(n) ? n : Math.min(have, room);
   if (want > have) fail('NOT_OWNED', `You only have ${have}`);
   if (want > room) fail('STACK_FULL', `Only ${max} fit in that space`);
-  inventoryTake(rec, kind, id, want);
-  rec.extras[space] = { kind, id, n: now + want };
+  if (kind === 'weapon') rec.extras[space] = weaponEntry(rules, id, takeWeaponCopy(rec, id, dur));
+  else {
+    inventoryTake(rec, kind, id, want);
+    rec.extras[space] = { kind, id, n: now + want };
+  }
   return space;
 }
 
@@ -259,7 +338,7 @@ export function takeFromBar(rec, slot) {
   const e = bar[slot];
   if (!e) fail('EMPTY_SLOT', 'That bar slot is empty');
   bar[slot] = null;
-  inventoryAdd(rec, e.kind, e.id, e.n);
+  inventoryAdd(rec, e.kind, e.id, e.n, e.dur);
   return e;
 }
 
@@ -269,7 +348,7 @@ export function takeFromExtras(rec, space) {
   const e = rec.extras[space];
   if (!e) fail('EMPTY_SLOT', 'That space is empty');
   rec.extras[space] = null;
-  inventoryAdd(rec, e.kind, e.id, e.n);
+  inventoryAdd(rec, e.kind, e.id, e.n, e.dur);
   return e;
 }
 
@@ -277,19 +356,21 @@ export function takeFromExtras(rec, space) {
  * Joining the arena: everything in the fast bar and the extras bar goes along, nothing else. Both are
  * emptied (the layouts are remembered in rec.lastBar / rec.lastExtras, so what survives can go back).
  * Returns { loadout, potions, bombs, starter }:
- *   loadout  weapon ids: the hand weapons in bar order, then the shield, for arena.join
+ *   loadout  the hand weapons in bar order, then the shield, for arena.join: a weapon id when full,
+ *            { id, dur } when worn (#51: it starts with the uses it had left)
  *   potions  how many Healing Potions; bombs { bombId: count } (every bomb of the rules)
  *   starter  true when the fast bar has no hand weapon: then the free starting Gun comes like before
  */
 export function takeBar(rec, rules) {
-  const hand = rec.bar.filter(e => e && isHandWeapon(rules, e.kind, e.id)).map(e => e.id);
+  const asLoadout = e => (isPosInt(e.dur) ? { id: e.id, dur: e.dur } : e.id);
+  const hand = rec.bar.filter(e => e && isHandWeapon(rules, e.kind, e.id)).map(asLoadout);
   const ex = rec.extras ?? {};
   let potions = 0;
   const bombs = Object.fromEntries(Object.keys(rules.BOMBS ?? {}).map(id => [id, 0]));
   const loadout = [...hand];
   for (const e of Object.values(ex)) {
     if (!e) continue;
-    if (e.kind === 'weapon') loadout.push(e.id);
+    if (e.kind === 'weapon') loadout.push(asLoadout(e));
     else if (e.kind === 'potion') potions += e.n;
     else if (e.kind === 'bomb') bombs[e.id] = (bombs[e.id] || 0) + e.n;
   }
@@ -304,36 +385,41 @@ export function takeBar(rec, rules) {
  * Back from the arena (left alive), or things the arena did not take: they go back into the fast-bar slots
  * and extras spaces they came from (when those are still empty: see rec.lastBar / rec.lastExtras), the rest
  * into the Inventory (loot from chests too).
- * items: { weapons: [ids], potions: n, bombs: { id: n } }; unknown ids and bad counts are ignored.
+ * items: { weapons: [id or { id, dur }], potions: n, bombs: { id: n } }; unknown ids and bad counts are ignored.
+ * A worn weapon ({ id, dur }) keeps its uses left (#51).
  * opts.refill = false puts everything into the Inventory.
  */
 export function returnToAccount(rec, rules, { weapons = [], potions = 0, bombs = {} } = {}, { refill = true } = {}) {
-  const left = [];
-  for (const id of Array.isArray(weapons) ? weapons : []) if (weaponDef(rules, id)) left.push(id);
+  const left = []; // [{ id, dur }]
+  for (const w of Array.isArray(weapons) ? weapons : []) {
+    const id = typeof w === 'string' ? w : w?.id;
+    if (weaponDef(rules, id)) left.push({ id, dur: wornDur(rules, id, typeof w === 'object' ? w.dur : undefined) });
+  }
   const pid = potionId(rules);
   let pots = pid && isPosInt(potions) ? potions : 0;
   const bombsLeft = {};
   for (const id of Object.keys(rules.BOMBS ?? {})) { const n = bombs?.[id]; bombsLeft[id] = isPosInt(n) ? n : 0; }
-  const takeWeapon = id => { const j = left.indexOf(id); if (j < 0) return 0; left.splice(j, 1); return 1; };
+  const takeWeapon = id => { const j = left.findIndex(w => w.id === id); return j < 0 ? null : left.splice(j, 1)[0]; };
 
   if (refill && Array.isArray(rec.lastBar)) {
     rec.lastBar.forEach((plan, i) => {
       if (!plan || i >= rec.bar.length || rec.bar[i] != null || !isHandWeapon(rules, plan.kind, plan.id)) return;
-      if (takeWeapon(plan.id)) rec.bar[i] = { kind: 'weapon', id: plan.id, n: 1 };
+      const w = takeWeapon(plan.id);
+      if (w) rec.bar[i] = weaponEntry(rules, w.id, w.dur);
     });
   }
   if (refill && rec.lastExtras && typeof rec.lastExtras === 'object') {
     for (const [space, plan] of Object.entries(rec.lastExtras)) {
       if (!plan || !Object.hasOwn(rec.extras, space) || rec.extras[space] != null || spaceOf(rules, plan.kind, plan.id) !== space) continue;
-      let n = 0;
+      let n = 0, dur;
       const cap = Math.min(isPosInt(plan.n) ? plan.n : 1, stackMax(rules, plan.kind, plan.id));
-      if (plan.kind === 'weapon') n = takeWeapon(plan.id);
+      if (plan.kind === 'weapon') { const w = takeWeapon(plan.id); if (w) { n = 1; dur = w.dur; } }
       else if (plan.kind === 'potion' && plan.id === pid) { n = Math.min(pots, cap); pots -= n; }
       else if (plan.kind === 'bomb' && Object.hasOwn(bombsLeft, plan.id)) { n = Math.min(bombsLeft[plan.id], cap); bombsLeft[plan.id] -= n; }
-      if (n > 0) rec.extras[space] = { kind: plan.kind, id: plan.id, n };
+      if (n > 0) rec.extras[space] = plan.kind === 'weapon' ? weaponEntry(rules, plan.id, dur) : { kind: plan.kind, id: plan.id, n };
     }
   }
-  for (const id of left) inventoryAdd(rec, 'weapon', id, 1);
+  for (const w of left) inventoryAdd(rec, 'weapon', w.id, 1, w.dur);
   if (pots) inventoryAdd(rec, 'potion', pid, pots);
   for (const [id, n] of Object.entries(bombsLeft)) inventoryAdd(rec, 'bomb', id, n);
 }

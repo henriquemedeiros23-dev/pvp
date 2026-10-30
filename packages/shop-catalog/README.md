@@ -44,7 +44,8 @@ inventorySummary(account);  // 'Inventory: 2× Shootbm, 1× Supersword, 2× Heal
 inventoryCards(account);
 // [{ key: 'weapon:shootbm:0', kind: 'weapon', id: 'shootbm', name: 'Shootbm', icon: '🎯', rarity: 'common',
 //    rarityName, rarityColor, rarityBackground, isShield: false, filled: true, ghost: false, count: 1, label: '',
-//    owned: 1, inBar: 0, durability: { uses: 20, max: 20, percent: 100, label: '20' }, first: true, place: 'bar', action: 'toBar' },
+//    owned: 1, inBar: 0, durability: { uses: 20, max: 20, percent: 100, label: '20' }, first: true, place: 'bar', action: 'toBar', dur: null },
+//  (a worn weapon copy, #51: durability shows its uses left and dur is sent with toBar so that copy moves)
 //  (a shield, potion or bomb card: place: 'extras', action: 'toExtras'; inBar counts both bars)
 //  { key: 'weapon:shootbm:1', …, filled: false, ghost: true, count: 0, action: null }, …
 //  { kind: 'potion', id: 'potion', iconSvg: '<svg…', count: 3, label: '×3', … }]

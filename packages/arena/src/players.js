@@ -39,16 +39,21 @@ export function join(A, key, { name, skin, loadout = [], coins = 0, potions = 0,
   // server's choice), copies of the same weapon too, as many as fit. Shields never take a slot:
   // the first shield in the loadout goes on the left arm, other shields are not taken.
   // starter: false skips the free starting weapon (the player's fast bar already has weapons, #39).
+  // A loadout entry is a weapon id (full durability) or { id, dur } (#51: a worn weapon keeps the uses it had left).
   const freeStart = starter !== false && Boolean(weaponDef(A, R.STARTING_WEAPON)) && !isShieldId(A, R.STARTING_WEAPON);
   const weapons = freeStart ? [R.STARTING_WEAPON] : [];
+  const durs = freeStart ? [maxDurability(A, R.STARTING_WEAPON)] : [];
   const taken = [];
   let shield = null;
   for (const w of Array.isArray(loadout) ? loadout : []) {
-    if (!weaponDef(A, w)) continue;
-    if (isShieldId(A, w)) {
-      if (!shield) { shield = w; taken.push(w); }
+    const wid = typeof w === 'string' ? w : w?.id;
+    if (typeof wid !== 'string' || !weaponDef(A, wid)) continue;
+    const dur = loadoutDur(A, wid, w);
+    if (isShieldId(A, wid)) {
+      if (!shield) { shield = { id: wid, dur }; taken.push(w); }
     } else if (weapons.length < R.MAX_SLOTS) {
-      weapons.push(w);
+      weapons.push(wid);
+      durs.push(dur);
       taken.push(w);
     }
   }
@@ -58,8 +63,9 @@ export function join(A, key, { name, skin, loadout = [], coins = 0, potions = 0,
     id: A.newId(), key, name: String(name ?? key), skin: { ...(skin ?? R.DEFAULT_SKIN ?? {}) },
     coins: Number.isInteger(coins) && coins >= 0 ? coins : 0,
     x: spot.x, y: 0, z: spot.z, ry: 0, pitch: 0, flags: 0,
-    // dur: uses left per slot (parallel to weapons), null = never breaks. Loadout weapons start full.
-    hp: R.MAX_HP, weapons, dur: weapons.map(w => maxDurability(A, w)), slot: 0,
+    // dur: uses left per slot (parallel to weapons), null = never breaks. Loadout weapons start with the uses
+    // they had left (#51; a plain id = full).
+    hp: R.MAX_HP, weapons, dur: durs, slot: 0,
     // charging (#38): useAt = when each slot's weapon last started charging (parallel to weapons; -Infinity = ready),
     // lastFire = the last use of any weapon (for the MIN_FIRE_GAP_MS anti-spam gap)
     useAt: weapons.map(() => -Infinity), lastFire: -Infinity,
@@ -75,7 +81,7 @@ export function join(A, key, { name, skin, loadout = [], coins = 0, potions = 0,
     frozenUntil: 0,   // completely stuck until this time (ms)
     shock: null,      // { dmg, everyMs, left, next, byId, by, weapon } while losing HP over time
   };
-  if (shield) equipShield(A, p, shield);
+  if (shield) equipShield(A, p, shield.id, shield.dur);
   A.players.set(p.id, p);
   A.byKey.set(key, p.id);
 
@@ -103,11 +109,26 @@ export function removePlayer(A, p) {
   if (A.byKey.get(p.key) === p.id) A.byKey.delete(p.key);
 }
 
+// The uses a loadout entry starts with: { id, dur } keeps dur (a whole number from 1 to the max), a plain id
+// (or a bad dur) is full. Weapons that never break: null.
+function loadoutDur(A, id, w) {
+  const max = maxDurability(A, id);
+  if (max == null) return null;
+  const d = typeof w === 'object' && w ? w.dur : undefined;
+  return Number.isInteger(d) && d > 0 ? Math.min(d, max) : max;
+}
+
+// A weapon going back to the account: its id when full, { id, dur } when worn (#51).
+function carried(A, id, dur) {
+  const max = maxDurability(A, id);
+  return max != null && Number.isInteger(dur) && dur > 0 && dur < max ? { id, dur } : id;
+}
+
 /**
  * Leaves the arena. Alive: returns the weapons to put back in the backpack: everything carried
  * except the free starting weapon given at join (if it has not broken), then the shield (if any).
- * Broken weapons are already gone; worn ones go back as plain ids (the backpack keeps no durability,
- * so they are full again next time).
+ * Broken weapons are already gone. A full weapon goes back as its id, a worn one as { id, dur } (#51: the
+ * account keeps the uses left, so it is NOT full again next time).
  */
 export function leave(A, id, { alive = true } = {}) {
   const p = A.players.get(id);
@@ -115,8 +136,9 @@ export function leave(A, id, { alive = true } = {}) {
   removePlayer(A, p);
   send(A, 'all', { t: 'pleave', id: p.id });
   if (!alive) return [];
-  const back = p.weapons.filter((w, i) => !p.free[i]);
-  if (p.shield) back.push(p.shield.id);
+  const back = [];
+  p.weapons.forEach((w, i) => { if (!p.free[i]) back.push(carried(A, w, p.dur[i])); });
+  if (p.shield) back.push(carried(A, p.shield.id, p.shield.dur));
   return back;
 }
 

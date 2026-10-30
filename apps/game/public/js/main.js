@@ -337,6 +337,16 @@ function itemIcon(c) {
   return icon;
 }
 
+// The small durability bar of a weapon (#51: worn weapons stay worn): green, yellow when low, red when almost broken.
+function durBar(d) {
+  const bar = el('span', 'dur');
+  const fill = el('i');
+  fill.style.width = `${d.percent}%`;
+  if (d.percent < 20) fill.className = 'critical'; else if (d.percent <= 50) fill.className = 'low';
+  bar.append(fill);
+  return bar;
+}
+
 function invCardElement(c) {
   const b = el('button', 'inv-card' + (c.ghost ? ' ghost' : ''));
   Object.assign(b.dataset, { kind: c.kind, id: c.id, filled: c.filled ? '1' : '0' });
@@ -349,13 +359,7 @@ function invCardElement(c) {
     return b;
   }
   rarityLook(b, c);
-  if (c.durability) {
-    const d = el('span', 'dur');
-    const fill = el('i');
-    fill.style.width = `${c.durability.percent}%`;
-    d.append(fill);
-    b.append(d);
-  }
+  if (c.durability) b.append(durBar(c.durability));
   const where = c.place === 'extras' ? 'your extras bar' : 'your fast bar';
   const label = `${c.name}${c.count > 1 ? ` ×${c.count}` : ''}${c.durability ? ` (durability ${c.durability.label})` : ''}: tap to put it in ${where}`;
   b.title = label;
@@ -363,7 +367,10 @@ function invCardElement(c) {
   b.addEventListener('click', () => {
     // a weapon goes into the picked fast-bar slot (or the first free one); extras fill their own space (#50)
     const slot = c.place === 'bar' ? pickedSlot : null;
-    invAction(() => api.toBar(c.kind, c.id, slot == null ? {} : { slot }));
+    const opts = {};
+    if (slot != null) opts.slot = slot;
+    if (c.dur != null) opts.dur = c.dur; // this worn copy (#51)
+    invAction(() => api.toBar(c.kind, c.id, opts));
   });
   return b;
 }
@@ -383,7 +390,8 @@ function barSlotElement(s) {
     b.style.background = s.rarityBackground !== s.rarityColor
       ? `radial-gradient(circle at 50% 40%, ${s.rarityColor}aa, rgba(10,8,16,0.85) 75%)`
       : `radial-gradient(circle at 50% 40%, ${s.rarityColor}66, rgba(10,8,16,0.6) 70%)`;
-    b.setAttribute('aria-label', `Bar slot ${s.key}: ${s.name}${s.count > 1 ? ` ×${s.count}` : ''}. Tap to put it back`);
+    if (s.durability) b.append(durBar(s.durability));
+    b.setAttribute('aria-label', `Bar slot ${s.key}: ${s.name}${s.durability ? ` (durability ${s.durability.label})` : ''}. Tap to put it back`);
     b.addEventListener('click', () => invAction(() => api.fromBar(s.index)));
   }
   b.title = b.getAttribute('aria-label');
@@ -407,7 +415,8 @@ function extrasSlotElement(s) {
     b.style.background = s.rarityBackground !== s.rarityColor
       ? `radial-gradient(circle at 50% 40%, ${s.rarityColor}aa, rgba(10,8,16,0.85) 75%)`
       : `radial-gradient(circle at 50% 40%, ${s.rarityColor}66, rgba(10,8,16,0.6) 70%)`;
-    b.setAttribute('aria-label', `${s.hintName} space: ${s.name}${s.max > 1 ? ` ${s.fill}` : ''}. Tap to put it back`);
+    if (s.durability) b.append(durBar(s.durability));
+    b.setAttribute('aria-label', `${s.hintName} space: ${s.name}${s.max > 1 ? ` ${s.fill}` : ''}${s.durability ? ` (durability ${s.durability.label})` : ''}. Tap to put it back`);
     b.addEventListener('click', () => invAction(() => api.fromExtras(s.space)));
   }
   b.title = b.getAttribute('aria-label');

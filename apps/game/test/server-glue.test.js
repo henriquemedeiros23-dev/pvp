@@ -85,7 +85,7 @@ function messages(ws) {
 test('sign up, join the arena, bad messages are dropped, leave', async () => {
   const signup = await post('/api/signup', { name: NAME, password: 'secret1' });
   assert.equal(signup.status, 200);
-  assert.deepEqual(Object.keys(signup.body.account).sort(), ['bar', 'bombs', 'coins', 'extras', 'name', 'owned', 'potions', 'skin', 'stash']);
+  assert.deepEqual(Object.keys(signup.body.account).sort(), ['bar', 'bombs', 'coins', 'extras', 'name', 'owned', 'potions', 'skin', 'stash', 'wear']);
 
   // the Inventory and the fast bar (#39): an empty bar; you can't put in what you don't own
   const inv = await post('/api/inventory', {}, signup.body.token);

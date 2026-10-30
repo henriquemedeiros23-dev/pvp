@@ -75,6 +75,7 @@ test('accounts survive a reload from disk', async t => {
     owned: ['color:black', 'hat:none', 'face:none', 'back:none', 'shirt:none', 'hat:cap'],
     skin: { color: 'black', hat: 'cap', face: 'none', back: 'none', shirt: 'none' },
     stash: {},
+    wear: {},
     potions: 0,
     bombs: { bomb: 0, legendarybomb: 0 },
     bar: [null, null, { kind: 'weapon', id: 'electricsword', n: 1 }, null, null],

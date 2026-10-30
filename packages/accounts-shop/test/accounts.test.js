@@ -30,7 +30,7 @@ test('signup gives a token and a fresh account with free items and the default s
   assert.deepEqual(view, {
     name: 'Stick_Kid', coins: 0,
     owned: ['color:black', 'hat:none', 'face:none', 'back:none', 'shirt:none'],
-    skin: { ...DEFAULT_SKIN }, stash: {}, potions: 0, bombs: { bomb: 0, legendarybomb: 0 },
+    skin: { ...DEFAULT_SKIN }, stash: {}, wear: {}, potions: 0, bombs: { bomb: 0, legendarybomb: 0 },
     bar: [null, null, null, null, null],
     extras: { shield: null, potion: null, bomb: null, legendarybomb: null },
   });

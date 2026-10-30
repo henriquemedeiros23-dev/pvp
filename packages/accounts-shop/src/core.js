@@ -100,6 +100,7 @@ export function createAccounts({
     // Inventory.
     if (rec.bar === undefined && rec.extras === undefined) fastBar.autoFillBar(rec, rules);
     else fastBar.cleanBar(rec, rules);
+    fastBar.cleanWear(rec, rules);
     for (const t of rec.tokens) tokens.set(t, rec);
     if (typeof rec.name === 'string') indexName(rec.name, true);
   }
@@ -208,6 +209,7 @@ export function createAccounts({
       owned: freeItems(),
       skin: { ...DEFAULT_SKIN },
       stash: {},
+      wear: {},
       potions: 0,
       bombs: bombCounts(null),
       kills: 0,
@@ -262,6 +264,8 @@ export function createAccounts({
       bombs: { ...a.bombs },
       // An old name that would not be allowed today (#41): the menu asks for a new one. Missing when the name is fine.
       ...(checkName(a.name).ok ? {} : { mustRename: true }),
+      // worn weapons in the Inventory (#51): { id: [uses left, …] }; copies not listed are full
+      wear: fastBar.copyWear(a.wear),
       bar: fastBar.copyBar(a.bar),
       extras: fastBar.copyExtras(a.extras),
     };
@@ -358,7 +362,8 @@ export function createAccounts({
    * Move an item from the Inventory into its bar. kind: 'weapon', 'potion' or 'bomb'.
    * A hand weapon (sword, gun) goes into the fast bar (#39): opts.slot = bar slot 0..4 (default: the first
    * empty one). A shield, Healing Potions or a bomb go into their own extras space (#50): opts.n = how many
-   * (default: as many as fit). Must own it; one shield; potions up to MAX_POTIONS, bombs up to their maxCarry.
+   * (default: as many as fit). Weapons and shields: opts.dur = which copy (its uses left, #51; default a full one,
+   * else the best worn one). Must own it; one shield; potions up to MAX_POTIONS, bombs up to their maxCarry.
    * Returns publicView.
    */
   function toBar(account, kind, id, opts = {}) {

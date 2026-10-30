@@ -137,9 +137,10 @@ export function createApiClient({ baseUrl = '', fetch: fetchFn, storage, tokenKe
      * Move an item from the Inventory into its bar. kind: 'weapon', 'potion' or 'bomb'.
      * A hand weapon goes into the fast bar (opts.slot: bar slot 0..4, default the first empty one); a shield,
      * Healing Potions or a bomb go into their extras space (opts.n: how many, default as many as fit).
+     * Weapons: opts.dur picks the copy with these uses left (#51; default a full one).
      * Resolves { account }.
      */
-    toBar: (kind, id, { slot, n } = {}) => post('/api/bar/put', { kind, id, slot, n }, true),
+    toBar: (kind, id, { slot, n, dur } = {}) => post('/api/bar/put', { kind, id, slot, n, dur }, true),
     /** Move a fast-bar slot (0..4) back into the Inventory. Resolves { account }. */
     fromBar: slot => post('/api/bar/take', { slot }, true),
     /** Move an extras space ('shield', 'potion', 'bomb', 'legendarybomb') back into the Inventory (#50). Resolves { account }. */
