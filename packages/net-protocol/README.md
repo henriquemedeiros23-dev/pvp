@@ -35,7 +35,7 @@ ws.send(encode('snap', { p: [p], n: 1 }));
 ws.send(encodeClient('fire', { d: [0, 0, 1] }));
 const r = decodeServerMessage(event.data);
 if (r.ok && r.msg.t === 'snap') for (const a of r.msg.p) unpackSnapshotPlayer(a); // { id, x, ..., protected, shield, shieldUp, shocked, frozen }
-ws.send(encodeClient('shield', { up: true }));          // hold Shift / the shield button: raise the shield
+ws.send(encodeClient('shield', { up: true }));          // hold the right mouse button / the shield button: raise the shield
 ```
 
 Shields and status effects (#26, protocol version 2): the client message `shield` (`{ up }`), `inv.shield`

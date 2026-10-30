@@ -115,7 +115,7 @@ coinsToast(3);                                      // { amount: 3, text: '+3 co
 ```
 
 **Aiming** (`src/aim.js`, #37, #40): only the Shootbm and the DM Gun can aim (their `aim` in `@pvp/game-rules`). Tap the
-🎯 AIM button (phone) or right click (computer) to switch aiming on, again to switch it off: the camera zooms in by
+🎯 AIM button (phone) or Shift (computer) to switch aiming on, again to switch it off: the camera zooms in by
 `aim.zoom` and comes closer over the shoulder, a round scope ring shows, the crosshair gets smaller and you walk at
 `aim.moveMul`. Aiming switches off when the weapon in hand changes (`aimHandKey`), and is paused (no zoom) while
 `blocked` (shield up, drinking, frozen). Time is passed in.

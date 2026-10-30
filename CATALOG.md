@@ -67,7 +67,7 @@ graph LR
 | `@pvp/island-scene` | The 3D island: sky with clouds, warm sun, green grass ground with dirt paths, grass tufts, flowers, bushes, rocks, beach with wet sand, waves, palms, ruins and chests, and gold coins popping out of opened chests. A lighter version for phones. | browser (also builds in Node) | partly: all placement and colors from a seed, time passed in, how it looks depends on the renderer | 19 |
 | `@pvp/local-server` | The game server inside the page (practice mode): arena, accounts in localStorage, tick, fake WebSocket, bots. | browser (also Node) | partly: seeded arena and bots, time and timer passed in; tokens and localStorage are real | 23 |
 | `@pvp/leaderboard` | The ranking: top 50 players by knockouts (a tie: who got there first), your own place even outside the top, 🥇🥈🥉 rows for the screen. | both | fully: pure functions (the knockout time is passed in) | 8 |
-| `@pvp/touch-controls` | Joystick, aim by dragging, buttons, held actions (shield), toggled actions (aim: on until pressed again), buttons that hide and show, keyboard and mouse (right click aims). | browser (core also in Node) | partly: the core is pure, the DOM part depends on real fingers and mice | 27 |
+| `@pvp/touch-controls` | Joystick, aim by dragging, buttons, held actions (shield), toggled actions (aim: on until pressed again), buttons that hide and show, keyboard and mouse (hold right click = shield, Shift = aim on/off). | browser (core also in Node) | partly: the core is pure, the DOM part depends on real fingers and mice | 28 |
 
 "Both" means Node and the browser (in the browser, `@pvp/*` imports need an import map or a bundler).
 
@@ -390,14 +390,14 @@ graph LR
 
 ## `@pvp/touch-controls`
 
-**Purpose:** game controls for phones and computers: joystick, drag to aim, buttons, held actions (hold Shift or the shield button to raise the shield), toggled actions (tap AIM or right click: aim on, again: off), keyboard (WASD, arrows, keys) and mouse with pointer lock.
+**Purpose:** game controls for phones and computers: joystick, drag to aim, buttons, held actions (hold the right mouse button or the shield button to raise the shield), toggled actions (tap AIM or press Shift: aim on, again: off), keyboard (WASD, arrows, keys) and mouse with pointer lock.
 
 | Export | Example |
 |---|---|
 | `createInputState(config)` | `const input = createInputState({ enabled: false });` |
-| `input.take()` | `const { ev, look, move, fire, shield, aim } = input.take(); // every frame (aim: switched on by the AIM button or a right click, #37, #40)` |
+| `input.take()` | `const { ev, look, move, fire, shield, aim } = input.take(); // every frame (aim: switched on by the AIM button or Shift, #37, #40, #49)` |
 | `input.show(name, visible)` | `input.show('aim', canAim); // hide/show an on-screen button (aim starts hidden); hiding lets go of it / switches it off` |
-| `input.setToggle(name, on)`, `input.toggled(name)`, `input.onToggle(fn)` | `input.setToggle('aim', false); // switch aiming off (weapon broke); config toggleButtons ['aim'], toggleMouse { 2: 'aim' }` |
+| `input.setToggle(name, on)`, `input.toggled(name)`, `input.onToggle(fn)` | `input.setToggle('aim', false); // switch aiming off (weapon broke); config toggleButtons ['aim'], toggleKeys { aim: ['shift'] }, holdMouse { 2: 'shield' }` |
 | `attachTouchControls(input, els)` | `const detach = attachTouchControls(input, { canvas, stick, knob, buttons });` |
 | `attachDesktopControls(input, opts)` | `attachDesktopControls(input, { canvas, target: window });` |
 | `isTouchDevice(window)` | `isTouchDevice(window) ? attachTouch... : attachDesktop...` |

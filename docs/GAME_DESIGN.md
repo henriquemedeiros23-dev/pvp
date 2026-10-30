@@ -66,7 +66,7 @@ Decided by the boss through 22 questions.
 - **Freeze (Ice Sword):** for 2 s you cannot move, turn, shoot, hit, switch weapons or raise your shield.
   You turn ice-blue inside an ice block.
 - **Shields** are worn on your **other arm**, never in a weapon slot. You wear one shield at a time.
-  - **Hold Shift** (computer) or **hold the 🛡️ button** (phone) to raise it. While it is up you cannot shoot or hit.
+  - **Hold the right mouse button** (computer) or **hold the 🛡️ button** (phone) to raise it. While it is up you cannot shoot or hit.
   - A raised shield blocks hits from the **front** (the half you are looking at): 0 damage, no shock or freeze,
     and the shield loses 1 block (5 for the Supersword). At 0 it breaks and disappears.
   - The **Mega Shield** also sends 25% of the blocked damage back to the attacker (25 for a Supersword hit).
@@ -146,9 +146,10 @@ Decided by the boss through 22 questions.
 ## Moving and controls
 - Walk, run, jump, slide and crouch. No climbing, no vehicles.
 - **Phone:** joystick on the left, buttons on the right, you aim yourself. Hold 🛡️ to raise your shield.
-- **Computer:** WASD to move, mouse to aim and shoot, **hold Shift to raise your shield**.
-- **Aim (Shootbm and DM Gun only):** tap the 🎯 AIM button (phone) or right click (computer) to start aiming; it keeps
-  aiming (the button glows and says **AIM ON**) until you tap / right click again. The camera zooms in (2x) with a round
+- **Computer:** WASD to move, mouse to aim and shoot, **hold the right mouse button to raise your shield**
+  (let go to lower it). The browser menu does not open on the game.
+- **Aim (Shootbm and DM Gun only):** tap the 🎯 AIM button (phone) or press Shift (computer) to start aiming; it keeps
+  aiming (the button glows and says **AIM ON**) until you tap / press Shift again. The camera zooms in (2x) with a round
   scope, your shots are much more accurate, and you walk slower. Not with the Gun or the Supergun.
   Aiming stops by itself when you switch weapons, your weapon breaks or you drop it, you leave the arena or get knocked
   out, or a new game starts. With the shield up, while drinking or frozen aiming is paused (no zoom) and comes back after.

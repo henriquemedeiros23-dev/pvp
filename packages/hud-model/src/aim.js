@@ -1,5 +1,5 @@
 // Aiming (#37): the AIM button (phone) / right mouse button (computer) for the weapons that can aim
-// (the Shootbm and the DM Gun: their `aim` in @pvp/game-rules). Since #40 it is a toggle: tap (or right click) once
+// (the Shootbm and the DM Gun: their `aim` in @pvp/game-rules). Since #40 it is a toggle: tap (or press Shift) once
 // to aim, again to stop; it stops by itself when the weapon in hand changes (aimHandKey). While aiming the camera zooms in and comes
 // closer over the shoulder, a round scope ring shows and the crosshair gets smaller.
 // Pure functions: time is passed in (any clock, e.g. performance.now() in the browser).
@@ -64,7 +64,7 @@ export function zoomedFov(fovDeg, zoom) {
 
 /**
  * The aim view for the weapon in your hand (an id or the weapon's rules object).
- * state: { on (aiming is switched on: the AIM button / right click toggle; `held` is the same), blocked (shield raised, drinking or frozen: no aiming),
+ * state: { on (aiming is switched on: the AIM button / Shift toggle; `held` is the same), blocked (shield raised, drinking or frozen: no aiming),
  *          blend (the zoom amount 0..1 from aimBlend; default 1 when aiming, else 0) }.
  * Returns {
  *   canAim:  the weapon can aim (show the AIM button),
