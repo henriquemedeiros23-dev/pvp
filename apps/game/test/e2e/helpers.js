@@ -43,12 +43,15 @@ export function chromiumPath() {
   return undefined; // let Playwright decide
 }
 
+const TEST_LIMITS = { MAX_SIGNUPS_PER_IP_PER_DAY: '100000', MAX_API_PER_SECOND: '1000', MAX_CONNECTIONS_PER_IP: '1000', LOGIN_FREE_TRIES_PER_IP: '1000' };
+
 /** Start the game server. env: extra environment (e.g. PVP_TEST_HOOKS, ARENA_SEED). Returns { port, url, stop }. */
 export async function startServer(env = {}) {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pvp-test-'));
   const port = await freePort();
   const child = spawn(process.execPath, [SERVER], {
-    env: { ...process.env, ...env, PORT: String(port), DATA_FILE: path.join(dataDir, 'accounts.json') },
+    // Every test player comes from 127.0.0.1, so the per-address limits (#52) are raised (a test can be a whole school).
+    env: { ...process.env, ...TEST_LIMITS, ...env, PORT: String(port), DATA_FILE: path.join(dataDir, 'accounts.json') },
     stdio: ['ignore', 'pipe', 'inherit'],
   });
   await new Promise((resolve, reject) => {

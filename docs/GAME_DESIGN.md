@@ -166,7 +166,7 @@ Decided by the boss through 22 questions.
 - **Characters:** stickmen with clean, sharp graphics.
 - **Skins:** colors and patterns, plus outfits (hats, masks, capes, clothes). Pattern prices (#44): Zebra Stripes 50 coins,
   Shiny Gold 75, Rainbow 100.
-- **Map:** a big island of ruins with buildings, towers and hiding spots, for up to 100 players.
+- **Map:** a big island of ruins with buildings, towers and hiding spots, for up to 125 players.
 
 ## Sounds (#55)
 - **All made in code** (`@pvp/sound`, Web Audio): no sound files, nothing to download. Each play is a little

@@ -1,0 +1,14 @@
+{
+  "name": "@pvp/file-backup",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Daily backups of one data file (keep the last N), safe atomic writes, and a launch-day reset that backs up first.",
+  "type": "module",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "scripts": {
+    "test": "node --test"
+  }
+}

@@ -119,7 +119,7 @@ export const SERVER_MESSAGES = deepFreeze({
     items: [{ list: ITEM, max: 10000 }, 'Items on the ground: { id, kind, weapon, x, y, z }'],
     bombs: [{ optional: { list: LIVE_BOMB, max: 1000 } }, 'Bombs that have not exploded yet (same fields as "bomb")'],
   }),
-  full: m('The arena is full, try again later.'),
+  full: m('The island is full (MAX_PLAYERS), try again soon.'),
   left: m('You left the fight (answer to "leave").'),
   snap: m('Snapshot, 20 times a second: players near you, packed as arrays (see SNAP).', {
     p: [{ list: SNAP_PLAYER, max: 1000 }, 'One array per nearby player (you included)'],

@@ -44,10 +44,14 @@ graph LR
   controls["@pvp/touch-controls"]
   sound["@pvp/sound"] --> random
   sound --> rules
+  ratelimit["@pvp/rate-limit"]
+  httpguard["@pvp/http-guard"]
+  backup["@pvp/file-backup"]
 ```
 
 `@pvp/api-client`, `@pvp/touch-controls`, `@pvp/collision`, `@pvp/game-rules`,
-`@pvp/net-protocol`, `@pvp/name-filter`, `@pvp/seeded-random` and `@pvp/leaderboard` need no other package.
+`@pvp/net-protocol`, `@pvp/name-filter`, `@pvp/seeded-random`, `@pvp/leaderboard`, `@pvp/rate-limit`, `@pvp/http-guard`
+and `@pvp/file-backup` need no other package (the last three keep the online server safe, #52).
 
 ## All packages
 
@@ -69,6 +73,9 @@ graph LR
 | `@pvp/island-scene` | The 3D island: sky with clouds, warm sun, green grass ground with dirt paths, grass tufts, flowers, bushes, rocks, beach with wet sand, waves, palms, ruins and chests, and gold coins popping out of opened chests. A lighter version for phones. | browser (also builds in Node) | partly: all placement and colors from a seed, time passed in, how it looks depends on the renderer | 19 |
 | `@pvp/local-server` | The game server inside the page (practice mode): arena, accounts in localStorage, tick, fake WebSocket, bots. | browser (also Node) | partly: seeded arena and bots, time and timer passed in; tokens and localStorage are real | 24 |
 | `@pvp/leaderboard` | The ranking: top 50 players by knockouts (a tie: who got there first), your own place even outside the top, 🥇🥈🥉 rows for the screen. | both | fully: pure functions (the knockout time is passed in) | 8 |
+| `@pvp/rate-limit` | Limits for an online server: token buckets (per key), open connections per key, a quota per time window, login brute-force protection with a wait that doubles. | both | fully: time is passed in | 9 |
+| `@pvp/http-guard` | Security headers (CSP: only self + cdn.jsdelivr.net + inline scripts by hash, no framing), the client IP and https behind a trusted proxy, safe static paths. | Node | fully: pure functions of the request and HTML | 8 |
+| `@pvp/file-backup` | Daily backups of a data file (keep the last N), atomic writes, and a launch-day reset that backs up first and wipes again on the next start. | Node | partly: decisions from the time passed in, files are real I/O | 8 |
 | `@pvp/touch-controls` | Joystick, aim by dragging, buttons, held actions (shield), toggled actions (aim: on until pressed again), buttons that hide and show, keyboard and mouse (hold right click = shield, Shift = aim on/off). | browser (core also in Node) | partly: the core is pure, the DOM part depends on real fingers and mice | 28 |
 | `@pvp/sound` | Every game sound made in code with Web Audio (guns, swords, shields, hits, headshot ding, bombs, chests, coins, potions, footsteps, menu clicks; no audio files): recipes as data, a seeded planner, 3D sound (distance + stereo pan) with a cap on sounds at once, which sounds a server message makes, the 🔊 mute button and Sounds volume slider (saved per browser). | both (player and buttons: browser) | partly: recipes, planner, mixer math and message mapping are pure and seeded; real playback follows the audio clock | 26 |
 
@@ -432,3 +439,49 @@ graph LR
 
 **Depends on:** `@pvp/seeded-random`, `@pvp/game-rules`.
 **Determinism:** partly. Recipes, planner, mixer math, footsteps, noise and the message mapping are pure (seeded, time passed in). Real playback depends on the browser's audio clock and the first tap.
+
+## `@pvp/rate-limit`
+
+**Purpose:** keep one player (or one address) from using up the server (#52): how often, how many at once, how many tries.
+
+| Export | Example |
+|---|---|
+| `createTokenBucket({ capacity, perSecond }, now)` | `const b = createTokenBucket({ capacity: 120, perSecond: 60 }, now); b.take(now); // false: too fast` |
+| `createRateLimiter({ capacity, perSecond })` | `api.take(ip, now); // one bucket per key; api.prune(now) forgets full ones` |
+| `createConcurrencyLimit({ max })` | `conns.open(ip) ? ok : ws.close(4029); conns.close(ip);` |
+| `createWindowQuota({ max, windowMs })` | `signups.allowed(ip, now); signups.add(ip, now); // 30 new accounts per IP per day` |
+| `createAttemptGuard({ freeTries, baseLockMs, maxLockMs, windowMs })` | `guard.waitMs(name, now) > 0 ? 'Too many tries. Wait a minute.' : ...; guard.fail(name, now); guard.reset(name)` |
+
+**Depends on:** nothing.
+**Determinism:** fully. The time is always passed in; no random, no timers.
+
+## `@pvp/http-guard`
+
+**Purpose:** the safety bits of an online web server (#52): security headers, the real client IP and https behind the host's proxy, safe static paths.
+
+| Export | Example |
+|---|---|
+| `securityHeaders({ scriptHashes, host, https })` | `res.writeHead(200, { ...securityHeaders({ scriptHashes: inlineScriptHashes(html), host: req.headers.host }) })` |
+| `contentSecurityPolicy(opts)` / `DEFAULT_SCRIPT_HOSTS` | `"default-src 'self'; script-src 'self' https://cdn.jsdelivr.net 'sha256-...'; ... frame-ancestors 'none'"` |
+| `inlineScriptHashes(html)` / `cspHash(text)` | `inlineScriptHashes(indexHtml); // ['sha256-...'] for the import map` |
+| `parseTrustProxy(env)` / `clientIp(req, { trustProxy })` / `isHttps(req, { trustProxy })` | `clientIp(req, { trustProxy: parseTrustProxy(process.env.TRUST_PROXY) }); // X-Forwarded-For only when trusted` |
+| `safeJoin(root, urlPath)` / `safeHost(host)` | `safeJoin(publicDir, '/js/../../x'); // null: refuse` |
+
+**Depends on:** nothing (Node's `crypto` and `path`).
+**Determinism:** fully. Pure functions of their inputs.
+
+## `@pvp/file-backup`
+
+**Purpose:** keep the accounts file safe (#52): a daily backup in the same folder (keep the last N), atomic writes, and the launch-day reset (`npm run admin:reset-accounts -- --yes`).
+
+| Export | Example |
+|---|---|
+| `backupIfDue(file, { now, keep, everyMs })` | `backupIfDue('/data/accounts.json', { now: Date.now(), keep: 7 }); // a copy once a day` |
+| `makeBackup(file, { now, keep, label })` / `listBackups(file, label)` | `makeBackup(file, { now }); // 'accounts.json.backup-2026-10-30T12-00-00Z'` |
+| `resetFile(file, { now, marker })` | `resetFile(file, { now }); // backup 'before-reset', write {}, leave 'accounts.json.reset-requested'` |
+| `applyPendingReset(file, { now })` | `applyPendingReset(file, { now: Date.now() }); // at server start: wipe again if a reset was asked for` |
+| `writeFileAtomic(file, text)` | `writeFileAtomic(file, '{}\n'); // temp file + fsync + rename` |
+| `stamp`, `parseStamp`, `backupPath`, `backupsToDelete`, `backupDue`, `resetMarkerPath` | pure helpers: names and decisions from the time passed in |
+
+**Depends on:** nothing (Node's `fs` and `path`).
+**Determinism:** partly. Every decision is a pure function of the time passed in; the file copies are real I/O.

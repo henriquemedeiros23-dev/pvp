@@ -24,6 +24,8 @@ const CHANGED = ['BASIC_WEAPON', 'RARITIES', 'LOOT_TABLE', 'WEAPONS'];
 const REMOVED_IN_28 = ['HEALS', 'MAX_BANDAGES', 'MAX_MEDKITS', 'BANDAGE_HEAL', 'MEDKIT_HEAL'];
 // #36: an opened chest now comes back after 2 minutes (was 15 s).
 const CHANGED_IN_36 = { CHEST_RESPAWN_MS: 120000 };
+// #52: the boss made the island hold 125 players (was 100).
+const CHANGED_IN_52 = { MAX_PLAYERS: 125 };
 // #42 added the Demon Horns hat; everything else in OUTFITS stays the same.
 const ADDED_IN_42 = { OUTFITS: o => { const c = structuredClone(o); delete c.hat.horns; return c; } };
 // #44: the boss made Zebra Stripes 50 (was 150), Shiny Gold 75 (was 250) and Rainbow 100 (was 400); the rest of COLORS stays.
@@ -31,10 +33,11 @@ const CHANGED_IN_44 = {
   COLORS: o => { const c = structuredClone(o); c.zebra.price = 150; c.gold.price = 250; c.rainbow.price = 400; return c; },
 };
 
-test('same named exports and values as the old apps/game/shared/config.js (except the #25/#26/#28/#36/#42/#44 changes)', () => {
+test('same named exports and values as the old apps/game/shared/config.js (except the #25/#26/#28/#36/#42/#44/#52 changes)', () => {
   for (const [name, value] of Object.entries(oldConfig)) {
     if (CHANGED.includes(name)) continue;
     if (name in CHANGED_IN_36) { assert.equal(rules[name], CHANGED_IN_36[name], `${name} changed in #36`); continue; }
+    if (name in CHANGED_IN_52) { assert.equal(rules[name], CHANGED_IN_52[name], `${name} changed in #52`); continue; }
     if (name in CHANGED_IN_44) { assert.deepEqual(CHANGED_IN_44[name](rules[name]), value, `export ${name} differs (beyond #44)`); continue; }
     if (name in ADDED_IN_42) { assert.deepEqual(ADDED_IN_42[name](rules[name]), value, `export ${name} differs (beyond #42)`); continue; }
     if (REMOVED_IN_28.includes(name)) { assert.ok(!(name in rules), `${name} should be gone (#28)`); continue; }
