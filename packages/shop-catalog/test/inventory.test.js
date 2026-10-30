@@ -5,7 +5,7 @@ import { RULES } from '@pvp/game-rules';
 import { WEAPON_ICONS, POTION_ICON_SVG, bombIconSvg } from '@pvp/hud-model';
 import {
   MIN_SPACES, inventoryItemKinds, spaceSize, itemLook, inventoryCount, inventoryCards, barSlots, barSummary,
-  extrasSlots, extrasSpaceFor, isHandWeapon, shopWeaponIds, inventorySummary, backpackSummary,
+  extrasSlots, extrasSpaceFor, isHandWeapon, shopWeaponIds, inventorySummary, backpackSummary, trashPrompt,
 } from '../src/index.js';
 
 const EMPTY_BAR = [null, null, null, null, null];
@@ -187,4 +187,20 @@ test('durability (#51): worn copies show their uses left, full ones first; bar a
   assert.equal(slots[1].durability.percent, 100);
   assert.deepEqual(extrasSlots(acc)[0].durability, { uses: 15, max: 60, percent: 25, label: '15' });
   assert.equal(inventoryCards(acc).find(c => c.id === 'potion').dur, null);
+});
+
+test('the trash (#53): the "are you sure?" words', () => {
+  const sword = trashPrompt('weapon', 'icesword');
+  assert.equal(sword.question, 'Are you sure you want to destroy this weapon?');
+  assert.equal(sword.note, 'It will be gone forever. No coins back.');
+  assert.deepEqual([sword.name, sword.icon, sword.yes, sword.no], ['Ice Sword', WEAPON_ICONS.icesword, 'YES', 'NO']);
+  assert.equal(trashPrompt('weapon', 'gun').question, 'Are you sure you want to destroy this weapon?');
+  assert.equal(trashPrompt('weapon', 'megashield').question, 'Are you sure you want to destroy this Mega Shield?');
+  const potions = trashPrompt('potion', 'potion', { count: 3 });
+  assert.equal(potions.question, 'Are you sure you want to destroy this Healing Potion?');
+  assert.equal(potions.note, 'Only ONE is destroyed. You keep 2. No coins back.');
+  assert.equal(potions.iconSvg, POTION_ICON_SVG);
+  assert.equal(trashPrompt('bomb', 'legendarybomb').question, 'Are you sure you want to destroy this Legendary Bomb?');
+  assert.equal(trashPrompt('weapon', 'pistol'), null);
+  assert.equal(trashPrompt('hat', 'crown'), null);
 });

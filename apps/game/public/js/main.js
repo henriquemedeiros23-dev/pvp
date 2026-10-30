@@ -3,7 +3,7 @@
 // @pvp/shop-catalog (what the shop and the Inventory show).
 import { createApiClient } from '@pvp/api-client';
 import { checkLoginForm, checkSignupForm } from '@pvp/account-form';
-import { shopTabs, shopItems, swatchBackground, inventoryCards, barSlots, extrasSlots, barSummary } from '@pvp/shop-catalog';
+import { shopTabs, shopItems, swatchBackground, inventoryCards, barSlots, extrasSlots, barSummary, trashPrompt } from '@pvp/shop-catalog';
 import { WEAPONS, BOMBS } from '@pvp/game-rules';
 import { WEAPON_ICONS, POTION_ICON_SVG, bombIconSvg, coinIconDataUrl } from '@pvp/hud-model';
 import { createSoundPlayer, attachSoundControls, unlockOnFirstGesture } from '@pvp/sound';
@@ -340,6 +340,7 @@ $('btnInvBack').addEventListener('click', () => showMenu());
 
 function openInventory() {
   pickedSlot = null;
+  setTrashMode(false);
   $('invError').textContent = '';
   show('inventory');
   renderInventory();
@@ -377,7 +378,9 @@ function invCardElement(c) {
   if (c.ghost) {
     b.title = `${c.name}: buy it in the shop`;
     b.setAttribute('aria-label', `${c.name}: empty space`);
-    b.addEventListener('click', () => { $('invError').textContent = `No ${c.name} here yet. Buy one in the SHOP!`; });
+    b.addEventListener('click', () => {
+      $('invError').textContent = trashMode ? 'That space is empty. Tap an item to destroy it' : `No ${c.name} here yet. Buy one in the SHOP!`;
+    });
     return b;
   }
   rarityLook(b, c);
@@ -387,6 +390,7 @@ function invCardElement(c) {
   b.title = label;
   b.setAttribute('aria-label', label);
   b.addEventListener('click', () => {
+    if (trashMode) { askTrash({ kind: c.kind, id: c.id, ...(c.dur != null ? { dur: c.dur } : {}), from: 'inventory' }, c.count); return; }
     // a weapon goes into the picked fast-bar slot (or the first free one); extras fill their own space (#50)
     const slot = c.place === 'bar' ? pickedSlot : null;
     const opts = {};
@@ -405,7 +409,11 @@ function barSlotElement(s) {
   b.append(el('span', 'key', s.key), itemIcon(s), el('small', 'name', s.name), el('span', 'cnt', s.label));
   if (s.empty) {
     b.setAttribute('aria-label', `Bar slot ${s.key}: empty. Tap it, then tap an item`);
-    b.addEventListener('click', () => { pickedSlot = pickedSlot === s.index ? null : s.index; renderInventory(); });
+    b.addEventListener('click', () => {
+      if (trashMode) { $('invError').textContent = 'That slot is empty. Tap an item to destroy it'; return; }
+      pickedSlot = pickedSlot === s.index ? null : s.index;
+      renderInventory();
+    });
   } else {
     rarityLook(b, s);
     // like the HUD slots: a soft glow in the rarity color
@@ -414,7 +422,10 @@ function barSlotElement(s) {
       : `radial-gradient(circle at 50% 40%, ${s.rarityColor}66, rgba(10,8,16,0.6) 70%)`;
     if (s.durability) b.append(durBar(s.durability));
     b.setAttribute('aria-label', `Bar slot ${s.key}: ${s.name}${s.durability ? ` (durability ${s.durability.label})` : ''}. Tap to put it back`);
-    b.addEventListener('click', () => invAction(() => api.fromBar(s.index)));
+    b.addEventListener('click', () => {
+      if (trashMode) askTrash({ kind: s.kind, id: s.id, from: 'bar', slot: s.index }, s.count);
+      else invAction(() => api.fromBar(s.index));
+    });
   }
   b.title = b.getAttribute('aria-label');
   return b;
@@ -431,7 +442,9 @@ function extrasSlotElement(s) {
   if (s.empty) {
     b.style.borderColor = `${s.hintColor}66`;
     b.setAttribute('aria-label', `${s.hintName} space: empty. Tap ${s.max > 1 ? 'them' : 'one'} in your Inventory to put ${s.max > 1 ? `up to ${s.max}` : 'it'} here`);
-    b.addEventListener('click', () => { $('invError').textContent = `This space is for ${s.hintName}. Tap ${s.max > 1 ? 'them' : 'one'} in your Inventory!`; });
+    b.addEventListener('click', () => {
+      $('invError').textContent = trashMode ? 'That space is empty. Tap an item to destroy it' : `This space is for ${s.hintName}. Tap ${s.max > 1 ? 'them' : 'one'} in your Inventory!`;
+    });
   } else {
     rarityLook(b, s);
     b.style.background = s.rarityBackground !== s.rarityColor
@@ -439,7 +452,10 @@ function extrasSlotElement(s) {
       : `radial-gradient(circle at 50% 40%, ${s.rarityColor}66, rgba(10,8,16,0.6) 70%)`;
     if (s.durability) b.append(durBar(s.durability));
     b.setAttribute('aria-label', `${s.hintName} space: ${s.name}${s.max > 1 ? ` ${s.fill}` : ''}${s.durability ? ` (durability ${s.durability.label})` : ''}. Tap to put it back`);
-    b.addEventListener('click', () => invAction(() => api.fromExtras(s.space)));
+    b.addEventListener('click', () => {
+      if (trashMode) askTrash({ kind: s.kind, id: s.id, from: 'extras', slot: s.space }, s.count);
+      else invAction(() => api.fromExtras(s.space));
+    });
   }
   b.title = b.getAttribute('aria-label');
   return b;
@@ -453,8 +469,58 @@ function renderInventory() {
   grid.scrollTop = top; // stay where you were
   $('invBar').replaceChildren(...barSlots(account).map(barSlotElement));
   $('invExtras').replaceChildren(...extrasSlots(account).map(extrasSlotElement));
+  $('inventory').classList.toggle('trashing', trashMode);
   $('invBarHint').textContent = pickedSlot != null ? `Now tap a weapon for slot ${pickedSlot + 1}` : 'Swords and guns. Only the bars come along';
 }
+
+// ------------------------------------------------------------ the trash (#53)
+// Tap 🗑️: trash mode (tap it again to cancel). Then tap an item (Inventory, fast bar or extras): "Are you sure you
+// want to destroy this weapon?" YES destroys ONE forever (the server checks it: @pvp/accounts-shop destroyItem),
+// NO keeps it. Either way trash mode turns off. The words come from trashPrompt in @pvp/shop-catalog.
+let trashMode = false;
+let trashTarget = null; // what YES destroys: { kind, id, dur?, from, slot? }
+
+function setTrashMode(on) {
+  trashMode = on;
+  pickedSlot = null;
+  const btn = $('btnTrash');
+  btn.classList.toggle('on', on);
+  btn.setAttribute('aria-pressed', String(on));
+  $('trashHint').classList.toggle('hidden', !on);
+  if (!on) closeTrashDialog();
+  $('inventory').classList.toggle('trashing', on);
+}
+
+function askTrash(target, count) {
+  const p = trashPrompt(target.kind, target.id, { count });
+  if (!p) return;
+  trashTarget = target;
+  $('invError').textContent = '';
+  const item = $('trashItem');
+  if (p.rarityColor) item.style.setProperty('--rc', p.rarityColor);
+  item.querySelector('.icon').replaceWith(itemIcon(p));
+  item.querySelector('.name').textContent = p.name;
+  $('trashQuestion').textContent = p.question;
+  $('trashNote').textContent = p.note;
+  $('trashYes').textContent = p.yes;
+  $('trashNo').textContent = p.no;
+  $('trashDialog').classList.remove('hidden');
+  $('trashNo').focus();
+}
+
+function closeTrashDialog() {
+  trashTarget = null;
+  $('trashDialog').classList.add('hidden');
+}
+
+$('btnTrash').addEventListener('click', () => { $('invError').textContent = ''; setTrashMode(!trashMode); renderInventory(); });
+$('trashNo').addEventListener('click', () => { setTrashMode(false); renderInventory(); });
+$('trashYes').addEventListener('click', () => {
+  const target = trashTarget;
+  setTrashMode(false);
+  if (target) invAction(() => api.destroyItem(target)); else renderInventory();
+});
+$('trashDialog').addEventListener('keydown', e => { if (e.key === 'Escape') { setTrashMode(false); renderInventory(); } });
 
 async function invAction(call) {
   if (busy) return;

@@ -151,9 +151,14 @@
     <header class="topbar">
       <button id="btnInvBack" class="back">‹ Back</button>
       <h2 class="inv-title">🎒 Inventory</h2>
-      <div class="coins"><span class="coin"></span><span id="invCoins">0</span></div>
+      <div class="inv-right">
+        <div class="coins"><span class="coin"></span><span id="invCoins">0</span></div>
+        <!-- the trash (#53): tap it, then tap an item to destroy it (it asks first) -->
+        <button id="btnTrash" class="trash-btn" aria-pressed="false" title="Trash: destroy an item" aria-label="Trash: destroy an item">🗑️<small>TRASH</small></button>
+      </div>
     </header>
     <p id="invHint" class="hint">Tap a weapon to put it in your fast bar, a shield, potion or bomb to put it in your extras. Tap a bar item to put it back.</p>
+    <p id="trashHint" class="trash-hint hidden" role="status">🗑️ Tap an item to destroy it. Tap 🗑️ again to cancel</p>
     <div id="invGrid" class="inv-grid" role="list" aria-label="Inventory"></div>
     <div class="inv-barbox">
       <div class="inv-barhead"><b>Fast bar</b><span id="invBarHint">Swords and guns. Only the bars come along</span></div>
@@ -161,6 +166,18 @@
       <div class="inv-barhead"><b>Extras</b><span>Shield, potions and bombs</span></div>
       <div id="invExtras" class="inv-bar inv-extras" role="list" aria-label="Extras bar"></div>
       <p id="invError" class="error"></p>
+    </div>
+    <!-- the trash (#53): "are you sure?" before anything is destroyed (words from trashPrompt in @pvp/shop-catalog) -->
+    <div id="trashDialog" class="trash-dialog hidden" role="dialog" aria-modal="true" aria-labelledby="trashQuestion">
+      <div class="trash-box">
+        <div id="trashItem" class="trash-item"><span class="icon"></span><b class="name"></b></div>
+        <p id="trashQuestion" class="trash-question"></p>
+        <p id="trashNote" class="trash-note"></p>
+        <div class="trash-buttons">
+          <button id="trashYes" class="big trash-yes">YES</button>
+          <button id="trashNo" class="big trash-no">NO</button>
+        </div>
+      </div>
     </div>
   </section>
 

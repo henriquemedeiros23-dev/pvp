@@ -145,6 +145,13 @@ export function createApiClient({ baseUrl = '', fetch: fetchFn, storage, tokenKe
     fromBar: slot => post('/api/bar/take', { slot }, true),
     /** Move an extras space ('shield', 'potion', 'bomb', 'legendarybomb') back into the Inventory (#50). Resolves { account }. */
     fromExtras: space => post('/api/bar/take', { space }, true),
+    /**
+     * The trash (#53): destroy ONE item forever (no coins back; the server refuses while you are in the arena).
+     * { kind, id, dur } from the Inventory (dur: which worn weapon copy, its uses left; none = a full copy),
+     * or { from: 'bar', slot: 0..4 } / { from: 'extras', slot: 'shield' | 'potion' | bomb id } (kind/id may be
+     * added: they must match). Resolves { account }.
+     */
+    destroyItem: ({ kind, id, dur, from = 'inventory', slot } = {}) => post('/api/trash', { kind, id, dur, from, slot }, true),
     /** Forget the token on this device (no server call). The last name stays. */
     logout() { store.remove(tokenKey); },
   };

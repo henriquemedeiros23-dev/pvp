@@ -186,6 +186,42 @@ input:focus { border-color: var(--gold); }
 .inv-extras .slot.empty .cnt { background: rgba(0,0,0,0.4); color: rgba(255,255,255,0.6); }
 .inv-extras .slot .icon svg { width: 30px; height: 30px; }
 #invError { min-height: 1.1em; margin: 0; font-size: 13px; }
+/* the trash (#53): a small 🗑️ button in the corner; trash mode marks every item red; "are you sure?" box */
+.inv-right { display: flex; align-items: center; gap: 8px; }
+.trash-btn {
+  flex: none; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+  min-width: 46px; min-height: 46px; padding: 3px 6px; border-radius: 12px; font-size: 18px; line-height: 1;
+  background: rgba(0,0,0,0.45); border: 1px solid var(--line);
+}
+.trash-btn small { font-size: 9px; font-weight: 900; letter-spacing: 0.05em; color: var(--muted); }
+.trash-btn.on { background: #c22; border-color: #ff8a7a; box-shadow: 0 0 14px rgba(255,70,50,0.75); }
+.trash-btn.on small { color: #fff; }
+.trash-hint {
+  margin: 0 16px 4px; padding: 6px 12px; border-radius: 999px; text-align: center; font-size: 14px; font-weight: 800;
+  background: rgba(204,34,34,0.85); color: #fff;
+}
+.trashing #invHint { display: none; }
+.trashing .inv-card:not(.ghost), .trashing .inv-bar .slot:not(.empty) { outline: 2px dashed #ff5a4a; outline-offset: 1px; }
+.trash-dialog {
+  position: fixed; inset: 0; z-index: 30; display: flex; align-items: center; justify-content: center;
+  padding: 16px; background: rgba(0,0,0,0.6);
+}
+.trash-box {
+  width: 100%; max-width: 340px; padding: 20px; border-radius: 20px; text-align: center;
+  background: #1c182a; border: 2px solid #ff5a4a; box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+}
+.trash-item { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.trash-item .icon { font-size: 44px; height: 52px; display: flex; align-items: center; justify-content: center; }
+.trash-item .icon svg { width: 48px; height: 48px; }
+.trash-item .name { color: var(--rc, #fff); font-size: 16px; }
+.trash-question { margin: 12px 0 4px; font-size: 19px; font-weight: 900; }
+.trash-note { margin: 0 0 16px; color: var(--muted); font-size: 14px; }
+.trash-buttons { display: flex; gap: 12px; }
+.trash-buttons .big { flex: 1; min-height: 52px; font-size: 18px; }
+.trash-yes { background: linear-gradient(180deg, #ff4a3a, #b81414); box-shadow: 0 5px 0 #6e0a0a; }
+.trash-yes:active { box-shadow: 0 2px 0 #6e0a0a; }
+.trash-no { background: linear-gradient(180deg, #6a6580, #46415a); box-shadow: 0 5px 0 #26222f; }
+.trash-no:active { box-shadow: 0 2px 0 #26222f; }
 @media (max-height: 430px) {
   #inventory .topbar { padding-top: 6px; padding-bottom: 4px; }
   #inventory .hint { display: none; }
