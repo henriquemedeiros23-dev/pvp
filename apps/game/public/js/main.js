@@ -125,7 +125,8 @@ async function enter(kind) {
     setAccount(res.account);
     for (const id of ['loginPass', 'signupName', 'signupPass', 'signupPass2']) $(id).value = '';
     $('loginName').value = res.account.name;
-    showMenu();
+    // Practice mode (#48): an old automatic player was claimed with this name; it is yours again.
+    showMenu(res.claimed ? 'Welcome back! Your old player is yours again.' : '');
   } catch (e) {
     errorBox.textContent = e.message;
   } finally {

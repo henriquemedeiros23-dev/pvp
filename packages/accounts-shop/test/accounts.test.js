@@ -380,3 +380,66 @@ test('old accounts that clash or have a bad name still load and log in; a bad na
   assert.equal(accounts.publicView(rude).mustRename, undefined);
   assert.equal(accounts.login('New_Name', 'pass').account, rude);
 });
+
+// ---------------------------------------------------------------- #48: claim an old account with no chosen password
+// An old practice player: made automatically (random password nobody knows), saved before the `passwordChosen` mark.
+function oldAutoStore() {
+  const { store, accounts } = setup();
+  const { account } = accounts.signup('Player_1234', 'f00dcafe1234deadbeef9999');
+  accounts.addCoins(account, 57);
+  accounts.rename(account, 'Boss_Kid');
+  accounts.addKnockout(account, 5000);
+  const data = store.load();
+  delete data.boss_kid.passwordChosen; // saved before #48: no mark
+  return createMemoryStore(data);
+}
+
+test('#48 claim: an old account whose password was never chosen is claimed by signing up with its name', () => {
+  const { accounts } = setup({ store: oldAutoStore(), allowClaimUnsetPassword: true });
+  const r = accounts.signup('Boss_Kid', 'mypass');
+  assert.equal(r.claimed, true);
+  assert.equal(accounts.byToken(r.token), r.account);
+  const view = accounts.publicView(r.account);
+  assert.equal(view.name, 'Boss_Kid');
+  assert.equal(view.coins, 57);
+  assert.equal(r.account.kills, 1);
+  assert.equal(r.account.tokens.length, 1); // only the new login
+  assert.equal(accounts.login('boss_kid', 'mypass').account, r.account);
+  rejects(() => accounts.login('Boss_Kid', 'f00dcafe1234deadbeef9999'), 'WRONG_LOGIN');
+  // now a normal account: a second claim is refused as taken
+  rejects(() => accounts.signup('Boss_Kid', 'other1'), 'NAME_TAKEN');
+  assert.equal(accounts.login('Boss_Kid', 'mypass').account.coins, 57);
+});
+
+test('#48 claim: a look-alike name claims too; short passwords and bad words are still refused', () => {
+  const { accounts } = setup({ store: oldAutoStore(), allowClaimUnsetPassword: true });
+  rejects(() => accounts.signup('Boss_Kid', 'abc'), 'BAD_PASSWORD');
+  const r = accounts.signup('B0ss_K1d', 'mypass');
+  assert.equal(r.claimed, true);
+  assert.equal(r.account.name, 'Boss_Kid'); // keeps its own name
+  assert.equal(r.account.coins, 57);
+});
+
+test('#48 claim: accounts made with a password (the mark) and the default (real server) are never claimed', () => {
+  // normal sign up: marked, not claimable even with the option on
+  const a = setup({ allowClaimUnsetPassword: true }).accounts;
+  a.signup('Normal_Kid', 'pass');
+  rejects(() => a.signup('Normal_Kid', 'other1'), 'NAME_TAKEN');
+  // the real server: no option, an unmarked old account is just taken
+  const real = setup({ store: oldAutoStore() }).accounts;
+  rejects(() => real.signup('Boss_Kid', 'mypass'), 'NAME_TAKEN');
+  // a function says which unmarked accounts may be claimed
+  const picky = setup({ store: oldAutoStore(), allowClaimUnsetPassword: rec => rec.coins > 100 }).accounts;
+  rejects(() => picky.signup('Boss_Kid', 'mypass'), 'NAME_TAKEN');
+});
+
+test('#48 claim: signup with autoPassword stays claimable, and a claim logs out the old tokens', () => {
+  const { accounts } = setup({ allowClaimUnsetPassword: true });
+  const auto = accounts.signup('Player_5555', 'random1234', { autoPassword: true });
+  assert.equal(auto.account.autoPassword, true);
+  const r = accounts.signup('player_5555', 'mine1');
+  assert.equal(r.claimed, true);
+  assert.equal(accounts.byToken(auto.token), null);
+  assert.equal(r.account.passwordChosen, true);
+  assert.ok(!('autoPassword' in r.account));
+});

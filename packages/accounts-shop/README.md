@@ -44,6 +44,13 @@ accounts.returnFromArena(acc, { weapons, potions, bombs });         // left aliv
 
 accounts.rename(acc, 'New_Name');        // same name rules as sign up; tokens stay logged in
 
+// Practice mode only (#48): claim an account whose password the player never chose.
+// Sign up marks accounts `passwordChosen: true` (or `autoPassword: true` with signup(name, pw, { autoPassword: true })).
+// With allowClaimUnsetPassword (true, or rec => boolean for unmarked records; default false = never), signing up
+// with the name (or a look-alike) of such an account gives it the new password and logs in, keeping everything:
+const local = createAccounts({ store, allowClaimUnsetPassword: rec => rec.autoPassword === true });
+local.signup('Boss_Kid', 'newpass');     // { token, account, claimed: true }; old tokens are logged out
+
 // the ranking (#47): knockouts are counted per account, with the time of the last one (it breaks ties)
 accounts.addKnockout(accounts.byName('stick_kid'), now); // byName ignores case (an arena player key works); returns the new count
 accounts.rankingEntries();                  // [{ name, kills, lastKillAt, skinColor }] of every account with knockouts

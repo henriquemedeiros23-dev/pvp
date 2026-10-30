@@ -25,6 +25,24 @@ export function practiceHash(password, salt) {
   return out;
 }
 
+/**
+ * #48: when the practice page got its "Create an account" form (#46, 2026-10-30 12:49:51 UTC). Before that the page
+ * only made automatic players (`ensurePlayer`: 'Player_1234' with a random password nobody knows), so a saved
+ * account made before this moment never had a password the player chose.
+ */
+export const PRACTICE_FORM_SINCE = Date.UTC(2026, 9, 30, 12, 49, 51);
+
+/**
+ * #48: may this practice account be claimed (signing up with its name gives it a new password)? Accounts with the
+ * `passwordChosen` mark never (accounts-shop checks that first). Otherwise: made by ensurePlayer (`autoPassword`),
+ * or saved before the Account form existed (no `createdAt`, or `createdAt` before PRACTICE_FORM_SINCE).
+ */
+export function practiceCanClaim(rec) {
+  if (!rec || rec.passwordChosen === true) return false;
+  if (rec.autoPassword === true) return true;
+  return !(Number.isFinite(rec.createdAt) && rec.createdAt >= PRACTICE_FORM_SINCE);
+}
+
 // Random bytes for tokens and salts: the browser's crypto when there is one, else from `fallback`.
 function defaultRandomBytes(fallback) {
   return n => {
@@ -67,6 +85,8 @@ export function createLocalServer({
     now,
     randomBytes: randomBytes || defaultRandomBytes(createRandom(`${seed}:bytes:${now()}`)),
     hashPassword: practiceHash,
+    // #48: an old automatic player (password nobody knows) is claimed by creating an account with its name.
+    allowClaimUnsetPassword: practiceCanClaim,
   });
   const playerKey = acc => acc.name.toLowerCase();
   const arena = createArena({ island, rules: RULES, random, now: now() });
@@ -89,7 +109,8 @@ export function createLocalServer({
       if (url === '/api/signup' || url === '/api/login') {
         const { name, password } = body;
         const r = url === '/api/signup' ? accounts.signup(name, password) : accounts.login(name, password);
-        return [200, { token: r.token, account: accounts.publicView(r.account) }];
+        // claimed (#48): an old automatic player is yours again, with everything in it
+        return [200, { token: r.token, account: accounts.publicView(r.account), ...(r.claimed ? { claimed: true } : {}) }];
       }
       const acc = accounts.byToken(token);
       if (!acc) return [401, { error: 'Please log in again' }];
@@ -305,7 +326,7 @@ export function createLocalServer({
       for (let i = 0; ; i++) {
         const name = `Player_${String(1000 + ((bytes[0] * 256 + bytes[1] + i * 7919) % 9000))}`;
         try {
-          const r = accounts.signup(name, password);
+          const r = accounts.signup(name, password, { autoPassword: true }); // claimable later (#48)
           tokens.set(tokenKey, r.token);
           return { token: r.token, account: accounts.publicView(r.account), created: true };
         } catch (e) {

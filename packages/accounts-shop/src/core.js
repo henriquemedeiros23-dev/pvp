@@ -41,6 +41,9 @@ const safeCount = n => (Number.isInteger(n) && n > 0 ? n : 0);
  * - now / randomBytes: injected so tests are deterministic (randomBytes(n) gives n bytes)
  * - hashPassword(password, saltHex): the password hash as a hex string (Node: scrypt)
  * - sameHash(a, b): compares two hex hashes (Node: crypto.timingSafeEqual)
+ * - allowClaimUnsetPassword (#48, practice mode only; default false): an account whose password the player never
+ *   chose (no `passwordChosen: true` mark, e.g. made automatically) can be CLAIMED by signing up with its name.
+ *   true: every unmarked account; a function `record => boolean`: only the unmarked ones it says yes to.
  */
 export function createAccounts({
   store,
@@ -49,6 +52,7 @@ export function createAccounts({
   randomBytes,
   hashPassword,
   sameHash = sameString,
+  allowClaimUnsetPassword = false,
 } = {}) {
   if (!store) throw new TypeError('createAccounts needs a store');
   if (typeof randomBytes !== 'function') throw new TypeError('createAccounts needs randomBytes');
@@ -147,8 +151,50 @@ export function createAccounts({
     return { token, account: rec };
   }
 
-  function signup(name, password) {
-    name = checkNewName(name);
+  // #48: may this record be claimed (its password was never chosen by the player)?
+  function canClaim(rec) {
+    if (!allowClaimUnsetPassword || !rec || rec.passwordChosen === true) return false;
+    return allowClaimUnsetPassword === true || (typeof allowClaimUnsetPassword === 'function' && !!allowClaimUnsetPassword(rec));
+  }
+
+  // #48: the one account in the way of this new name (same name or a look-alike), if it can be claimed.
+  function claimable(name) {
+    const res = checkName(name, { badWords: false });
+    if (!res.ok) return null;
+    const keys = new Set(lookAlikes.get(nameKey(res.name)) ?? []);
+    const exact = res.name.toLowerCase();
+    if (Object.hasOwn(records, exact)) keys.add(exact);
+    if (keys.size !== 1) return null; // several look-alikes: not sure which one, so no
+    const rec = records[[...keys][0]];
+    return canClaim(rec) ? rec : null;
+  }
+
+  // #48: the claimed account gets the new password (from now on a normal account) and only the new login.
+  function claim(rec, name, password) {
+    ({ password } = checkCredentials(name, password));
+    rec.salt = toHex(randomBytes(16));
+    rec.hash = hashPassword(password, rec.salt);
+    rec.passwordChosen = true;
+    delete rec.autoPassword;
+    for (const t of rec.tokens) tokens.delete(t); // old logins (e.g. the forgotten auto token) stop working
+    rec.tokens = [];
+    return { ...newToken(rec), claimed: true };
+  }
+
+  /**
+   * Sign up. Returns { token, account }. With allowClaimUnsetPassword, a name taken by an account whose password
+   * was never chosen claims that account instead: { token, account, claimed: true } (everything in it is kept).
+   * opts.autoPassword: the password was made up by the program, not the player (the account stays claimable).
+   */
+  function signup(name, password, opts = {}) {
+    const typed = name;
+    try {
+      name = checkNewName(name);
+    } catch (e) {
+      const rec = e instanceof AccountError && e.code === 'NAME_TAKEN' ? claimable(typed) : null;
+      if (!rec) throw e;
+      return claim(rec, String(typed).trim(), password);
+    }
     ({ password } = checkCredentials(name, password));
     const key = name.toLowerCase();
     const salt = toHex(randomBytes(16));
@@ -156,6 +202,7 @@ export function createAccounts({
       name,
       salt,
       hash: hashPassword(password, salt),
+      ...(opts?.autoPassword ? { autoPassword: true } : { passwordChosen: true }),
       coins: 0,
       owned: freeItems(),
       skin: { ...DEFAULT_SKIN },

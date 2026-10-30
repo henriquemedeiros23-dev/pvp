@@ -56,7 +56,7 @@ graph LR
 | `@pvp/collision` | Walls, jumping, landing and ray hits in a world made of boxes. | both | fully: pure math, no random, no time | 19 |
 | `@pvp/world-gen` | Builds the island of ruins (houses, towers, chests) from a seed. | both | fully: all random comes from the seed | 12 |
 | `@pvp/net-protocol` | Every message between phone and server, with builders and checks. | both | fully: pure functions and frozen data | 21 |
-| `@pvp/accounts-shop` | Accounts, log in, rename (no bad or look-alike names), coins, buying skins, weapons, potions and bombs, the Inventory and the 5-slot fast bar (only the bar goes into the arena). | Node (browser via `/browser`) | partly: logic is pure, tokens/clock are passed in, file saving is real I/O | 49 |
+| `@pvp/accounts-shop` | Accounts, log in, rename (no bad or look-alike names), claiming an old auto-made practice account, coins, buying skins, weapons, potions and bombs, the Inventory and the 5-slot fast bar (only the bar goes into the arena). | Node (browser via `/browser`) | partly: logic is pure, tokens/clock are passed in, file saving is real I/O | 53 |
 | `@pvp/name-filter` | Is this player name OK? 3-16 letters, numbers or _, no swear words or slurs (tricky spellings too, no false alarms on normal words), and a look-alike key so nobody copies a name. | both | fully: pure functions and a fixed word list | 12 |
 | `@pvp/arena` | The fight itself: players, chests, loot, weapons, shields, shock and freeze, drinking potions, aiming, thrown bombs, damage, knockouts, damage numbers for nearby players. | both | fully: time and seeded random are passed in (replay tests) | 134 |
 | `@pvp/shop-catalog` | Turns the rules and an account into the cards the shop screen shows, and the Inventory screen: spaces (at least 2 of everything) and the fast bar. | both | fully: pure functions of their inputs | 21 |
@@ -65,7 +65,7 @@ graph LR
 | `@pvp/account-form` | Checks the Account screen: log in, and create an account with the password typed twice ("The passwords are not the same. Try again."). | both | fully: pure functions of the typed text | 6 |
 | `@pvp/stickman-3d` | A three.js stickman with skins, outfits, the boss's weapons and shields, the Healing Potion flask, bombs and their red area, frozen/shocked looks and animation. | browser (pose math also in Node) | partly: pose math is pure, how it looks depends on the renderer | 27 |
 | `@pvp/island-scene` | The 3D island: sky with clouds, warm sun, green grass ground with dirt paths, grass tufts, flowers, bushes, rocks, beach with wet sand, waves, palms, ruins and chests, and gold coins popping out of opened chests. A lighter version for phones. | browser (also builds in Node) | partly: all placement and colors from a seed, time passed in, how it looks depends on the renderer | 19 |
-| `@pvp/local-server` | The game server inside the page (practice mode): arena, accounts in localStorage, tick, fake WebSocket, bots. | browser (also Node) | partly: seeded arena and bots, time and timer passed in; tokens and localStorage are real | 19 |
+| `@pvp/local-server` | The game server inside the page (practice mode): arena, accounts in localStorage, tick, fake WebSocket, bots. | browser (also Node) | partly: seeded arena and bots, time and timer passed in; tokens and localStorage are real | 22 |
 | `@pvp/leaderboard` | The ranking: top 50 players by knockouts (a tie: who got there first), your own place even outside the top, 🥇🥈🥉 rows for the screen. | both | fully: pure functions (the knockout time is passed in) | 8 |
 | `@pvp/touch-controls` | Joystick, aim by dragging, buttons, held actions (shield), toggled actions (aim: on until pressed again), buttons that hide and show, keyboard and mouse (right click aims). | browser (core also in Node) | partly: the core is pure, the DOM part depends on real fingers and mice | 27 |
 
@@ -181,8 +181,10 @@ graph LR
 | `accounts.rename` | `accounts.rename(acc, 'New_Name'); // same checks as sign up (@pvp/name-filter)` |
 | `accounts.addKnockout` / `byName` / `rankingEntries` | `accounts.addKnockout(accounts.byName(ev.byKey), now); accounts.rankingEntries(); // the ranking (#47)` |
 | `AccountError` | `catch (e) { if (e.code === 'NAME_TAKEN') ... }` |
+| `allowClaimUnsetPassword` (#48) | `createAccounts({ store, allowClaimUnsetPassword: rec => ... }); accounts.signup('Boss_Kid', 'pw'); // { token, account, claimed: true }` |
 
 **Depends on:** `@pvp/game-rules`, `@pvp/name-filter` (and Node's `crypto` and `fs`).
+**Claiming (#48, practice only):** sign up marks accounts `passwordChosen: true` (`signup(name, pw, { autoPassword: true })` marks `autoPassword` instead). With the option `allowClaimUnsetPassword` (off by default, so the real server never does it), signing up with the name (or a look-alike) of an unmarked account the option says yes to gives that account the new password and logs in, keeping everything; old tokens stop working and it is a normal account from then on.
 **Names (#41):** sign up and rename refuse bad words (`BAD_WORD`) and names that are taken or look like a taken one (`NAME_TAKEN`, "Someone already has that name. Please pick a new name."), using a look-alike index. Log in only checks the format, so old accounts keep working; `publicView` adds `mustRename: true` for an old name that would not pass today.
 **Determinism:** partly. Shop and loadout logic is pure. Tokens, salts and timestamps come from the injected `randomBytes` and `now`, so tests are repeatable. The JSON file store writes real files on a timer.
 
@@ -365,8 +367,10 @@ graph LR
 | `server.tick(now)` | `createLocalServer({ autoStart: false, now }); server.tick(); // tests` |
 | `createBots(opts)` | `const bots = createBots({ arena, island, random: createRandom('b'), count: 3 }); bots.tick(now);` |
 | `createFakeSocket(opts)` | the WebSocket-like object (send, close, readyState, onopen/onmessage/onclose) |
+| `practiceCanClaim(rec)` / `PRACTICE_FORM_SINCE` | `practiceCanClaim({ createdAt: Date.UTC(2026, 9, 20) }); // true: an old auto player (#48)` |
 
 **Depends on:** `@pvp/arena`, `@pvp/accounts-shop` (browser entry), `@pvp/api-client`, `@pvp/leaderboard`, `@pvp/name-filter`, `@pvp/net-protocol`, `@pvp/world-gen`, `@pvp/seeded-random`, `@pvp/collision`, `@pvp/game-rules`.
+**Claiming (#48):** the old practice page made an automatic player (`Player_1234`, random password nobody knows) that the boss renamed; since #46 he could not log in to it. Now "Create an account" with its name claims it (new password, coins and items kept, "Welcome back! Your old player is yours again."). Rule (`practiceCanClaim`): no `passwordChosen` mark, and either `autoPassword` (made by `ensurePlayer`) or made before `PRACTICE_FORM_SINCE` (when the practice page got the #46 form; before that it only made automatic players).
 **Determinism:** partly. The arena and bots use seeded randoms and time/timer are passed in, so tests replay exactly; login tokens use `crypto.getRandomValues` unless `randomBytes` is passed, and `localStorage` is real storage.
 
 ## `@pvp/leaderboard`

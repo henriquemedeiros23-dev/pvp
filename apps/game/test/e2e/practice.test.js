@@ -202,6 +202,40 @@ test('artifact version: boots inside a wrapper page, join works, no console erro
   }
 });
 
+// #48: an old automatic player (random password nobody knows, renamed to Boss_Kid) is saved in the browser.
+// "Create an account" with that name claims it: logged in, coins kept, a friendly message; then it is a normal account.
+test('practice file: claim the old automatic player by creating an account with its name', { skip: SKIP, timeout: 120000 }, async () => {
+  const h = await practicePage({ viewport: { width: 1100, height: 700 } });
+  const { page } = h;
+  const old = {
+    boss_kid: { name: 'Boss_Kid', salt: '0123456789abcdef', hash: 'ab'.repeat(32), coins: 77, tokens: ['oldtoken'], createdAt: Date.UTC(2026, 9, 20) },
+  };
+  await h.context.addInitScript(data => {
+    if (!localStorage.getItem('pvp.practice.accounts')) localStorage.setItem('pvp.practice.accounts', data);
+  }, JSON.stringify(old));
+  try {
+    await page.goto(`${pathToFileURL(file).href}?seed=claim&bots=0`);
+    await page.locator('#login').waitFor({ state: 'visible', timeout: 60000 });
+    await signUpForm(page, 'Boss_Kid', 'mypass1');
+    await page.locator('#menu').waitFor({ state: 'visible', timeout: 60000 });
+    assert.equal(await page.textContent('#menuName'), 'Boss_Kid');
+    await page.waitForFunction(() => document.getElementById('menuCoins').textContent === '77');
+    assert.match(await page.textContent('#menuMessage'), /Welcome back! Your old player is yours again\./);
+    // log out: claiming again is refused, the new password logs in
+    await page.click('#btnLogout');
+    await page.locator('#login').waitFor({ state: 'visible' });
+    await signUpForm(page, 'Boss_Kid', 'thief12');
+    await page.waitForFunction(() => /already has that name/.test(document.getElementById('signupError').textContent));
+    await logInForm(page, 'Boss_Kid', 'mypass1');
+    await page.locator('#menu').waitFor({ state: 'visible', timeout: 60000 });
+    await page.waitForFunction(() => document.getElementById('menuCoins').textContent === '77');
+    assert.deepEqual(h.errors, []);
+    assert.deepEqual(h.outside, []);
+  } finally {
+    await h.context.close();
+  }
+});
+
 test('practice file: the island draws (screenshot on a phone in landscape)', { skip: SKIP, timeout: 120000 }, async () => {
   const h = await practicePage({ viewport: { width: 844, height: 390 }, deviceScaleFactor: 1, isMobile: true, hasTouch: true });
   const { page } = h;

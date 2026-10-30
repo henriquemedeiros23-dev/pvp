@@ -40,6 +40,14 @@ server.teleport(api.token, 10, 20);      // practice/test helper, like the serve
   and `/api/bar/take` work like on the server.
 - The ranking (#47): a knockout gives the attacker's local account +1 (`accounts.addKnockout`, time from `now`);
   `/api/ranking` answers `rankPlayers` from `@pvp/leaderboard`. Bots are no accounts, so they are never in it.
+- Claiming an old player (#48): the practice page before #46 made an automatic player (`ensurePlayer`: 'Player_1234',
+  random password nobody knows). "Create an account" with that account's name (or a look-alike) and a new password
+  claims it: it gets the password, keeps coins, Inventory, bar, skin and knockouts, and `/api/signup` answers
+  `claimed: true` (the menu says "Welcome back! Your old player is yours again."). Then it is a normal account.
+  Rule (`practiceCanClaim(rec)`): no `passwordChosen: true` mark (every sign up and claim sets it), and either
+  `autoPassword: true` (ensurePlayer sets it) or `createdAt` before `PRACTICE_FORM_SINCE` (2026-10-30 12:49:51 UTC,
+  when the practice page got the #46 form; before that it only made automatic players). Only practice turns this on
+  (accounts-shop's `allowClaimUnsetPassword`); the real server never does.
 - Passwords of local accounts use `practiceHash` (FNV based, **not secure**): the accounts never leave this browser.
 - `createBots({ arena, island, random, count })` (`src/bots.js`) works with any arena: call `bots.tick(now)` before
   `arena.tick(now)`. Bots only use the arena's normal methods (join, setState, openChest, fire).

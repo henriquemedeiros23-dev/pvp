@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { decodeServerMessage, encodeClient } from '@pvp/net-protocol';
-import { createLocalServer, createFakeSocket, practiceHash, OPEN, CLOSED } from '../src/index.js';
+import { createLocalServer, createFakeSocket, practiceHash, practiceCanClaim, PRACTICE_FORM_SINCE, OPEN, CLOSED } from '../src/index.js';
 import { ANYWHERE, decodeWord } from '@pvp/name-filter/words';
 
 const settle = () => new Promise(r => setTimeout(r, 0)); // let the deferred (microtask) deliveries run
@@ -345,4 +345,66 @@ test('ranking (#47): a knockout gives the attacker\'s account +1; /api/ranking l
   });
   await api.login('Ann', 'secret');
   assert.deepEqual((await api.ranking()).me, { place: 1, name: 'Ann', kills: 1 });
+});
+
+// ---------------------------------------------------------------- #48: claim the old automatic practice player
+// Practice storage like an old page left it: an ensurePlayer account renamed to 'Boss_Kid', with coins,
+// saved without the #48 marks, created at `createdAt`, and the token forgotten (#46).
+function oldPracticeStorage(createdAt) {
+  const storage = fakeStorage();
+  const { server } = setup({ storage, now: () => createdAt });
+  const { token } = server.ensurePlayer();
+  server.rename(token, 'Boss_Kid');
+  server.accounts.addCoins(server.accounts.byName('Boss_Kid'), 42);
+  const data = JSON.parse(storage.getItem('pvp.practice.accounts'));
+  delete data.boss_kid.autoPassword;
+  delete data.boss_kid.passwordChosen;
+  storage.setItem('pvp.practice.accounts', JSON.stringify(data));
+  storage.removeItem('pvp.practice.token');
+  return storage;
+}
+
+test('#48 practice: "Create an account" with the old player\'s name claims it (coins kept), only once', async () => {
+  const storage = oldPracticeStorage(Date.UTC(2026, 9, 20));
+  const api = setup({ storage }).server.createApi();
+  const res = await api.signup('Boss_Kid', 'mypass');
+  assert.equal(res.claimed, true);
+  assert.equal(res.account.name, 'Boss_Kid');
+  assert.equal(res.account.coins, 42);
+  assert.equal((await api.me()).account.coins, 42);
+  api.logout();
+  await assert.rejects(api.signup('Boss_Kid', 'other1'), /already has that name/);
+  assert.equal((await api.login('Boss_Kid', 'mypass')).account.coins, 42);
+  // still a normal account after a reload
+  const again = setup({ storage }).server.createApi();
+  await assert.rejects(again.signup('Boss_Kid', 'thief1'), /already has that name/);
+  assert.equal((await again.login('Boss_Kid', 'mypass')).account.coins, 42);
+});
+
+test('#48 practice: accounts from the #46 form and new accounts are not claimable; ensurePlayer ones are', async () => {
+  // unmarked, but made after the form existed: its password was chosen
+  const api = setup({ storage: oldPracticeStorage(PRACTICE_FORM_SINCE + 60_000) }).server.createApi();
+  await assert.rejects(api.signup('Boss_Kid', 'mypass'), /already has that name/);
+  // a new account is marked
+  const s2 = setup().server;
+  const api2 = s2.createApi();
+  await api2.signup('New_Kid', 'pass');
+  assert.equal(s2.accounts.byName('New_Kid').passwordChosen, true);
+  await assert.rejects(api2.signup('New_Kid', 'pass2'), /already has that name/);
+  // an ensurePlayer account made today is marked autoPassword and can be claimed
+  const s3 = setup({ now: () => PRACTICE_FORM_SINCE + 1e9 }).server;
+  const { account } = s3.ensurePlayer();
+  const api3 = s3.createApi();
+  api3.logout();
+  const res = await api3.signup(account.name, 'mine1');
+  assert.equal(res.claimed, true);
+});
+
+test('#48 practiceCanClaim: no mark and (autoPassword or saved before the form existed)', () => {
+  assert.equal(practiceCanClaim({ passwordChosen: true, autoPassword: true, createdAt: 1 }), false);
+  assert.equal(practiceCanClaim({ autoPassword: true, createdAt: PRACTICE_FORM_SINCE + 1 }), true);
+  assert.equal(practiceCanClaim({ createdAt: PRACTICE_FORM_SINCE - 1 }), true);
+  assert.equal(practiceCanClaim({}), true);
+  assert.equal(practiceCanClaim({ createdAt: PRACTICE_FORM_SINCE }), false);
+  assert.equal(practiceCanClaim(null), false);
 });
