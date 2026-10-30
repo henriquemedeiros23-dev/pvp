@@ -1,0 +1,14 @@
+{
+  "name": "@pvp/http-guard",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Safety helpers for a Node web server put online: security headers, the client IP behind a trusted proxy, https detection, safe static paths, inline script hashes.",
+  "type": "module",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "scripts": {
+    "test": "node --test"
+  }
+}

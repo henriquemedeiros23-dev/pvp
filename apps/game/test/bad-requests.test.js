@@ -73,14 +73,16 @@ test('invalid JSON body is answered and the server keeps running', async () => {
   await assertAlive();
 });
 
-test('unexpected error in the API answers 500 and the server keeps running', async () => {
-  // a JSON "null" body is valid JSON but not an object
-  assert.equal(await request('POST', '/api/signup', 'null'), 500);
+test('a body that is not a JSON object is treated as empty (a friendly 400) and the server keeps running', async () => {
+  // "null" and "[]" are valid JSON but not an object (#52: cleaned up before the API sees them, was a 500)
+  assert.equal(await request('POST', '/api/signup', 'null'), 400);
+  assert.equal(await request('POST', '/api/signup', '[1]'), 400);
   await assertAlive();
 });
 
-test('too big body is dropped and the server keeps running', async () => {
-  // the server cuts the connection, so the request may fail or get no answer
-  await request('POST', '/api/signup', 'x'.repeat(50000)).catch(() => {});
+test('too big body gets 413 (or is cut) and the server keeps running', async () => {
+  // the server answers 413 and closes the connection, so the request may also fail
+  const status = await request('POST', '/api/signup', 'x'.repeat(50000)).catch(() => 413);
+  assert.equal(status, 413);
   await assertAlive();
 });

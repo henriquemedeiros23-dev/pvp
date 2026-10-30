@@ -1,0 +1,29 @@
+# Render Blueprint for PvP Island (#52). See docs/DEPLOY.md for the step-by-step guide.
+# One always-on web service + a small persistent disk for the accounts file.
+services:
+  - type: web
+    name: pvp-island
+    runtime: node
+    # A paid plan is needed: free services fall asleep and cannot have a disk. Check prices on render.com.
+    plan: starter
+    branch: main
+    autoDeploy: true            # every push to main updates the game
+    buildCommand: npm ci --omit=dev --workspace=@pvp/game
+    startCommand: node apps/game/server.js
+    healthCheckPath: /healthz
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: "22"
+      - key: DATA_FILE
+        value: /var/data/accounts.json
+      # Render's HTTPS front door is 1 proxy: trust its X-Forwarded-For / X-Forwarded-Proto.
+      - key: TRUST_PROXY
+        value: "1"
+      - key: MAX_PLAYERS
+        value: "125"
+    disk:
+      name: pvp-data
+      mountPath: /var/data
+      sizeGB: 1
