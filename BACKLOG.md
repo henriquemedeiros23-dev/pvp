@@ -84,8 +84,11 @@ The live list is on GitHub Issues: https://github.com/henriquemedeiros23-dev/pvp
 | 47 | ✅ | **Ranking top 50** | A RANKING button in the menu: the 50 players with the most knockouts. |
 | 48 | ✅ | **Get back your old practice player** | Old practice players (no password) can be claimed by creating an account with that name, keeping everything. |
 | 49 | 🔲 | **Right mouse = shield, Shift = aim** | Swap the computer controls for shield and aim. |
+| 50 | 🔲 | **Extras bar** | Shield, potions, Bombs and Legendary Bombs get their own bar with drawings; the fast bar is weapons only. |
+| 51 | 🔲 | **Bug: durability resets** | Weapons came back at full durability after going to the menu; keep it saved. |
 
 ## Later ideas
 - Sounds and music
 - Ranking of top players
 - Put the game online so friends can play from anywhere
+  - Launch day: the boss asks to wipe all accounts (his too) so everyone starts at the same time with nothing
