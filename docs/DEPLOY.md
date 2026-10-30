@@ -99,7 +99,9 @@ match with 125 players running, shooting and opening chests):
 | Data sent to each player | about 60 KB per second (95%: 84 KB/s) | about 16 KB per second |
 | Data sent in total | about 7.4 MB per second (about 26 GB per hour when full) | about 0.5 MB per second |
 
-That was on a fast 4-core computer. A small hosting plan has much less CPU (often a part of one core), so:
+That was on a fast 4-core computer with nothing else running. When the same computer was very busy with other work,
+the 125-player tick went up to 40-57 ms, right at the 50 ms limit (then the game starts to lag). A small hosting plan
+has much less CPU (often a part of one shared core), so:
 
 - **Start with the Starter plan.** For a few dozen players at the same time it is plenty.
 - If the game gets **laggy when the island is full** (players jump, the logs are slow), pick a plan with **at least
