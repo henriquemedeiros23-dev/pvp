@@ -1,6 +1,6 @@
 // Player limits, timers and movement. (The only heal, the Healing Potion, is in potion.js.)
 
-export const MAX_PLAYERS = 100;
+export const MAX_PLAYERS = 125;
 export const MAX_HP = 100;
 export const MAX_SLOTS = 5;          // weapon slots, including the starting weapon
 export const CHEST_RESPAWN_MS = 2 * 60 * 1000; // an opened chest comes back after 2 minutes (#36)

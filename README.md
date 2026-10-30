@@ -19,6 +19,18 @@ npm start
 Then open the address it prints. Phones on the same Wi-Fi can join too.
 Set `PORT` to use another port (default 3000). Run every test with `npm test`.
 
+### Put it online
+
+[docs/DEPLOY.md](docs/DEPLOY.md) is the step-by-step guide (for a grown-up, no programming needed): Render with
+`render.yaml` (always-on service, a disk for the accounts, health check `/healthz`), or Railway / any Docker host
+with the `Dockerfile`. Online the server runs with `NODE_ENV=production`, `TRUST_PROXY=1` and `DATA_FILE` on the
+disk; it has limits (125 players, connections, messages, login tries, new accounts), security headers, daily
+backups of the accounts, and saves everything (players get their bar things back) when it is stopped.
+All settings are in the table at the end of DEPLOY.md.
+
+- `npm run load-check`: a fake full island (125 players) and how much work and data that is.
+- `npm run admin:reset-accounts -- --yes`: the launch-day reset (wipes ALL accounts after a backup). Only when the boss asks.
+
 ### Practice mode (one file, no server)
 
 `npm run build:practice` makes `dist/practice/pvp-island.html`: the whole game in ONE html file that runs
@@ -38,7 +50,7 @@ phone layout, and more (`apps/game/test/e2e/`). No console errors are allowed.
 - Needs Chromium for Playwright: it is found in `PLAYWRIGHT_BROWSERS_PATH` (default `/opt/pw-browsers`),
   or set `CHROMIUM_PATH` to a Chrome/Chromium binary.
 - WebGL runs in software (swiftshader), so the game draws only a few frames a second; the tests wait for that.
-- Every test server uses a temp accounts file, never the real one.
+- Every test server uses a temp accounts file, never the real one. The page runs under the real Content-Security-Policy, so a blocked script shows up as a console error.
 - The play test starts its server with `PVP_TEST_HOOKS=1`, which lets the test jump a player close to a chest
   (`debugTeleport`), give coins (`debugCoins`) or knockouts for the ranking (`debugKills`). Never set it for real players: without it the server ignores that message.
 - Add `SCREENSHOTS=1` to update `docs/screenshots/`.

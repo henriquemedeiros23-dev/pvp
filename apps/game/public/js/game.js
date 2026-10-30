@@ -18,6 +18,12 @@ import { DamageNumbers } from './damage-numbers.js';
 const $ = id => document.getElementById(id);
 const JOIN_TIMEOUT_MS = 8000;  // give up joining if 'welcome' does not come
 const LEAVE_TIMEOUT_MS = 3000; // stop waiting for the server's 'left'
+// Why the server closed the connection (close codes from apps/game/server.js).
+const CLOSE_REASONS = {
+  4029: 'The island is very busy right now. Try again soon!',
+  4008: 'Whoa, too fast! Try again.',
+  1012: 'The island is restarting for an update. Try again in a minute!',
+};
 const MENU_PREVIEW_SHIFT_X = 0.27; // menu stickman this part of the screen right of the middle (landscape)
 const MENU_PREVIEW_SHIFT_Y = 0.2;  // ... or below the middle (portrait)
 
@@ -167,13 +173,14 @@ export class Game {
       this.opening = ws; // a socket that is still opening (closed if the join gives up)
       ws.onopen = () => { if (this.opening === ws) this.opening = null; this.ws = ws; resolve(); };
       ws.onerror = () => reject(new Error('Could not connect to the server'));
-      ws.onclose = () => {
+      ws.onclose = e => {
         if (this.ws === ws) this.ws = null;
         if (this.opening === ws) this.opening = null;
-        reject(new Error('Could not connect to the server')); // no effect if it opened before
-        this.settleJoin(new Error('Lost connection to the server. Try again!'));
+        const why = CLOSE_REASONS[e?.code]; // the server said why (too busy, restarting...)
+        reject(new Error(why || 'Could not connect to the server')); // no effect if it opened before
+        this.settleJoin(new Error(why || 'Lost connection to the server. Try again!'));
         this.settleLeave();
-        if (this.mode === 'play') { this.endPlay(); this.ui.onLeft('Lost connection to the server'); }
+        if (this.mode === 'play') { this.endPlay(); this.ui.onLeft(why || 'Lost connection to the server'); }
       };
       ws.onmessage = e => {
         const r = decodeServerMessage(e.data);

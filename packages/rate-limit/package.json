@@ -1,0 +1,14 @@
+{
+  "name": "@pvp/rate-limit",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Small limiters for a game server: token buckets per key, open connections per key, a quota per time window, and login brute-force protection with backoff.",
+  "type": "module",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "scripts": {
+    "test": "node --test"
+  }
+}

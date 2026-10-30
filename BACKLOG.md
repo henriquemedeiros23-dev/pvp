@@ -86,8 +86,8 @@ The live list is on GitHub Issues: https://github.com/henriquemedeiros23-dev/pvp
 | 49 | ✅ | **Right mouse = shield, Shift = aim** | Swap the computer controls for shield and aim. |
 | 50 | ✅ | **Extras bar** | Shield, potions, Bombs and Legendary Bombs get their own bar with drawings; the fast bar is weapons only. |
 | 51 | ✅ | **Bug: durability resets** | Weapons came back at full durability after going to the menu; keep it saved. |
-| 52 | 🔲 | **Ready to go online** | Server hardening, deploy files (Render/Railway), launch-day reset script, and simple steps for a grown-up. |
-| 53 | 🔲 | **Trash in the Inventory** | A small 🗑️ button: tap it, tap an item, confirm to destroy it. |
+| 52 | ✅ | **Ready to go online** | Server hardening, deploy files (Render/Railway), launch-day reset script, and simple steps for a grown-up. |
+| 53 | ✅ | **Trash in the Inventory** | A small 🗑️ button: tap it, tap an item, confirm to destroy it. |
 | 54 | 🔲 | **Name bar above players** | A clear small bar with the name (and HP) above every player. |
 | 55 | 🔲 | **Sounds (no music)** | Shots, swords, bombs, chests, coins and headshots, with volume and mute. No music. |
 

@@ -48,7 +48,7 @@ try {
       show('dead');
     },
     onLeft(reason) { showMenu(reason || ''); },
-    onFull() { showMenu('Arena is full. Try again in a moment!'); },
+    onFull() { showMenu('The island is full, try again soon!'); },
   }, { openSocket: inject.openSocket });
 } catch (e) {
   console.warn('3D view could not start:', e);
