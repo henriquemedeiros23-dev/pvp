@@ -91,3 +91,4 @@ The live list is on GitHub Issues: https://github.com/henriquemedeiros23-dev/pvp
 - Sounds and music
 - Ranking of top players
 - Put the game online so friends can play from anywhere
+  - Launch day: the boss asks to wipe all accounts (his too) so everyone starts at the same time with nothing
