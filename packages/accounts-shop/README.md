@@ -41,6 +41,11 @@ const bombs = accounts.takeBombs(acc);      // { bomb: 5, legendarybomb: 3 } at 
 accounts.returnBombs(acc, { bomb: 2 });     // left alive: unused bombs go back
 
 accounts.rename(acc, 'New_Name');        // same name rules; tokens stay logged in
+
+// the ranking (#47): knockouts are counted per account, with the time of the last one (it breaks ties)
+accounts.addKnockout(accounts.byName('stick_kid'), now); // byName ignores case (an arena player key works); returns the new count
+accounts.rankingEntries();                  // [{ name, kills, lastKillAt, skinColor }] of every account with knockouts
+                                            // -> rankPlayers() in @pvp/leaderboard
 accounts.logout(token);
 await accounts.flush();                     // on shutdown
 ```
@@ -50,7 +55,8 @@ that is no longer in the rules (like the old wooden sword, or the Pistol, Rocket
 is dropped when the accounts are loaded, so old saved accounts still load.
 The backpack also counts Healing Potions (`potions`, any number; only 3 go into the arena). Older saved
 accounts without it load with 0 potions. Bombs are counted the same way (`bombs: { bomb, legendarybomb }`, any number;
-older accounts load with 0).
+older accounts load with 0). Knockouts for the ranking (`kills`, `lastKillAt`) are kept on the account record (not in `publicView`);
+older accounts load with 0.
 
 Error codes: `BAD_NAME`, `BAD_PASSWORD`, `NAME_TAKEN`, `WRONG_LOGIN`, `UNKNOWN_ITEM`, `ALREADY_OWNED`, `NOT_ENOUGH_COINS`, `NOT_OWNED` (all `AccountError`). Passing an account object that didn't come from this service throws a `TypeError`.
 

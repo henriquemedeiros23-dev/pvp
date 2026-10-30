@@ -1,0 +1,14 @@
+{
+  "name": "@pvp/leaderboard",
+  "version": "1.0.0",
+  "private": true,
+  "description": "The ranking: top players by knockouts (ties: who got there first), and anyone's own place.",
+  "type": "module",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "scripts": {
+    "test": "node --test"
+  }
+}

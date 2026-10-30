@@ -34,6 +34,8 @@ server.teleport(api.token, 10, 20);      // practice/test helper, like the serve
   the arena's outbox goes out as JSON, chest coins are added to the account, the account's coin total wins,
   knocked out = weapons lost, leaving alive = weapons back in the backpack. Potions and bombs come along and go back
   the same way; the `throw` message throws a bomb (#32).
+- The ranking (#47): a knockout gives the attacker's local account +1 (`accounts.addKnockout`, time from `now`);
+  `/api/ranking` answers `rankPlayers` from `@pvp/leaderboard`. Bots are no accounts, so they are never in it.
 - Passwords of local accounts use `practiceHash` (FNV based, **not secure**): the accounts never leave this browser.
 - `createBots({ arena, island, random, count })` (`src/bots.js`) works with any arena: call `bots.tick(now)` before
   `arena.tick(now)`. Bots only use the arena's normal methods (join, setState, openChest, fire).

@@ -24,7 +24,8 @@
       "@pvp/stickman-3d": "/packages/stickman-3d/src/index.js",
       "@pvp/island-scene": "/packages/island-scene/src/index.js",
       "@pvp/touch-controls": "/packages/touch-controls/src/index.js",
-      "@pvp/net-protocol": "/packages/net-protocol/src/index.js"
+      "@pvp/net-protocol": "/packages/net-protocol/src/index.js",
+      "@pvp/leaderboard": "/packages/leaderboard/src/index.js"
     } }
   </script>
 </head>
@@ -57,6 +58,7 @@
       <div class="menu-buttons">
         <button id="btnJoin" class="huge">JOIN ARENA</button>
         <button id="btnShop" class="huge alt">SHOP</button>
+        <button id="btnRanking" class="huge gold">🏆 RANKING</button>
       </div>
       <p class="online"><span class="dot"></span><span id="menuOnline">0</span> players in the arena</p>
       <p id="menuBackpack" class="backpack"></p>
@@ -83,6 +85,18 @@
     <p id="shopHint" class="hint"></p>
     <div id="shopGrid" class="grid"></div>
     <p id="shopError" class="error"></p>
+  </section>
+
+  <!-- Ranking (#47): the top 50 players by knockouts, filled by js/ranking.js -->
+  <section id="ranking" class="screen hidden">
+    <header class="topbar">
+      <button id="btnRankingBack" class="back">‹ Back</button>
+      <div class="who">🏆 Ranking</div>
+    </header>
+    <p class="hint">The top 50 players with the most knockouts</p>
+    <ol id="rankingList" class="ranking-list"></ol>
+    <p id="rankingEmpty" class="hint hidden">No knockouts yet. Join the arena and be the first!</p>
+    <p id="rankingError" class="error"></p>
   </section>
 
   <!-- In-game HUD -->

@@ -5,9 +5,10 @@ import { shopTabs, shopItems, backpackSummary, swatchBackground } from '@pvp/sho
 import { WEAPONS, BOMBS } from '@pvp/game-rules';
 import { WEAPON_ICONS, POTION_ICON_SVG, bombIconSvg, coinIconDataUrl } from '@pvp/hud-model';
 import { Game } from './game.js';
+import { setupRanking } from './ranking.js';
 
 const $ = id => document.getElementById(id);
-const SCREENS = ['login', 'menu', 'shop', 'dead'];
+const SCREENS = ['login', 'menu', 'shop', 'dead', 'ranking'];
 const ONLINE_REFRESH_MS = 5000;
 
 // Practice mode (practice.html) sets globalThis.pvpInject = { api, openSocket } before this file runs,
@@ -132,6 +133,7 @@ setInterval(() => {
 
 $('btnShop').addEventListener('click', () => { $('shopError').textContent = ''; show('shop'); renderShop(); });
 $('btnLogout').addEventListener('click', () => { api.logout(); goLogin(); });
+setupRanking({ api, show, showMenu, handleError }); // the 🏆 RANKING screen (#47)
 
 $('btnJoin').addEventListener('click', async () => {
   if (!game) { showMenu('Your browser cannot show 3D graphics, so the game cannot start.'); return; }

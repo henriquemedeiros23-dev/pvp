@@ -12,6 +12,11 @@ Decided by the boss through 22 questions.
 ## Main menu
 - **Join Arena:** jump into the running match.
 - **Shop:** buy skins and weapons with coins.
+- **🏆 Ranking (#47):** the **top 50 players** with the most **knockouts** (not coins). 🥇🥈🥉 for the first three,
+  your own row in gold, and if you are not in the top 50 your place is shown at the bottom.
+  - Every time you knock out another player, your account gets **+1 knockout** (saved). Your own bomb does not count.
+    In practice mode your knockouts count too; the bots are not in the ranking.
+  - The same number of knockouts: whoever got there **first** ranks higher. Players with 0 knockouts are not listed.
 
 ## Fighting
 - **Weapons** come from the boss's cards (`docs/design/`), nothing else (#26):

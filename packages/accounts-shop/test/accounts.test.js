@@ -347,3 +347,28 @@ test('old saved accounts without bombs still load (0 bombs); bad bomb counts bec
   const odd = again.login('Odd_Kid', 'secret').account;
   assert.deepEqual(again.takeBombs(odd), { bomb: 0, legendarybomb: 0 });
 });
+
+test('knockouts for the ranking (#47): counted with the time, found by name, listed when > 0; old accounts start at 0', () => {
+  const store = createMemoryStore();
+  const { accounts } = setup({ store });
+  const ann = accounts.signup('Ann', 'secret').account;
+  accounts.signup('Bob', 'secret');
+  assert.equal(accounts.byName('ANN'), ann);
+  assert.equal(accounts.byName('nobody'), null);
+  assert.equal(accounts.byName(null), null);
+  assert.equal(accounts.byName('__proto__'), null);
+  assert.equal(accounts.addKnockout(ann, 5000), 1);
+  assert.equal(accounts.addKnockout(ann, 7000), 2);
+  assert.equal(ann.kills, 2);
+  assert.deepEqual(accounts.rankingEntries(), [{ name: 'Ann', kills: 2, lastKillAt: 7000, skinColor: DEFAULT_SKIN.color }]);
+  assert.throws(() => accounts.addKnockout({ name: 'Ann' }), TypeError);
+  // saved, and older accounts without knockouts load with 0
+  const data = store.load();
+  assert.equal(data.ann.kills, 2);
+  delete data.bob.kills;
+  delete data.bob.lastKillAt;
+  data.ann.lastKillAt = 'x';
+  const again = createAccounts({ store: createMemoryStore(data), now: fakeClock(), randomBytes: fakeRandom() });
+  assert.equal(again.byName('bob').kills, 0);
+  assert.deepEqual(again.rankingEntries().map(e => [e.name, e.kills, e.lastKillAt]), [['Ann', 2, 0]]);
+});

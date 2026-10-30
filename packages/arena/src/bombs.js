@@ -87,7 +87,7 @@ export function throwBomb(A, id, bombId, dir, now) {
   const flat = Math.hypot(to.x - p.x, to.z - p.z);
   const fly = Math.min(def.fuseMs, Math.round(A.tune.bombFlyMs + A.tune.bombFlyMsPerM * flat));
   const b = {
-    id: A.newId(), b: bombId, by: p.id, byName: p.name, from, to,
+    id: A.newId(), b: bombId, by: p.id, byName: p.name, byKey: p.key, from, to,
     throwAt: now, landAt: now + fly, explodeAt: now + def.fuseMs,
   };
   A.bombs.set(b.id, b);
@@ -122,6 +122,6 @@ function explode(A, b) {
     const kx = d > 1e-6 ? (ox / d) * T.bombKnock : 0, kz = d > 1e-6 ? (oz / d) * T.bombKnock : 0;
     // your own bomb: nobody gets the credit; someone else's: the thrower (also after leaving)
     const attacker = self ? null : thrower;
-    damage(A, p, def.dmg, attacker, b.b, round2(kx), round2(kz), { byName: self ? null : b.byName });
+    damage(A, p, def.dmg, attacker, b.b, round2(kx), round2(kz), { byName: self ? null : b.byName, byKey: self ? null : b.byKey });
   }
 }

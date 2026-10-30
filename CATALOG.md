@@ -37,11 +37,12 @@ graph LR
   local --> worldgen
   local --> random
   local --> collision
+  local --> leaderboard["@pvp/leaderboard"]
   controls["@pvp/touch-controls"]
 ```
 
 `@pvp/api-client`, `@pvp/touch-controls`, `@pvp/collision`, `@pvp/game-rules`,
-`@pvp/net-protocol` and `@pvp/seeded-random` need no other package.
+`@pvp/net-protocol`, `@pvp/seeded-random` and `@pvp/leaderboard` need no other package.
 
 ## All packages
 
@@ -52,14 +53,15 @@ graph LR
 | `@pvp/collision` | Walls, jumping, landing and ray hits in a world made of boxes. | both | fully: pure math, no random, no time | 18 |
 | `@pvp/world-gen` | Builds the island of ruins (houses, towers, chests) from a seed. | both | fully: all random comes from the seed | 12 |
 | `@pvp/net-protocol` | Every message between phone and server, with builders and checks. | both | fully: pure functions and frozen data | 21 |
-| `@pvp/accounts-shop` | Accounts, log in, coins, buying skins, weapons, potions and bombs, the backpack. | Node (browser via `/browser`) | partly: logic is pure, tokens/clock are passed in, file saving is real I/O | 36 |
-| `@pvp/arena` | The fight itself: players, chests, loot, weapons, shields, shock and freeze, drinking potions, aiming, thrown bombs, damage, knockouts, damage numbers for nearby players. | both | fully: time and seeded random are passed in (replay tests) | 123 |
+| `@pvp/accounts-shop` | Accounts, log in, coins, buying skins, weapons, potions and bombs, the backpack. | Node (browser via `/browser`) | partly: logic is pure, tokens/clock are passed in, file saving is real I/O | 37 |
+| `@pvp/arena` | The fight itself: players, chests, loot, weapons, shields, shock and freeze, drinking potions, aiming, thrown bombs, damage, knockouts, damage numbers for nearby players. | both | fully: time and seeded random are passed in (replay tests) | 133 |
 | `@pvp/shop-catalog` | Turns the rules and an account into the cards the shop screen shows. | both | fully: pure functions of their inputs | 12 |
 | `@pvp/hud-model` | Turns your inventory and health into the in-game HUD: Durability bar of the held weapon, H.P bar, 5 slots, shield pill, potion button with drinking ring, "Charging 1.4s" after a shot, damage numbers above heads, aiming (zoom, scope ring, AIM / AIM ON button), bomb buttons, the coin icon from the boss's drawing. | both | fully: pure functions of their inputs (time passed in) | 39 |
-| `@pvp/api-client` | Talks to the server's account and shop API and keeps the login token. | both | fully: fetch and storage are passed in | 10 |
+| `@pvp/api-client` | Talks to the server's account and shop API and keeps the login token. | both | fully: fetch and storage are passed in | 11 |
 | `@pvp/stickman-3d` | A three.js stickman with skins, outfits, the boss's weapons and shields, the Healing Potion flask, bombs and their red area, frozen/shocked looks and animation. | browser (pose math also in Node) | partly: pose math is pure, how it looks depends on the renderer | 27 |
 | `@pvp/island-scene` | The 3D island: sky with clouds, warm sun, green grass ground with dirt paths, grass tufts, flowers, bushes, rocks, beach with wet sand, waves, palms, ruins and chests, and gold coins popping out of opened chests. A lighter version for phones. | browser (also builds in Node) | partly: all placement and colors from a seed, time passed in, how it looks depends on the renderer | 19 |
-| `@pvp/local-server` | The game server inside the page (practice mode): arena, accounts in localStorage, tick, fake WebSocket, bots. | browser (also Node) | partly: seeded arena and bots, time and timer passed in; tokens and localStorage are real | 16 |
+| `@pvp/local-server` | The game server inside the page (practice mode): arena, accounts in localStorage, tick, fake WebSocket, bots. | browser (also Node) | partly: seeded arena and bots, time and timer passed in; tokens and localStorage are real | 17 |
+| `@pvp/leaderboard` | The ranking: top 50 players by knockouts (a tie: who got there first), your own place even outside the top, 🥇🥈🥉 rows for the screen. | both | fully: pure functions (the knockout time is passed in) | 8 |
 | `@pvp/touch-controls` | Joystick, aim by dragging, buttons, held actions (shield), toggled actions (aim: on until pressed again), buttons that hide and show, keyboard and mouse (right click aims). | browser (core also in Node) | partly: the core is pure, the DOM part depends on real fingers and mice | 27 |
 
 "Both" means Node and the browser (in the browser, `@pvp/*` imports need an import map or a bundler).
@@ -172,6 +174,7 @@ graph LR
 | `createJsonFileStore(file, opts)` | `createJsonFileStore('data/accounts.json', { saveDelayMs: 1000 });` |
 | `createWebStorageStore(storage, key)` | `createWebStorageStore(localStorage, 'pvp.accounts'); // memory if blocked` |
 | `accounts.rename` | `accounts.rename(acc, 'New_Name');` |
+| `accounts.addKnockout` / `byName` / `rankingEntries` | `accounts.addKnockout(accounts.byName(ev.byKey), now); accounts.rankingEntries(); // the ranking (#47)` |
 | `AccountError` | `catch (e) { if (e.code === 'NAME_TAKEN') ... }` |
 
 **Depends on:** `@pvp/game-rules` (and Node's `crypto` and `fs`).
@@ -194,6 +197,7 @@ graph LR
 | `arena.throwBomb` | `arena.throwBomb(id, 'bomb', [dx, dy, dz], now); // explodes 3 s later, in tick` |
 | `arena.setCoins` | `arena.setCoins(id, account.coins); // the account's total wins, queues an 'inv'` |
 | `arena.tick` / `arena.drain` | `arena.tick(now); for (const ev of arena.drain()) send(ev); // ev.to: id, 'all', 'server' or a list of ids` |
+| knockouts for the server | `{ to: 'server', kind: 'knockedOut', playerId, playerKey, weapons, by, byId, byKey } // byKey: who did it (also after leaving), null for your own bomb (#47)` |
 | damage numbers (#33) | `{ to: [ids near the victim], msg: { t: 'dmg', id, amount, ko?, blocked?, shock? } }` |
 | `ARENA_DEFAULTS` | `createArena({ ..., tuning: { ...ARENA_DEFAULTS, snapshotRadius: 200 } });` |
 
@@ -257,6 +261,7 @@ graph LR
 | `api.signup` / `api.login` | `const { account } = await api.login('Bob', 'secret');` |
 | `api.me` | `const { account, online } = await api.me();` |
 | `api.buy` / `api.equip` | `await api.buy('hat', 'crown');` |
+| `api.ranking` | `const { top, me } = await api.ranking(); // top 50 by knockouts + my place (#47)` |
 | `ApiError` | `catch (e) { show(e.message); /* e.status 0 = no connection */ }` |
 | `safeStorage(storage)` | `const s = safeStorage(localStorage); s.set('k', 'v');` |
 
@@ -319,8 +324,22 @@ graph LR
 | `createBots(opts)` | `const bots = createBots({ arena, island, random: createRandom('b'), count: 3 }); bots.tick(now);` |
 | `createFakeSocket(opts)` | the WebSocket-like object (send, close, readyState, onopen/onmessage/onclose) |
 
-**Depends on:** `@pvp/arena`, `@pvp/accounts-shop` (browser entry), `@pvp/api-client`, `@pvp/net-protocol`, `@pvp/world-gen`, `@pvp/seeded-random`, `@pvp/collision`, `@pvp/game-rules`.
+**Depends on:** `@pvp/arena`, `@pvp/accounts-shop` (browser entry), `@pvp/api-client`, `@pvp/leaderboard`, `@pvp/net-protocol`, `@pvp/world-gen`, `@pvp/seeded-random`, `@pvp/collision`, `@pvp/game-rules`.
 **Determinism:** partly. The arena and bots use seeded randoms and time/timer are passed in, so tests replay exactly; login tokens use `crypto.getRandomValues` unless `randomBytes` is passed, and `localStorage` is real storage.
+
+## `@pvp/leaderboard`
+
+**Purpose:** the ranking (#47): the top 50 players by knockouts (most first; the same number: whoever got there first, then the name), players with 0 knockouts left out, and anyone's own place even outside the top. Also the rows the 🏆 RANKING screen draws.
+
+| Export | Example |
+|---|---|
+| `rankPlayers(players, opts)` | `rankPlayers(accounts.rankingEntries(), { me: { name, kills, lastKillAt } }); // { top: [{ place, name, kills, skinColor? }], me: { place, name, kills } }` |
+| `compareRank(a, b)` | `list.sort(compareRank); // kills desc, then lastKillAt asc, then name` |
+| `rankingRows(ranking)` | `rankingRows(await api.ranking()).rows; // [{ place, label: '🥇', name, kills, me, below? }]` |
+| `placeLabel(place)` / `RANKING_SIZE` | `placeLabel(1); // '🥇'; placeLabel(4); // '#4'; RANKING_SIZE === 50` |
+
+**Depends on:** nothing.
+**Determinism:** fully. Pure functions; ties are broken by the knockout time (passed in by the server) and then the name, never by input order. One pass keeps only the best 50, so thousands of players are fast.
 
 ## `@pvp/touch-controls`
 

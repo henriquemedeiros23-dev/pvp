@@ -40,7 +40,7 @@ phone layout, and more (`apps/game/test/e2e/`). No console errors are allowed.
 - WebGL runs in software (swiftshader), so the game draws only a few frames a second; the tests wait for that.
 - Every test server uses a temp accounts file, never the real one.
 - The play test starts its server with `PVP_TEST_HOOKS=1`, which lets the test jump a player close to a chest
-  (`debugTeleport`). Never set it for real players: without it the server ignores that message.
+  (`debugTeleport`), give coins (`debugCoins`) or knockouts for the ranking (`debugKills`). Never set it for real players: without it the server ignores that message.
 - Add `SCREENSHOTS=1` to update `docs/screenshots/`.
 
 ## Layout

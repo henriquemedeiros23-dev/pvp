@@ -65,7 +65,7 @@ export function strike(A, attacker, victim, w, def, kx = 0, kz = 0, full = true,
   if (def.shock) {
     // a new shock starts over: forMs / everyMs more ticks, the first one everyMs from now
     const { dmg, everyMs, forMs } = def.shock;
-    victim.shock = { dmg, everyMs, left: Math.max(1, Math.round(forMs / everyMs)), next: A.now + everyMs, byId: attacker.id, by: attacker.name, weapon: w };
+    victim.shock = { dmg, everyMs, left: Math.max(1, Math.round(forMs / everyMs)), next: A.now + everyMs, byId: attacker.id, by: attacker.name, byKey: attacker.key, weapon: w };
   }
   if (def.freezeMs) {
     victim.frozenUntil = Math.max(victim.frozenUntil, A.now + def.freezeMs);
@@ -101,7 +101,7 @@ export function tickEffects(A, now) {
       s.next += s.everyMs;
       if (s.left === 0) p.shock = null;
       const by = A.players.get(s.byId) ?? null;
-      damage(A, p, s.dmg, by, s.weapon, 0, 0, { byName: s.by, shock: true });
+      damage(A, p, s.dmg, by, s.weapon, 0, 0, { byName: s.by, byKey: s.byKey, shock: true });
     }
   }
 }

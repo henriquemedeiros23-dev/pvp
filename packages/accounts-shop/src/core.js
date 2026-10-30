@@ -74,6 +74,9 @@ export function createAccounts({
     rec.potions = safeCount(rec.potions);
     // Bombs in the backpack, one count per bomb (older accounts have none: 0 each).
     rec.bombs = bombCounts(rec.bombs);
+    // Knockouts for the ranking (#47; older accounts start at 0) and when the last one happened.
+    rec.kills = safeCount(rec.kills);
+    rec.lastKillAt = Number.isFinite(rec.lastKillAt) && rec.lastKillAt > 0 ? rec.lastKillAt : 0;
     // Weapons that are no longer in the game (e.g. the old wooden sword, or the Pistol and the others removed
     // in #26) are dropped from the backpack.
     for (const id of Object.keys(rec.stash)) if (!Object.hasOwn(WEAPONS, id)) delete rec.stash[id];
@@ -130,6 +133,8 @@ export function createAccounts({
       stash: {},
       potions: 0,
       bombs: bombCounts(null),
+      kills: 0,
+      lastKillAt: 0,
       tokens: [],
       createdAt: now(),
     };
@@ -176,6 +181,33 @@ export function createAccounts({
       potions: a.potions,
       bombs: { ...a.bombs },
     };
+  }
+
+  /** The account with this name (any case, e.g. an arena player key), or null. */
+  function byName(name) {
+    const key = typeof name === 'string' ? name.toLowerCase() : '';
+    return (key && Object.hasOwn(records, key) && records[key]) || null;
+  }
+
+  /**
+   * One more knockout for the ranking (#47). `at` is when it happened (ms, default now()):
+   * it breaks ties (who reached that count first ranks higher). Returns the new count.
+   */
+  function addKnockout(account, at = now()) {
+    const a = own(account);
+    a.kills = safeCount(a.kills) + 1;
+    a.lastKillAt = Number.isFinite(at) && at > 0 ? at : 0;
+    save();
+    return a.kills;
+  }
+
+  /** Every account with knockouts, for @pvp/leaderboard's rankPlayers: [{ name, kills, lastKillAt, skinColor }]. */
+  function rankingEntries() {
+    const out = [];
+    for (const a of Object.values(records)) {
+      if (a.kills > 0) out.push({ name: a.name, kills: a.kills, lastKillAt: a.lastKillAt, skinColor: a.skin?.color });
+    }
+    return out;
   }
 
   /** Add (or with a negative n, take away) coins. Never goes below 0. Returns the new total. */
@@ -306,6 +338,7 @@ export function createAccounts({
   return {
     signup, login, logout, byToken, publicView, addCoins, buy, equip, rename, takeLoadout, returnLoadout,
     takePotions, returnPotions, takeBombs, returnBombs,
+    byName, addKnockout, rankingEntries,
     /** Write any pending changes now (tests, shutdown). */
     flush: () => store.flush(),
   };

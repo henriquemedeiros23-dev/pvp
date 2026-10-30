@@ -87,6 +87,7 @@ test('knockout drops weapons, shield and potions, emits ko + dead + knockedOut',
   const k = serverEvents(out, 'knockedOut')[0];
   assert.equal(k.playerId, v);
   assert.deepEqual(k.weapons, ['gun', 'icesword', 'shootbm', 'shield']);
+  assert.equal(k.byKey, 'shooter', 'the attacker\'s key, for the ranking (#47)');
   assert.deepEqual(arena.leave(v, { alive: true }), [], 'nothing to give back after a knockout');
 });
 

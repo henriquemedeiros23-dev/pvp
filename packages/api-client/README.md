@@ -15,6 +15,7 @@ const { account } = await api.signup('Bob', 'secret');     // or api.login(name,
 const { account: me, online } = await api.me();
 await api.buy('hat', 'crown');       // kind: 'color' | 'hat' | 'face' | 'back' | 'shirt' | 'weapon'
 await api.equip('hat', 'crown');     // each resolves { account }
+const { top, me } = await api.ranking(); // the ranking (#47): top 50 by knockouts and my place (me.place null = none yet)
 api.logout();                         // forgets the token on this device
 
 try { await api.buy('weapon', 'icesword'); }

@@ -143,3 +143,14 @@ test('the default fetch is the global fetch, called later', async () => {
     globalThis.fetch = saved;
   }
 });
+
+test('ranking (#47) posts with the token and checks the answer', async () => {
+  const RANKING = { top: [{ place: 1, name: 'Ann', kills: 4 }], me: { place: 1, name: 'Ann', kills: 4 } };
+  const fetch = fakeFetch({ status: 200, body: RANKING }, { status: 200, body: { top: 'x' } });
+  const storage = memoryStorage();
+  storage.setItem(TOKEN_KEY, 't9');
+  const api = createApiClient({ fetch, storage });
+  assert.deepEqual(await api.ranking(), RANKING);
+  assert.deepEqual([fetch.calls[0].url, fetch.calls[0].opts.headers['x-token']], ['/api/ranking', 't9']);
+  await assert.rejects(api.ranking(), e => e instanceof ApiError && e.message.length > 0);
+});

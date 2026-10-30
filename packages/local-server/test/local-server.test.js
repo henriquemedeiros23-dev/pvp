@@ -260,3 +260,33 @@ test('damage numbers (#33): a hit sends "dmg" to the players near the victim, no
   assert.deepEqual(target.c.of('dmg'), [dmg]);
   assert.deepEqual(far.c.of('dmg'), []);
 });
+
+test('ranking (#47): a knockout gives the attacker\'s account +1; /api/ranking lists it with my place', async () => {
+  const { server, run } = setup();
+  const api = server.createApi();
+  const ann = await api.signup('Ann', 'secret');
+  server.accounts.addCoins(server.accounts.byName('ann'), 250);
+  await api.buy('weapon', 'supersword'); // 100 damage: one hit knocks out
+  const bob = await api.signup('Bob', 'secret');
+  const a = await open(server, ann.token);
+  const b = await open(server, bob.token);
+  a.send('join');
+  b.send('join');
+  await settle();
+  await run(3200); // spawn protection is over
+  assert.ok(server.teleport(ann.token, 0, 0));
+  assert.ok(server.teleport(bob.token, 0, 0.4)); // so close that facing does not matter
+  a.send('slot', { i: 1 });
+  a.send('fire', { d: [0, 0, 1] });
+  await run(50);
+  assert.equal(a.of('ko').length, 1, 'Bob was knocked out');
+  assert.equal(server.accounts.byName('ann').kills, 1);
+  assert.equal(server.accounts.byName('bob').kills, 0);
+  // Bob (logged in now) is not ranked; Ann is first
+  assert.deepEqual(await api.ranking(), {
+    top: [{ place: 1, name: 'Ann', kills: 1, skinColor: 'black' }],
+    me: { place: null, name: 'Bob', kills: 0 },
+  });
+  await api.login('Ann', 'secret');
+  assert.deepEqual((await api.ranking()).me, { place: 1, name: 'Ann', kills: 1 });
+});

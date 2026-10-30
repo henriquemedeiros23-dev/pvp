@@ -30,7 +30,7 @@ input:focus { border-color: var(--gold); }
 
 .screen { position: fixed; inset: 0; z-index: 10; display: flex; flex-direction: column; align-items: center; overflow-y: auto; touch-action: pan-y; }
 #login, #dead { justify-content: center; background: radial-gradient(ellipse at top, rgba(60,40,90,0.55), rgba(10,8,16,0.85)); padding: 16px; }
-#menu, #shop { background: linear-gradient(180deg, rgba(14,10,24,0.55), rgba(14,10,24,0.88)); }
+#menu, #shop, #ranking { background: linear-gradient(180deg, rgba(14,10,24,0.55), rgba(14,10,24,0.88)); }
 .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 22px; padding: 24px; width: 100%; box-shadow: 0 20px 60px rgba(0,0,0,0.5); }
 .panel.narrow { max-width: 380px; display: flex; flex-direction: column; gap: 12px; }
 .panel.center { text-align: center; align-items: center; }
@@ -48,6 +48,8 @@ input:focus { border-color: var(--gold); }
 .big:active, .huge:active { transform: translateY(3px); box-shadow: 0 2px 0 #a8321f; }
 .alt { background: linear-gradient(180deg, #5ea2ff, var(--accent2)); box-shadow: 0 5px 0 #1f4fa8; }
 .alt:active { box-shadow: 0 2px 0 #1f4fa8; }
+.gold { background: linear-gradient(180deg, #ffd969, var(--gold)); color: #2a1d00; box-shadow: 0 5px 0 #b8860b; }
+.gold:active { box-shadow: 0 2px 0 #b8860b; }
 .huge { font-size: clamp(20px, 4vw, 28px); padding: 18px 28px; min-width: 240px; letter-spacing: 1px; }
 .link { background: none; color: var(--muted); text-decoration: underline; padding: 8px; }
 .error { color: var(--bad); min-height: 1.2em; margin: 4px 0 0; text-align: center; font-weight: 600; }
@@ -372,3 +374,18 @@ body.desktop .hotbar { bottom: 26px; --slot: 72px; --label-w: 88px; --bar-w: 180
   .hotbar { flex-direction: column; align-items: center; gap: 6px; }
   .vitals { align-items: center; }
 }
+
+/* Ranking (#47): one row per player, your own row in gold; outside the top 50 your row is at the bottom */
+.ranking-list { list-style: none; margin: 0; padding: 12px 16px 24px; width: 100%; max-width: 560px; display: flex; flex-direction: column; gap: 6px; }
+.rank-row {
+  display: grid; grid-template-columns: 52px 22px minmax(0, 1fr) auto; align-items: center; gap: 10px;
+  background: var(--panel); border: 2px solid var(--line); border-radius: 14px; padding: 8px 12px; font-weight: 700;
+}
+.rank-row .place { font-size: 18px; text-align: center; color: var(--muted); font-variant-numeric: tabular-nums; }
+.rank-row.medal .place { font-size: 26px; line-height: 1; }
+.rank-row .swatch { width: 22px; height: 22px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.25); }
+.rank-row .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rank-row .kills { color: var(--gold); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.rank-row.me { border-color: var(--gold); background: rgba(255,197,49,0.18); box-shadow: 0 0 16px rgba(255,197,49,0.25); }
+.rank-row.below { margin-top: 14px; position: relative; }
+.rank-row.below::before { content: '⋯'; position: absolute; left: 0; right: 0; top: -20px; text-align: center; color: var(--muted); }

@@ -8,6 +8,7 @@ import { generateIsland } from '@pvp/world-gen';
 import { createArena } from '@pvp/arena';
 import { createRandom, hashString } from '@pvp/seeded-random';
 import { createApiClient, safeStorage } from '@pvp/api-client';
+import { rankPlayers } from '@pvp/leaderboard';
 import { parseClientMessage, encode } from '@pvp/net-protocol';
 import { createFakeSocket } from './socket.js';
 import { createBots } from './bots.js';
@@ -93,6 +94,11 @@ export function createLocalServer({
         return [200, { account }];
       }
       if (url === '/api/equip') return [200, { account: accounts.equip(acc, body.kind, body.id) }];
+      if (url === '/api/ranking') {
+        // the ranking (#47): local accounts only (bots are not accounts)
+        const me = { name: acc.name, kills: acc.kills, lastKillAt: acc.lastKillAt };
+        return [200, rankPlayers(accounts.rankingEntries(), { me })];
+      }
       return [404, { error: 'Not found' }];
     } catch (e) {
       if (e instanceof AccountError) return [400, { error: e.message }];
@@ -131,6 +137,11 @@ export function createLocalServer({
           if (total !== ev.total) arena.setCoins(ev.playerId, total);
         }
         if (ev.kind === 'knockedOut') {
+          // the ranking (#47): +1 for the account that did it (not your own bomb, not a bot: bot keys are no account)
+          if (ev.byKey && ev.byKey !== ev.playerKey) {
+            const killer = accounts.byName(ev.byKey);
+            if (killer) accounts.addKnockout(killer, arena.now());
+          }
           if (bots && bots.knockedOut(ev.playerId, arena.now())) continue;
           gone.push(ev.playerId);
         }

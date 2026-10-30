@@ -45,7 +45,9 @@ setInterval(() => {
   arena.tick(Date.now());                           // potions, chests, golden chest, items, shock damage, snaps
   for (const ev of arena.drain()) {
     if (ev.to === 'server') handle(ev);             // { kind: 'coins', playerId, playerKey, amount, total }
-                                                    // { kind: 'knockedOut', playerId, playerKey, weapons, by, byId }
+                                                    // { kind: 'knockedOut', playerId, playerKey, weapons, by, byId, byKey }
+                                                    // byKey: the attacker's player key, also after it left (bombs,
+                                                    // shock); null for your own bomb or no attacker (ranking, #47)
     else if (ev.to === 'all') for (const id of arena.playerIds()) { if (id !== ev.except) sendTo(id, ev.msg); }
     else if (Array.isArray(ev.to)) for (const id of ev.to) sendTo(id, ev.msg); // players near someone ('dmg')
     else sendTo(ev.to, ev.msg);                     // also deliver to a player id that just got knocked out ('dead')

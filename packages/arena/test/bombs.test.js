@@ -275,3 +275,30 @@ test('same seed and calls: exactly the same messages (bombs are deterministic)',
   assert.equal(run(), one);
   assert.match(one, /"t":"boom"/);
 });
+
+test('ranking (#47): knockedOut names the killer\'s key, also after leaving; never for your own bomb', () => {
+  const rules = { ...RULES, BOMBS: { ...RULES.BOMBS, bomb: { ...RULES.BOMBS.bomb, dmg: 100 } } };
+  // someone else's bomb, the thrower left before it exploded: still credited to the thrower's key
+  const arena = makeArena({ rules });
+  const a = arena.join('ann', { name: 'Ann', bombs: { bomb: 1 } }).id;
+  const v = arena.join('bob', { name: 'Bob' }).id;
+  arena.teleport(a, { x: 0, z: 0 });
+  arena.teleport(v, { x: 0, z: 4 });
+  arena.throwBomb(a, 'bomb', atGround(4), READY);
+  arena.leave(a, { alive: true });
+  arena.tick(READY + 3000);
+  const k = serverEvents(drain(arena), 'knockedOut')[0];
+  assert.equal(k.byId, null);
+  assert.equal(k.byKey, 'ann');
+  // your own bomb: nobody gets the knockout
+  const B = makeArena({ rules });
+  const s = B.join('solo', { name: 'Solo', bombs: { bomb: 1 } }).id;
+  B.teleport(s, { x: 0, z: 0 });
+  B.throwBomb(s, 'bomb', atGround(4), READY);
+  B.teleport(s, { x: 0, z: 4 });
+  B.tick(READY + 3000);
+  const self = serverEvents(drain(B), 'knockedOut')[0];
+  assert.equal(self.playerId, s);
+  assert.equal(self.byKey, null);
+  assert.equal(self.by, null);
+});

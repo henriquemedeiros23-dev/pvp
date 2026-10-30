@@ -104,6 +104,15 @@ export function createApiClient({ baseUrl = '', fetch: fetchFn, storage, tokenKe
     buy: (kind, id) => post('/api/buy', { kind, id }, true),
     /** Wear a skin item you own. Resolves { account }. */
     equip: (kind, id) => post('/api/equip', { kind, id }, true),
+    /**
+     * The ranking (#47): the top 50 by knockouts and your own place.
+     * Resolves { top: [{ place, name, kills, skinColor? }], me: { place (null = no knockouts yet), name, kills } }.
+     */
+    async ranking() {
+      const data = await post('/api/ranking', {}, true);
+      if (!Array.isArray(data.top)) throw new ApiError(FRIENDLY.badAnswer, 200);
+      return data;
+    },
     /** Forget the token on this device (no server call). */
     logout() { store.remove(tokenKey); },
   };

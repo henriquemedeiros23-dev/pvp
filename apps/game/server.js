@@ -15,6 +15,7 @@ import { RULES } from '@pvp/game-rules';
 import { createAccounts, createJsonFileStore, AccountError } from '@pvp/accounts-shop';
 import { generateIsland } from '@pvp/world-gen';
 import { createArena } from '@pvp/arena';
+import { rankPlayers } from '@pvp/leaderboard';
 import { createRandom } from '@pvp/seeded-random';
 import { parseClientMessage, encode, check, MAX_CLIENT_MESSAGE_SIZE } from '@pvp/net-protocol';
 
@@ -34,6 +35,8 @@ const TEST_MESSAGES = {
   debugTeleport: { obj: { x: { type: 'number', min: -1000, max: 1000 }, z: { type: 'number', min: -1000, max: 1000 } } },
   // Give my account some coins (to buy things in the shop during a browser test). The arena gets the new total.
   debugCoins: { obj: { n: { type: 'uint', min: 1, max: 10000 } } },
+  // Give my account some knockouts for the ranking (#47), as if I knocked out n players just now.
+  debugKills: { obj: { n: { type: 'uint', min: 1, max: 1000 } } },
 };
 // The monorepo's packages/ folder (read-only: the browser loads package src files from here).
 const PACKAGES_DIR = path.resolve(ROOT, '..', '..', 'packages');
@@ -65,11 +68,25 @@ function handleApi(req, res, body) {
       return send(200, { account });
     }
     if (url === '/api/equip') return send(200, { account: accounts.equip(acc, body.kind, body.id) });
+    if (url === '/api/ranking') return send(200, ranking(acc));
     return send(404, { error: 'Not found' });
   } catch (e) {
     if (e instanceof AccountError) return send(400, { error: e.message });
     throw e;
   }
+}
+
+// The ranking (#47): top 50 accounts by knockouts (@pvp/leaderboard) and my own place.
+function ranking(acc) {
+  return rankPlayers(accounts.rankingEntries(), { me: { name: acc.name, kills: acc.kills, lastKillAt: acc.lastKillAt } });
+}
+
+// A knockout counts for the ranking (#47) when a real account did it: not your own bomb (byKey is null
+// then, or the same as playerKey), not the island, not a bot. The time breaks ties.
+function countKnockout(ev, now) {
+  if (!ev.byKey || ev.byKey === ev.playerKey) return;
+  const killer = accounts.byName(ev.byKey);
+  if (killer) accounts.addKnockout(killer, now);
 }
 
 // ---------------------------------------------------------------- static files
@@ -142,7 +159,7 @@ function pump() {
         if (total !== ev.total) arena.setCoins(ev.playerId, total);
       }
       // Knocked out: the weapons and potions are lost (dropped on the island), nothing goes back to the backpack.
-      if (ev.kind === 'knockedOut') gone.push(ev.playerId);
+      if (ev.kind === 'knockedOut') { countKnockout(ev, Date.now()); gone.push(ev.playerId); }
       continue;
     }
     const text = JSON.stringify(ev.msg);
@@ -246,6 +263,7 @@ function parseTestMessage(raw) {
 
 function onTestMessage(conn, m) {
   if (m.t === 'debugCoins') { accounts.addCoins(conn.acc, m.n); syncCoins(conn.acc); return; }
+  if (m.t === 'debugKills') { for (let i = 0; i < m.n; i++) accounts.addKnockout(conn.acc, Date.now()); return; }
   const id = conn.playerId != null && arena.hasPlayer(conn.playerId) ? conn.playerId : null;
   if (id == null) return;
   if (m.t === 'debugTeleport' && arena.teleport(id, { x: m.x, y: 0, z: m.z })) {

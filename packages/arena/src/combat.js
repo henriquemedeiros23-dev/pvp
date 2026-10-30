@@ -13,7 +13,7 @@ const round2 = v => +v.toFixed(2);
 
 /**
  * Hurt `victim` (no shield check: use strike() in effects.js for weapon hits).
- * `attacker` is a player object (may have left already) or null; opts.byName names an attacker who left.
+ * `attacker` is a player object (may have left already) or null; opts.byName / opts.byKey name an attacker who left.
  * opts.shock marks a shock tick (for the 'dmg' number); opts.head a gun headshot (#45: 'dmg' and 'hitmark' get head: true).
  * Everyone near the victim (the victim too) gets a 'dmg' with the health lost (#33).
  * Returns true if the damage was done (false: not in the arena, already out, or spawn protection).
@@ -36,7 +36,7 @@ export function damage(A, victim, amount, attacker, weapon, kx = 0, kz = 0, opts
     if (opts.head) dmg.head = true;
     sendNear(A, victim, dmg); // before the knockout, so the victim gets it too
   }
-  if (victim.hp <= 0) knockOut(A, victim, attacker, weapon, opts.byName);
+  if (victim.hp <= 0) knockOut(A, victim, attacker, weapon, opts.byName, opts.byKey);
   return true;
 }
 
@@ -46,7 +46,7 @@ export function damage(A, victim, amount, attacker, weapon, kx = 0, kz = 0, opts
  * A dropped weapon with more than half its durability keeps it; half or less is set to half
  * (rounded up), see droppedDurability in @pvp/game-rules.
  */
-function knockOut(A, victim, attacker, weapon, byName) {
+function knockOut(A, victim, attacker, weapon, byName, byKey) {
   const spread = A.tune.koDropSpread;
   const lost = [...victim.weapons];
   victim.weapons.forEach((w, i) => {
@@ -65,7 +65,13 @@ function knockOut(A, victim, attacker, weapon, byName) {
   const by = attacker ? attacker.name : (byName ?? null);
   send(A, 'all', { t: 'ko', id: victim.id, x: victim.x, y: victim.y, z: victim.z, victim: victim.name, by, weapon });
   send(A, victim.id, { t: 'dead', by, weapon });
-  tellServer(A, 'knockedOut', { playerId: victim.id, playerKey: victim.key, weapons: lost, by, byId: attacker ? attacker.id : null });
+  // byKey (#47): the attacker's player key (the account), also after the attacker left; null for your own
+  // bomb or no attacker. The server counts it for the ranking (never when byKey === playerKey).
+  const killerKey = attacker ? attacker.key : (byKey ?? null);
+  tellServer(A, 'knockedOut', {
+    playerId: victim.id, playerKey: victim.key, weapons: lost, by, byId: attacker ? attacker.id : null,
+    byKey: killerKey === victim.key ? null : killerKey,
+  });
 }
 
 // Returns true if the swing hit someone (a player, or a raised shield); a swing at the air returns false.
