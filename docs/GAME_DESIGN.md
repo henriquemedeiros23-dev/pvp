@@ -161,6 +161,23 @@ Decided by the boss through 22 questions.
   Shiny Gold 75, Rainbow 100.
 - **Map:** a big island of ruins with buildings, towers and hiding spots, for up to 100 players.
 
+## Sounds (#55)
+- **All made in code** (`@pvp/sound`, Web Audio): no sound files, nothing to download. Each play is a little
+  different (seeded), so it never sounds like a robot.
+- **Fight:** every gun has its own shot (Gun pop, Shootbm crack, DM Gun heavier, Supergun big blast). Sword swing
+  whoosh and hit; the Ice Sword hit sounds icy, the Electric Sword zaps. Shield: a swoosh when you raise it, a clang
+  when it blocks. A "ding" for a headshot, a small tick when your gun hits, an "oof" when you get hurt, a falling
+  "bwoo" for a knockout, a crack when a weapon or shield breaks.
+- **Bombs:** a whoosh when thrown, the fuse sizzles, then BOOM (the Legendary Bomb is bigger and deeper).
+- **Loot:** chest creak, coins jingle, a fanfare for the golden chest (and a shimmer when it appears), potion gulps
+  and a heal chime, a "blip" when you pick something up. Soft footsteps for your own player, faster when you run.
+- **Menus:** a soft click on buttons, "ka-ching" when you buy.
+- **3D:** other players' sounds come from where they are: quieter far away, left or right ear from the camera.
+  Phones play at most 8 sounds at once (computers 16); the important ones (your own, headshots, booms) win.
+- **No music** (the boss's choice).
+- **Settings:** 🔊 in the menu top bar and a small 🔊 in the fight HUD mute / unmute; 🎚️ in the menu opens the
+  Sounds volume slider. Saved in this browser. Sound starts on your first tap (browsers need that).
+
 ## Other
 - **Platform:** phones (runs in the phone's browser).
 - **Accounts:** saved, so you keep your coins and skins.

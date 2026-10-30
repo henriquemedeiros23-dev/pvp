@@ -14,6 +14,7 @@ import { chargeView, chargeStarts, hitMarker } from '@pvp/hud-model';
 import { aimView, aimBlend, aimButtonView, aimHandKey, zoomedFov } from '@pvp/hud-model';
 import { coinsToast } from '@pvp/hud-model';
 import { DamageNumbers } from './damage-numbers.js';
+import { GameSounds } from './game-sounds.js';
 
 const $ = id => document.getElementById(id);
 const JOIN_TIMEOUT_MS = 8000;  // give up joining if 'welcome' does not come
@@ -64,7 +65,8 @@ function nameTag(name) {
 }
 
 export class Game {
-  constructor(canvas, ui, { openSocket } = {}) {
+  constructor(canvas, ui, { openSocket, sound } = {}) {
+    this.sounds = new GameSounds(this, sound || null); // sounds (#55, @pvp/sound)
     this.ui = ui; // callbacks: onPlaying(), onDead(by, weapon), onLeft(reason), onFull()
     // token -> a WebSocket (or a WebSocket-like object, e.g. practice mode's @pvp/local-server)
     this.openSocket = openSocket || (token => new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/?token=${encodeURIComponent(token)}`));
@@ -305,11 +307,13 @@ export class Game {
       charge: play ? $('charge').classList.contains('hidden') ? '' : $('chargeText').textContent : '',
       chargeHint: play && !$('charge').classList.contains('hidden') ? $('chargeHint').textContent : '', // '25%' while charging (#38)
       damageNumbers: play ? this.dmgNums.shown() : [],
+      sound: this.sounds.player?.stats() ?? null, // #55
       hitmark: this.lastHitmark ?? null, // the last hit marker's kind: 'hit' | 'head' | 'ko' | 'blocked' (#45)
     };
   }
 
   onMessage(m) {
+    this.sounds.message(m); // first: chests and the golden chest are still as they were
     switch (m.t) {
       case 'welcome': this.startPlay(m); return this.settleJoin('playing');
       case 'full': this.settleJoin('full'); return this.ui.onFull();
@@ -893,6 +897,7 @@ export class Game {
     if (this.mode === 'play' && this.me) this.updatePlay(dt);
     else this.updateMenu(dt);
     this.updateWorld(dt);
+    this.sounds.frame(dt);
     if (this.mode === 'play') this.dmgNums.update(this.camera, innerWidth, innerHeight, performance.now(), id => this.playerPos(id));
     this.renderer.render(this.scene, this.camera);
   }

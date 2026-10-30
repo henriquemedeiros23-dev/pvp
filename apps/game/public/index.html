@@ -27,7 +27,8 @@
       "@pvp/net-protocol": "/packages/net-protocol/src/index.js",
       "@pvp/leaderboard": "/packages/leaderboard/src/index.js",
       "@pvp/name-filter": "/packages/name-filter/src/index.js",
-      "@pvp/account-form": "/packages/account-form/src/index.js"
+      "@pvp/account-form": "/packages/account-form/src/index.js",
+      "@pvp/sound": "/packages/sound/src/index.js"
     } }
   </script>
 </head>
@@ -68,8 +69,18 @@
         <!-- Change your name (#41): the server says no to bad words and to names someone already has -->
         <button id="btnRename" class="rename-btn" title="Change your name" aria-label="Change your name">✏️</button>
       </div>
+      <!-- Sounds (#55): 🔊 mutes / unmutes, 🎚️ opens the Sounds volume slider (saved in this browser) -->
+      <div class="sound-btns">
+        <button id="btnSound" class="sound-btn" aria-pressed="false" title="Sound is on. Tap to turn it off" aria-label="Sound is on. Tap to turn it off">🔊</button>
+        <button id="btnSoundSettings" class="sound-btn" aria-expanded="false" aria-controls="soundPanel" title="Sound volume" aria-label="Sound volume">🎚️</button>
+      </div>
       <div class="coins"><span class="coin"></span><span id="menuCoins">0</span></div>
     </header>
+    <div id="soundPanel" class="sound-panel hidden" role="dialog" aria-label="Sound settings">
+      <label for="soundVolume">Sounds <b id="soundVolumeText">80%</b></label>
+      <input id="soundVolume" type="range" min="0" max="100" step="1" value="80">
+      <button id="btnSoundClose" type="button" class="big">OK</button>
+    </div>
     <form id="renamePanel" class="rename-panel hidden" autocomplete="off">
       <label for="renameInput">New name</label>
       <input id="renameInput" maxlength="16" placeholder="New name" autocomplete="off" spellcheck="false">
@@ -168,6 +179,7 @@
       <div class="hud-info">
         <span class="pill"><span class="coin"></span><b id="hudCoins">0</b></span>
         <span class="pill">👥 <b id="hudPlayers">1</b></span>
+        <button id="btnSoundHud" class="pill sound-btn small" aria-pressed="false" title="Sound is on. Tap to turn it off" aria-label="Sound is on. Tap to turn it off">🔊</button>
       </div>
     </div>
     <div id="compass" class="compass hidden">★ <span id="compassDist"></span></div>

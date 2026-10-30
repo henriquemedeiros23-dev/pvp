@@ -42,6 +42,8 @@ graph LR
   local --> collision
   local --> leaderboard["@pvp/leaderboard"]
   controls["@pvp/touch-controls"]
+  sound["@pvp/sound"] --> random
+  sound --> rules
 ```
 
 `@pvp/api-client`, `@pvp/touch-controls`, `@pvp/collision`, `@pvp/game-rules`,
@@ -68,6 +70,7 @@ graph LR
 | `@pvp/local-server` | The game server inside the page (practice mode): arena, accounts in localStorage, tick, fake WebSocket, bots. | browser (also Node) | partly: seeded arena and bots, time and timer passed in; tokens and localStorage are real | 23 |
 | `@pvp/leaderboard` | The ranking: top 50 players by knockouts (a tie: who got there first), your own place even outside the top, 🥇🥈🥉 rows for the screen. | both | fully: pure functions (the knockout time is passed in) | 8 |
 | `@pvp/touch-controls` | Joystick, aim by dragging, buttons, held actions (shield), toggled actions (aim: on until pressed again), buttons that hide and show, keyboard and mouse (hold right click = shield, Shift = aim on/off). | browser (core also in Node) | partly: the core is pure, the DOM part depends on real fingers and mice | 28 |
+| `@pvp/sound` | Every game sound made in code with Web Audio (guns, swords, shields, hits, headshot ding, bombs, chests, coins, potions, footsteps, menu clicks; no audio files): recipes as data, a seeded planner, 3D sound (distance + stereo pan) with a cap on sounds at once, which sounds a server message makes, the 🔊 mute button and Sounds volume slider (saved per browser). | both (player and buttons: browser) | partly: recipes, planner, mixer math and message mapping are pure and seeded; real playback follows the audio clock | 26 |
 
 "Both" means Node and the browser (in the browser, `@pvp/*` imports need an import map or a bundler).
 
@@ -405,3 +408,24 @@ graph LR
 
 **Depends on:** nothing.
 **Determinism:** partly. The core (`createInputState`) is pure: the same events give the same result, so replays work. The DOM adapters depend on real fingers, mice and screen layout.
+
+## `@pvp/sound`
+
+**Purpose:** all the sounds of the game, made in code with the Web Audio API (oscillators, noise buffers, envelopes, filters), no audio files and no downloads (#55). Other players' sounds come from where they are (quieter far away, panned left/right from the camera). No music (the boss asked for none).
+
+| Export | Example |
+|---|---|
+| `SOUNDS`, `SOUND_NAMES` | `SOUNDS.supergun // { gain, priority, minGapMs, jitter, parts: [{ osc: 'sine', freq: [75, 30], dur: 0.5, ... }] }` |
+| `planSound(recipe, { rng, gain })` | `planSound(SOUNDS.gun, { rng: createRandom(1) }) // { gain, dur, voices: [{ type, start, end, freq, filter, env }] }` |
+| `volumeToGain(v)`, `masterGain(settings)` | `masterGain({ muted: false, volume: 0.5 }) // 0.25` |
+| `attenuation(d)`, `spatialize(listener, pos)` | `spatialize({ x: 0, z: 0, yaw: 0 }, [-10, 0, 0]) // { gain: 0.38.., pan: 0.85, distance: 10 }` |
+| `createVoiceLimiter({ max })` | `lim.request({ now, dur, priority, name, minGapMs }) // { ok, id, steal: [ids] } or { ok: false, reason: 'full' | 'gap' }` |
+| `createFootsteps()` | `steps.step(dt, { speed, onGround }) // null or { foot, gain }: faster when running, one on landing` |
+| `noiseSamples(color, n, rng)` | `noiseSamples('brown', 8000, createRandom(1)) // Float32Array in -1..1` |
+| `soundEventsFor(msg, ctx)`, `gunSound(w)`, `hitSound(w)` | `soundEventsFor({ t: 'boom', b: 'legendarybomb', x, y, z }) // [{ sound: 'bigBoom', pos: [x, y, z] }]` |
+| `loadSettings(storage)`, `saveSettings(storage, s)`, `soundButtonView(s)`, `volumeSliderView(s)` | `loadSettings(localStorage) // { muted: false, volume: 0.8 } (never throws)` |
+| `createSoundPlayer(opts)` | `const sound = createSoundPlayer({ storage: localStorage, mobile }); sound.play('gun', { pos }); sound.toggleMute(); sound.stats()` |
+| `attachSoundControls(player, els)`, `unlockOnFirstGesture(player)` | `attachSoundControls(sound, { muteButtons, settingsButton, panel, slider, sliderText, closeButton })` |
+
+**Depends on:** `@pvp/seeded-random`, `@pvp/game-rules`.
+**Determinism:** partly. Recipes, planner, mixer math, footsteps, noise and the message mapping are pure (seeded, time passed in). Real playback depends on the browser's audio clock and the first tap.

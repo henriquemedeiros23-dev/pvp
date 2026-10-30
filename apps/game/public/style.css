@@ -507,3 +507,16 @@ body.desktop .hotbar { bottom: 26px; --slot: 72px; --label-w: 88px; --bar-w: 180
 .rank-row.me { border-color: var(--gold); background: rgba(255,197,49,0.18); box-shadow: 0 0 16px rgba(255,197,49,0.25); }
 .rank-row.below { margin-top: 14px; position: relative; }
 .rank-row.below::before { content: '⋯'; position: absolute; left: 0; right: 0; top: -20px; text-align: center; color: var(--muted); }
+
+/* Sounds (#55): 🔊 mute button and 🎚️ volume panel in the menu top bar, a small 🔊 in the in-game HUD */
+.sound-btns { display: flex; gap: 6px; margin-left: auto; margin-right: 8px; flex: none; }
+.sound-btn { flex: none; background: rgba(0,0,0,0.45); border: 1px solid var(--line); border-radius: 999px; width: 36px; height: 36px; font-size: 17px; line-height: 1; padding: 0; }
+.sound-btn.muted { opacity: 0.75; border-color: rgba(255, 90, 74, 0.6); }
+.hud-info .sound-btn.small { width: auto; height: auto; padding: 6px 10px; font-size: 15px; }
+.sound-panel {
+  position: absolute; z-index: 20; top: 64px; right: calc(12px + var(--safe-r)); width: min(280px, calc(100% - 24px));
+  display: flex; flex-direction: column; gap: 10px; padding: 16px; border-radius: 18px;
+  background: var(--panel); border: 1px solid var(--line); box-shadow: 0 16px 40px rgba(0,0,0,0.55);
+}
+.sound-panel label { font-weight: 800; display: flex; justify-content: space-between; }
+.sound-panel input[type="range"] { width: 100%; padding: 0; border: 0; background: none; accent-color: var(--accent); height: 28px; }

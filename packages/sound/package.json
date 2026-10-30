@@ -1,0 +1,18 @@
+{
+  "name": "@pvp/sound",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Game sounds made in code with the Web Audio API: sound recipes as data, a seeded planner, mixer math (volume, distance, stereo pan, a cap on voices) and a small browser player.",
+  "type": "module",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "scripts": {
+    "test": "node --test"
+  },
+  "dependencies": {
+    "@pvp/game-rules": "1.0.0",
+    "@pvp/seeded-random": "1.0.0"
+  }
+}

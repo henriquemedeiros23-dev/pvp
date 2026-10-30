@@ -6,6 +6,7 @@ import { checkLoginForm, checkSignupForm } from '@pvp/account-form';
 import { shopTabs, shopItems, swatchBackground, inventoryCards, barSlots, extrasSlots, barSummary } from '@pvp/shop-catalog';
 import { WEAPONS, BOMBS } from '@pvp/game-rules';
 import { WEAPON_ICONS, POTION_ICON_SVG, bombIconSvg, coinIconDataUrl } from '@pvp/hud-model';
+import { createSoundPlayer, attachSoundControls, unlockOnFirstGesture } from '@pvp/sound';
 import { Game } from './game.js';
 import { setupRanking } from './ranking.js';
 
@@ -36,6 +37,25 @@ function loading(on, text = 'Connecting…') {
   $('loading').classList.toggle('hidden', !on);
 }
 
+// ------------------------------------------------------------ sounds (#55)
+// Made in code (@pvp/sound), no audio files. Audio starts on the first tap or key (browsers need that).
+// 🔊 mutes / unmutes (menu and in-game), 🎚️ opens the Sounds volume slider; saved in this browser.
+const sound = createSoundPlayer({
+  storage: (() => { try { return window.localStorage; } catch { return undefined; } })(),
+  mobile: !!globalThis.matchMedia?.('(pointer: coarse)')?.matches,
+});
+unlockOnFirstGesture(sound);
+attachSoundControls(sound, {
+  muteButtons: [$('btnSound'), $('btnSoundHud')], settingsButton: $('btnSoundSettings'), panel: $('soundPanel'),
+  slider: $('soundVolume'), sliderText: $('soundVolumeText'), closeButton: $('btnSoundClose'),
+});
+// a soft click for menu buttons (not the in-game touch buttons, not the 🔊 buttons: they click by themselves)
+document.addEventListener('click', e => {
+  const b = e.target.closest?.('button');
+  if (b && !b.closest('#touch, #hotbar') && !b.classList.contains('sound-btn')) sound.play('click');
+});
+if (new URLSearchParams(location.search).has('debug')) window.pvpSound = sound; // tests
+
 // ------------------------------------------------------------ game
 let game = null;
 try {
@@ -49,7 +69,7 @@ try {
     },
     onLeft(reason) { showMenu(reason || ''); },
     onFull() { showMenu('Arena is full. Try again in a moment!'); },
-  }, { openSocket: inject.openSocket });
+  }, { openSocket: inject.openSocket, sound });
 } catch (e) {
   console.warn('3D view could not start:', e);
 }
@@ -301,7 +321,9 @@ async function shopAction(call) {
   $('shopError').textContent = '';
   try {
     const res = await call();
+    const before = account?.coins;
     setAccount(res.account);
+    if (before != null && res.account && res.account.coins < before) sound.play('buy'); // ka-ching
   } catch (e) {
     handleError(e, $('shopError'));
   } finally {
