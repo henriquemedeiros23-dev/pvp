@@ -75,12 +75,12 @@ The live list is on GitHub Issues: https://github.com/henriquemedeiros23-dev/pvp
 | 38 | ✅ | **New charging rules** | Charge per weapon; sword misses don't charge; attacking while charging does 25% damage. |
 | 39 | ✅ | **Inventory screen and fast bar** | Menu Inventory with your bought items (space for 2 of each); pick what goes in your 5-slot bar for the arena. |
 | 40 | ✅ | **Aim button stays on** | Tap AIM once to keep aiming, tap again to stop. |
-| 41 | 🔲 | **Change name + no swear words** | A name button in the menu; names with bad words are refused: pick a new name. |
+| 41 | ✅ | **Change name + no swear words** | A name button in the menu; names with bad words are refused: pick a new name. |
 | 42 | ✅ | **Demon Horns hat** | Red demon horns in the shop for 50 coins. |
 | 43 | ✅ | **Greener, more realistic island** | Lush grass, plants, soil paths, wet sand, nicer water and light; still fast on phones. |
 | 44 | ✅ | **Cheaper special colors** | Rainbow 100, Shiny Gold 75, Zebra 50 coins. |
 | 45 | ✅ | **Headshots +3 damage** | A bullet in the head does 3 more damage, with a HEADSHOT sign. |
-| 46 | 🔲 | **Login every time + password twice** | The Account screen always shows before the menu; Create account asks for the password twice. |
+| 46 | ✅ | **Login every time + password twice** | The Account screen always shows before the menu; Create account asks for the password twice. |
 | 47 | 🔲 | **Ranking top 50** | A RANKING button in the menu: the 50 players with the most knockouts. |
 
 ## Later ideas
