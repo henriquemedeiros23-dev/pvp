@@ -89,6 +89,7 @@ The live list is on GitHub Issues: https://github.com/henriquemedeiros23-dev/pvp
 | 52 | 🔲 | **Ready to go online** | Server hardening, deploy files (Render/Railway), launch-day reset script, and simple steps for a grown-up. |
 | 53 | 🔲 | **Trash in the Inventory** | A small 🗑️ button: tap it, tap an item, confirm to destroy it. |
 | 54 | 🔲 | **Name bar above players** | A clear small bar with the name (and HP) above every player. |
+| 55 | 🔲 | **Sounds and music** | Shots, swords, bombs, chests, coins, headshots and menu music, with volume and mute. |
 
 ## Later ideas
 - Sounds and music
