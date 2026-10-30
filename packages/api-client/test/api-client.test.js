@@ -224,3 +224,22 @@ test('inventory, toBar, fromBar (#39) and fromExtras (#50) send the token and th
     ['/api/bar/put', 't9', { kind: 'weapon', id: 'gun' }],
   ]);
 });
+
+test('destroyItem (#53, the trash) sends the token and what to destroy', async () => {
+  const fetch = fakeFetch(
+    { status: 200, body: { account: ACCOUNT } },
+    { status: 200, body: { account: ACCOUNT } },
+    { status: 400, body: { error: 'Leave the arena first' } },
+  );
+  const storage = memoryStorage();
+  storage.setItem(TOKEN_KEY, 't9');
+  const api = createApiClient({ fetch, storage });
+  assert.deepEqual((await api.destroyItem({ kind: 'weapon', id: 'icesword', dur: 10 })).account, ACCOUNT);
+  await api.destroyItem({ from: 'extras', slot: 'potion' });
+  await assert.rejects(api.destroyItem({ from: 'bar', slot: 1 }), e => e instanceof ApiError && e.status === 400 && e.message === 'Leave the arena first');
+  assert.deepEqual(fetch.calls.map(c => [c.url, c.opts.headers['x-token'], c.body]), [
+    ['/api/trash', 't9', { kind: 'weapon', id: 'icesword', dur: 10, from: 'inventory' }],
+    ['/api/trash', 't9', { from: 'extras', slot: 'potion' }],
+    ['/api/trash', 't9', { from: 'bar', slot: 1 }],
+  ]);
+});

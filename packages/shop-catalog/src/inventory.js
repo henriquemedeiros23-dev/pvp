@@ -206,6 +206,23 @@ export function extrasSlots(account, rules = RULES) {
 }
 
 /**
+ * The trash (#53): the words of the "are you sure?" box for ONE item. A hand weapon is "this weapon" (the boss's
+ * words); a shield, potion or bomb uses its name ("this Healing Potion"). count = how many are in the tapped space
+ * or slot: only ONE is destroyed, the note says how many stay. Unknown items give null.
+ * { kind, id, name, icon | iconSvg, rarityColor, …look, question, note, yes: 'YES', no: 'NO' }
+ */
+export function trashPrompt(kind, id, { count = 1 } = {}, rules = RULES) {
+  const look = itemLook(kind, id, rules);
+  if (!look) return null;
+  const what = isHandWeapon(kind, id, rules) ? 'weapon' : look.name;
+  const keep = isPosInt(count) ? count - 1 : 0;
+  const note = keep > 0
+    ? `Only ONE is destroyed. You keep ${keep}. No coins back.`
+    : 'It will be gone forever. No coins back.';
+  return { ...look, question: `Are you sure you want to destroy this ${what}?`, note, yes: 'YES', no: 'NO' };
+}
+
+/**
  * One line for the menu about what comes into the arena, e.g.
  * 'Fast bar: Shootbm (4 free) · Extras: Mega Shield, 3× Healing Potion'
  * or 'Fast bar is empty: you get the free Gun. Fill it in your Inventory!' (plus the extras, if any).

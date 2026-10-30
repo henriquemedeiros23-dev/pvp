@@ -445,3 +445,27 @@ test('#48 practiceCanClaim: no mark and (autoPassword or saved before the form e
   assert.equal(practiceCanClaim({ createdAt: PRACTICE_FORM_SINCE }), false);
   assert.equal(practiceCanClaim(null), false);
 });
+
+test('the trash (#53): destroy one item through the API, not while in the arena', async () => {
+  const { server } = setup();
+  const api = server.createApi();
+  const { token } = await api.signup('Trashy_1', 'secret');
+  server.accounts.addCoins(server.accounts.byToken(token), 100);
+  await api.buy('weapon', 'shootbm');
+  await api.buy('weapon', 'shootbm');
+  await api.buy('potion', 'potion');
+  await api.toBar('potion', 'potion');
+  let acc = (await api.destroyItem({ kind: 'weapon', id: 'shootbm' })).account;
+  assert.deepEqual(acc.stash, { shootbm: 1 });
+  assert.equal(acc.coins, 100 - 7 - 7 - 10, 'no coins back');
+  acc = (await api.destroyItem({ from: 'extras', slot: 'potion', kind: 'potion', id: 'potion' })).account;
+  assert.equal(acc.extras.potion, null);
+  await assert.rejects(api.destroyItem({ kind: 'potion', id: 'potion' }), /don't have that/);
+  const c = await open(server, token);
+  c.send('join');
+  await settle();
+  await assert.rejects(api.destroyItem({ kind: 'weapon', id: 'shootbm' }), /Leave the arena first/);
+  c.send('leave');
+  await settle();
+  assert.deepEqual((await api.destroyItem({ kind: 'weapon', id: 'shootbm' })).account.stash, {});
+});

@@ -2,7 +2,7 @@
 
 ## What it does
 
-Talks to the game server's account and shop API (sign up, log in, who am I, buy, equip, rename, the Inventory and the fast bar) and remembers the login token, with short friendly error messages. Plain ES module with no dependencies, so it works in Node and directly in the browser.
+Talks to the game server's account and shop API (sign up, log in, who am I, buy, equip, rename, the Inventory, the fast bar and the trash) and remembers the login token, with short friendly error messages. Plain ES module with no dependencies, so it works in Node and directly in the browser.
 
 ## How to use
 
@@ -24,6 +24,10 @@ await api.toBar('weapon', 'icesword', { slot: 2 });  // into fast-bar slot 3
 await api.toBar('potion', 'potion');                 // shield, potions, bombs: into their extras space (#50), as many as fit
 await api.fromBar(0);                                // fast-bar slot 1 back into the Inventory
 await api.fromExtras('potion');                      // an extras space back ('shield', 'potion', 'bomb', 'legendarybomb')
+// the trash (#53): destroy ONE item forever (no coins back; refused while you are in the arena), resolves { account }
+await api.destroyItem({ kind: 'weapon', id: 'icesword', dur: 10 }); // from the Inventory (dur: that worn copy; none = a full one)
+await api.destroyItem({ from: 'bar', slot: 0 });                    // the weapon in fast-bar slot 1
+await api.destroyItem({ from: 'extras', slot: 'potion' });          // one from an extras space
 
 await api.rename('Boss_Kid');        // { account }; a refused name throws with a kid-friendly message (#41)
 api.lastName;                         // the last name used on this device ('' if none): pre-fill the log in box (#46)

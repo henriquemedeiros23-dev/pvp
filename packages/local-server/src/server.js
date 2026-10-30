@@ -103,6 +103,12 @@ export function createLocalServer({
     return accounts.rename(acc, name);
   }
 
+  // The trash (#53, like the server's /api/trash): destroy one item forever, not while in the arena.
+  function trashItem(acc, body) {
+    if (arena.idOf(playerKey(acc)) !== undefined) throw new AccountError('IN_ARENA', 'Leave the arena first');
+    return accounts.destroyItem(acc, { kind: body.kind, id: body.id, dur: body.dur, from: body.from, slot: body.slot });
+  }
+
   // ---------------------------------------------------------------- API (like the server's /api/*)
   function handleApi(url, body, token) {
     try {
@@ -131,6 +137,7 @@ export function createLocalServer({
       if (url === '/api/inventory') return [200, { account: accounts.publicView(acc) }];
       if (url === '/api/bar/put') return [200, { account: accounts.toBar(acc, body.kind, body.id, { slot: body.slot, n: body.n, dur: body.dur }) }];
       if (url === '/api/bar/take') return [200, { account: body.space !== undefined ? accounts.fromExtras(acc, body.space) : accounts.fromBar(acc, body.slot) }];
+      if (url === '/api/trash') return [200, { account: trashItem(acc, body) }];
       return [404, { error: 'Not found' }];
     } catch (e) {
       if (e instanceof AccountError) return [400, { error: e.message }];
