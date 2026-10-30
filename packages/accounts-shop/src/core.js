@@ -416,9 +416,24 @@ export function createAccounts({
     return publicView(a);
   }
 
+  /**
+   * The trash (#53): destroy ONE item forever, no coins back. what: { kind, id, dur?, from, slot? }
+   *   from 'inventory' (default): kind + id, a weapon by dur (a worn copy's uses left; none = a full copy)
+   *   from 'bar': slot = fast-bar slot 0..4;  from 'extras': slot = 'shield', 'potion' or a bomb id (one of the stack)
+   * In the bars, kind / id / dur (if given) must match what is there. Must own it. The game server must refuse
+   * this while the player is in the arena (the accounts service does not know about the arena).
+   * Errors: BAD_PLACE, UNKNOWN_ITEM, NOT_OWNED, BAD_SLOT, BAD_SPACE, EMPTY_SLOT. Returns publicView.
+   */
+  function destroyItem(account, what) {
+    const a = own(account);
+    barCall(() => fastBar.destroyOne(a, rules, what && typeof what === 'object' ? what : {}));
+    save();
+    return publicView(a);
+  }
+
   return {
     signup, login, logout, byToken, publicView, addCoins, buy, equip, rename,
-    toBar, fromBar, fromExtras, takeBar, returnFromArena,
+    toBar, fromBar, fromExtras, takeBar, returnFromArena, destroyItem,
     byName, addKnockout, rankingEntries,
     /** Write any pending changes now (tests, shutdown). */
     flush: () => store.flush(),

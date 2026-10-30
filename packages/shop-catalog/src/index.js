@@ -5,7 +5,7 @@ import { RULES, rarityStyle } from '@pvp/game-rules';
 // The Inventory screen and the fast bar (#39)
 export {
   MIN_SPACES, inventoryItemKinds, spaceSize, itemLook, inventoryCount, inventoryCards, barSlots, barSummary,
-  isHandWeapon, extrasSpaceFor, extrasSlots,
+  isHandWeapon, extrasSpaceFor, extrasSlots, trashPrompt,
 } from './inventory.js';
 
 const TABS = Object.freeze([
