@@ -56,16 +56,16 @@ graph LR
 | `@pvp/collision` | Walls, jumping, landing and ray hits in a world made of boxes. | both | fully: pure math, no random, no time | 19 |
 | `@pvp/world-gen` | Builds the island of ruins (houses, towers, chests) from a seed. | both | fully: all random comes from the seed | 12 |
 | `@pvp/net-protocol` | Every message between phone and server, with builders and checks. | both | fully: pure functions and frozen data | 21 |
-| `@pvp/accounts-shop` | Accounts, log in, rename (no bad or look-alike names), claiming an old auto-made practice account, coins, buying skins, weapons, potions and bombs, the Inventory, the 5-slot fast bar (hand weapons) and the extras bar (shield, potions, bombs; only the two bars go into the arena). | Node (browser via `/browser`) | partly: logic is pure, tokens/clock are passed in, file saving is real I/O | 59 |
+| `@pvp/accounts-shop` | Accounts, log in, rename (no bad or look-alike names), claiming an old auto-made practice account, coins, buying skins, weapons, potions and bombs, the Inventory, the 5-slot fast bar (hand weapons) and the extras bar (shield, potions, bombs; only the two bars go into the arena), the trash (destroy one item). | Node (browser via `/browser`) | partly: logic is pure, tokens/clock are passed in, file saving is real I/O | 67 |
 | `@pvp/name-filter` | Is this player name OK? 3-16 letters, numbers or _, no swear words or slurs (tricky spellings too, no false alarms on normal words), and a look-alike key so nobody copies a name. | both | fully: pure functions and a fixed word list | 12 |
 | `@pvp/arena` | The fight itself: players, chests, loot, weapons, shields, shock and freeze, drinking potions, aiming, thrown bombs, damage, knockouts, damage numbers for nearby players. | both | fully: time and seeded random are passed in (replay tests) | 134 |
-| `@pvp/shop-catalog` | Turns the rules and an account into the cards the shop screen shows, and the Inventory screen: spaces (at least 2 of everything), the fast bar and the extras bar. | both | fully: pure functions of their inputs | 23 |
+| `@pvp/shop-catalog` | Turns the rules and an account into the cards the shop screen shows, and the Inventory screen: spaces (at least 2 of everything), the fast bar, the extras bar and the trash's "are you sure?" words. | both | fully: pure functions of their inputs | 24 |
 | `@pvp/hud-model` | Turns your inventory and health into the in-game HUD: Durability bar of the held weapon, H.P bar, 5 slots, shield pill, potion button with drinking ring, "Charging 1.4s" after a shot, damage numbers above heads, the name bar above other players (pill, H.P colors, size by distance), aiming (zoom, scope ring, AIM / AIM ON button), bomb buttons, the coin icon from the boss's drawing. | both | fully: pure functions of their inputs (time passed in) | 47 |
-| `@pvp/api-client` | Talks to the server's account, shop, rename and Inventory/fast bar/extras bar API, keeps the login token and the last name used. | both | fully: fetch and storage are passed in | 14 |
+| `@pvp/api-client` | Talks to the server's account, shop, rename and Inventory/fast bar/extras bar/trash API, keeps the login token and the last name used. | both | fully: fetch and storage are passed in | 15 |
 | `@pvp/account-form` | Checks the Account screen: log in, and create an account with the password typed twice ("The passwords are not the same. Try again."). | both | fully: pure functions of the typed text | 6 |
 | `@pvp/stickman-3d` | A three.js stickman with skins, outfits, the boss's weapons and shields, the Healing Potion flask, bombs and their red area, frozen/shocked looks, the name bar above the head, and animation. | browser (pose math also in Node) | partly: pose math is pure, how it looks depends on the renderer | 30 |
 | `@pvp/island-scene` | The 3D island: sky with clouds, warm sun, green grass ground with dirt paths, grass tufts, flowers, bushes, rocks, beach with wet sand, waves, palms, ruins and chests, and gold coins popping out of opened chests. A lighter version for phones. | browser (also builds in Node) | partly: all placement and colors from a seed, time passed in, how it looks depends on the renderer | 19 |
-| `@pvp/local-server` | The game server inside the page (practice mode): arena, accounts in localStorage, tick, fake WebSocket, bots. | browser (also Node) | partly: seeded arena and bots, time and timer passed in; tokens and localStorage are real | 23 |
+| `@pvp/local-server` | The game server inside the page (practice mode): arena, accounts in localStorage, tick, fake WebSocket, bots. | browser (also Node) | partly: seeded arena and bots, time and timer passed in; tokens and localStorage are real | 24 |
 | `@pvp/leaderboard` | The ranking: top 50 players by knockouts (a tie: who got there first), your own place even outside the top, 🥇🥈🥉 rows for the screen. | both | fully: pure functions (the knockout time is passed in) | 8 |
 | `@pvp/touch-controls` | Joystick, aim by dragging, buttons, held actions (shield), toggled actions (aim: on until pressed again), buttons that hide and show, keyboard and mouse (hold right click = shield, Shift = aim on/off). | browser (core also in Node) | partly: the core is pure, the DOM part depends on real fingers and mice | 28 |
 
@@ -174,6 +174,7 @@ graph LR
 | `accounts.signup` / `accounts.login` | `const { token, account } = accounts.signup('Stick_Kid', 'secret');` |
 | `accounts.buy` / `accounts.equip` | `accounts.buy(acc, 'hat', 'crown'); accounts.equip(acc, 'hat', 'crown');` |
 | `accounts.toBar` / `fromBar` / `fromExtras` | `accounts.toBar(acc, 'weapon', 'icesword', { slot: 2 }); accounts.toBar(acc, 'potion', 'potion'); accounts.fromBar(acc, 2); accounts.fromExtras(acc, 'potion'); // checked: must own it, weapons in the fast bar, 1 shield, stacks capped` |
+| `accounts.destroyItem` | `accounts.destroyItem(acc, { kind: 'weapon', id: 'icesword', dur: 10 }); accounts.destroyItem(acc, { from: 'extras', slot: 'potion' }); // the trash (#53): ONE item gone forever (the exact worn copy), no coins back; the server refuses it in the arena` |
 | `accounts.takeBar` | `const { loadout, potions, bombs, starter } = accounts.takeBar(acc); // ONLY the bar goes into the arena` |
 | `accounts.returnFromArena` | `accounts.returnFromArena(acc, { weapons: ['gun', { id: 'icesword', dur: 12 }], potions, bombs }); // back into the bars, loot into the Inventory; worn weapons stay worn (#51)` |
 | `createJsonFileStore(file, opts)` | `createJsonFileStore('data/accounts.json', { saveDelayMs: 1000 });` |
@@ -244,6 +245,7 @@ graph LR
 | `barSlots(account)` | `barSlots(account); // 5 slots: { index, key: '1', empty, name, icon, count, label, action: 'fromBar' }` |
 | `extrasSlots(account)` | `extrasSlots(account); // 4 spaces: { space: 'shield', hintName, hintIcon or hintIconSvg, empty, name, count, fill: '2/3', action: 'fromExtras' }` |
 | `barSummary(account)` | `barSummary(account); // 'Fast bar: DM Gun (4 free) · Extras: 3× Healing Potion'` |
+| `trashPrompt(kind, id, { count })` | `trashPrompt('weapon', 'icesword').question; // 'Are you sure you want to destroy this weapon?' (#53; 'this Healing Potion' for extras; note says only ONE goes)` |
 | `inventoryItemKinds` / `spaceSize` / `itemLook` / `MIN_SPACES` | `spaceSize('potion', 'potion'); // 3 (a space holds as much as a bar slot)` |
 | `swatchBackground(card)` | `el.style.background = swatchBackground(card);` |
 | `OUTFIT_ICONS` | `OUTFIT_ICONS.hat.crown; // '👑'` |
@@ -295,6 +297,7 @@ graph LR
 | `api.rename` | `await api.rename('Boss_Kid'); // a refused name throws with the kid-friendly message` |
 | `api.lastName` | `nameBox.value = api.lastName; // '' if nobody logged in here yet` |
 | `api.inventory` / `api.toBar` / `api.fromBar` / `api.fromExtras` | `await api.toBar('weapon', 'icesword', { slot: 0 }); await api.fromBar(0); await api.fromExtras('potion'); // #39, #50` |
+| `api.destroyItem` | `await api.destroyItem({ kind: 'weapon', id: 'shootbm' }); await api.destroyItem({ from: 'bar', slot: 0 }); // the trash (#53): /api/trash` |
 | `ApiError` | `catch (e) { show(e.message); /* e.status 0 = no connection */ }` |
 | `safeStorage(storage)` | `const s = safeStorage(localStorage); s.set('k', 'v');` |
 

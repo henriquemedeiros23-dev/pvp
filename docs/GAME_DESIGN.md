@@ -22,6 +22,13 @@ Decided by the boss through 22 questions.
     does not have to tap 5 times; tap the space to put them all back.
   - Tap anything in a bar to put it back into the Inventory. Leave the arena alive and what is left goes back into the
     same slot or space; get knocked out and you lose only what was in the bars.
+  - **🗑️ Trash (#53):** a small 🗑️ TRASH button in the top corner. Tap it (it turns red: "Tap an item to destroy it";
+    tap 🗑️ again to cancel), then tap an item in the Inventory or in a bar. A box asks **"Are you sure you want to
+    destroy this weapon?"** (for a shield, potion or bomb it says its name, like "this Healing Potion") with its picture.
+    **YES** (red) destroys **one** (one copy, or one of a stack) forever, **no coins back**; **NO** keeps it. Either way
+    trash mode turns off. The server checks it (you must own it; not while you are in the arena), and a worn weapon is
+    destroyed as exactly that copy. The free starting Gun is never in the Inventory (it stays in the arena), so it cannot
+    be trashed and you always get it again when your fast bar is empty; a **bought** Gun can be trashed like any weapon.
 - **🏆 Ranking (#47):** the **top 50 players** with the most **knockouts** (not coins). 🥇🥈🥉 for the first three,
   your own row in gold, and if you are not in the top 50 your place is shown at the bottom.
   - Every time you knock out another player, your account gets **+1 knockout** (saved). Your own bomb does not count.

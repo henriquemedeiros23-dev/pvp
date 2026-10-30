@@ -423,3 +423,53 @@ export function returnToAccount(rec, rules, { weapons = [], potions = 0, bombs =
   if (pots) inventoryAdd(rec, 'potion', pid, pots);
   for (const [id, n] of Object.entries(bombsLeft)) inventoryAdd(rec, 'bomb', id, n);
 }
+
+const given = v => v !== undefined && v !== null;
+
+/**
+ * The trash (#53): destroy ONE item forever (no coins back). Where it is:
+ *   from 'inventory' (default)  kind + id. A weapon: the exact copy, by its uses left (dur = a worn copy's uses
+ *                               left; no dur, or full durability = a full copy). That copy must be there.
+ *   from 'bar'                  slot = fast-bar slot (0-based): the weapon in it
+ *   from 'extras'               slot = extras space ('shield', 'potion', a bomb id): ONE of the stack (a shield: it)
+ * For the bars, kind / id / dur may be given too: they must match what is there (so an old screen can never
+ * destroy the wrong thing). Returns what was destroyed: { kind, id, n: 1, dur? }.
+ * Throws BarError: BAD_PLACE, UNKNOWN_ITEM, NOT_OWNED, BAD_SLOT, BAD_SPACE, EMPTY_SLOT.
+ */
+export function destroyOne(rec, rules, { kind, id, dur, from = 'inventory', slot } = {}) {
+  if (from === 'bar' || from === 'extras') {
+    let e;
+    if (from === 'bar') {
+      if (!(Number.isInteger(slot) && slot >= 0 && slot < rec.bar.length)) fail('BAD_SLOT', 'That bar slot does not exist');
+      e = rec.bar[slot];
+    } else {
+      if (typeof slot !== 'string' || !rec.extras || !Object.hasOwn(rec.extras, slot)) fail('BAD_SPACE', 'That extras space does not exist');
+      e = rec.extras[slot];
+    }
+    if (!e) fail('EMPTY_SLOT', from === 'bar' ? 'That bar slot is empty' : 'That space is empty');
+    const eDur = isPosInt(e.dur) ? e.dur : undefined;
+    if ((given(kind) && kind !== e.kind) || (given(id) && id !== e.id)
+      || (given(dur) && e.kind === 'weapon' && wornDur(rules, e.id, dur) !== eDur)) fail('NOT_OWNED', 'That is not there any more');
+    const out = { kind: e.kind, id: e.id, n: 1, ...(eDur !== undefined ? { dur: eDur } : {}) };
+    if (e.n > 1) e.n -= 1;
+    else if (from === 'bar') rec.bar[slot] = null;
+    else rec.extras[slot] = null;
+    return out;
+  }
+  if (from !== 'inventory') fail('BAD_PLACE', 'Pick something in your Inventory or your bars');
+  if (!stackMax(rules, kind, id)) fail('UNKNOWN_ITEM', 'That item is not in the game');
+  if (inventoryCount(rec, kind, id) < 1) fail('NOT_OWNED', "You don't have that in your Inventory");
+  if (kind !== 'weapon') {
+    inventoryTake(rec, kind, id, 1);
+    return { kind, id, n: 1 };
+  }
+  // the exact copy: a worn one by its uses left, else a full one
+  const worn = given(dur) ? wornDur(rules, id, dur) : undefined;
+  const list = wearList(rec, id);
+  if (given(dur) && worn === undefined && dur !== maxDur(rules, id)) fail('NOT_OWNED', "You don't have that one in your Inventory");
+  if (worn !== undefined ? !list.includes(worn) : inventoryCount(rec, 'weapon', id) <= list.length) {
+    fail('NOT_OWNED', "You don't have that one in your Inventory");
+  }
+  takeWeaponCopy(rec, id, worn);
+  return { kind, id, n: 1, ...(worn !== undefined ? { dur: worn } : {}) };
+}

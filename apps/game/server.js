@@ -77,6 +77,10 @@ function handleApi(req, res, body) {
     if (url === '/api/inventory') return send(200, { account: accounts.publicView(acc) });
     if (url === '/api/bar/put') return send(200, { account: accounts.toBar(acc, body.kind, body.id, { slot: body.slot, n: body.n, dur: body.dur }) });
     if (url === '/api/bar/take') return send(200, { account: body.space !== undefined ? accounts.fromExtras(acc, body.space) : accounts.fromBar(acc, body.slot) });
+    if (url === '/api/trash') { // #53: destroy one item forever (not while in the arena)
+      if (arena.idOf(playerKey(acc)) !== undefined) return send(400, { error: 'Leave the arena first' });
+      return send(200, { account: accounts.destroyItem(acc, { kind: body.kind, id: body.id, dur: body.dur, from: body.from, slot: body.slot }) });
+    }
     return send(404, { error: 'Not found' });
   } catch (e) {
     if (e instanceof AccountError) return send(400, { error: e.message });

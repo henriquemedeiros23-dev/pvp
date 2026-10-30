@@ -2,7 +2,7 @@
 
 ## What it does
 
-Player accounts (sign up, log in on up to 2 devices, log out), coins, the shop (buy and equip skins, buy weapons, Healing Potions and bombs into the Inventory: `stash`, `potions`, `bombs`) the fast bar (#39): 5 slots for hand weapons (swords, guns) the player fills from the Inventory, and the extras bar (#50): one fixed space each for a shield, the Healing Potions and each bomb. Only the two bars go into the arena; everything else stays safe in the Inventory. Storage is pluggable: in memory, one JSON file, or `localStorage`. The main entry is for Node (uses `node:crypto` and `node:fs`); `@pvp/accounts-shop/browser` works in the browser. Prices and limits come from `@pvp/game-rules`.
+Player accounts (sign up, log in on up to 2 devices, log out), coins, the shop (buy and equip skins, buy weapons, Healing Potions and bombs into the Inventory: `stash`, `potions`, `bombs`), the trash (#53: destroy one item), the fast bar (#39): 5 slots for hand weapons (swords, guns) the player fills from the Inventory, and the extras bar (#50): one fixed space each for a shield, the Healing Potions and each bomb. Only the two bars go into the arena; everything else stays safe in the Inventory. Storage is pluggable: in memory, one JSON file, or `localStorage`. The main entry is for Node (uses `node:crypto` and `node:fs`); `@pvp/accounts-shop/browser` works in the browser. Prices and limits come from `@pvp/game-rules`.
 
 ## How to use
 
@@ -50,6 +50,17 @@ accounts.returnFromArena(acc, { weapons, potions, bombs });         // left aliv
 accounts.toBar(acc, 'weapon', 'icesword', { dur: 10 });             // move that worn copy (default: a full one)
 // knocked out: just don't call returnFromArena, the bar's things are lost; the Inventory never is
 
+// The trash (#53): destroy ONE item forever, no coins back. The game server refuses it while the player is in the
+// arena (the accounts service does not know the arena). Returns publicView.
+accounts.destroyItem(acc, { kind: 'weapon', id: 'icesword' });            // a FULL copy from the Inventory
+accounts.destroyItem(acc, { kind: 'weapon', id: 'icesword', dur: 10 });   // exactly the worn copy with 10 uses left
+accounts.destroyItem(acc, { kind: 'potion', id: 'potion' });              // one Healing Potion (one bomb: kind 'bomb')
+accounts.destroyItem(acc, { from: 'bar', slot: 0, kind: 'weapon', id: 'dmgun' }); // the weapon in fast-bar slot 1
+accounts.destroyItem(acc, { from: 'extras', slot: 'potion' });            // ONE of the potions in the extras space
+// kind / id / dur given with a bar: they must match what is there (an old screen never destroys the wrong thing)
+// errors: NOT_OWNED, UNKNOWN_ITEM, BAD_PLACE, BAD_SLOT, BAD_SPACE, EMPTY_SLOT
+// The free starting Gun is never in the Inventory (it stays in the arena), so it can't be trashed; a bought Gun can.
+
 accounts.rename(acc, 'New_Name');        // same name rules as sign up; tokens stay logged in
 
 // Practice mode only (#48): claim an account whose password the player never chose.
@@ -82,7 +93,7 @@ bombs in the extras). A new account starts with empty bars. Accounts saved with 
 in fast-bar slots) are migrated on load: those move into their extras space (the remembered layout too). A broken saved
 bar is cleaned on load: anything that does not fit (a second shield, too many potions) goes back into the Inventory.
 
-Error codes: `BAD_NAME`, `BAD_WORD`, `BAD_PASSWORD`, `NAME_TAKEN`, `WRONG_LOGIN`, `UNKNOWN_ITEM`, `ALREADY_OWNED`, `NOT_ENOUGH_COINS`, `NOT_OWNED`, and for the bars `BAR_FULL`, `SLOT_TAKEN`, `STACK_FULL`, `ONE_SHIELD`, `BAD_SLOT`, `BAD_SPACE`, `BAD_COUNT`, `EMPTY_SLOT` (all `AccountError`). Passing an account object that didn't come from this service throws a `TypeError`.
+Error codes: `BAD_NAME`, `BAD_WORD`, `BAD_PASSWORD`, `NAME_TAKEN`, `WRONG_LOGIN`, `UNKNOWN_ITEM`, `ALREADY_OWNED`, `NOT_ENOUGH_COINS`, `NOT_OWNED`, and for the bars `BAR_FULL`, `SLOT_TAKEN`, `STACK_FULL`, `ONE_SHIELD`, `BAD_SLOT`, `BAD_SPACE`, `BAD_COUNT`, `EMPTY_SLOT`, and for the trash `BAD_PLACE` (all `AccountError`). Passing an account object that didn't come from this service throws a `TypeError`.
 
 A store is any object with `load()` (all records), `save(data)` (may be delayed) and `flush()` (Promise). The JSON file store writes to `<file>.tmp`, then renames it over the file, so a crash can't leave half a file. A broken file throws on load instead of silently starting empty.
 

@@ -8,7 +8,7 @@ Pure functions that turn the game rules (`@pvp/game-rules`) and a player's accou
 
 ```js
 import { shopTabs, shopItems, inventorySummary, swatchBackground, OUTFIT_ICONS,
-  inventoryCards, barSlots, extrasSlots, barSummary } from '@pvp/shop-catalog';
+  inventoryCards, barSlots, extrasSlots, barSummary, trashPrompt } from '@pvp/shop-catalog';
 
 shopTabs();
 // [{ id: 'color', label: 'Colors', hint: '…' }, { id: 'hat', … }, … { id: 'weapon', label: 'Weapons', … },
@@ -62,6 +62,11 @@ extrasSlots(account);
 //    fill: '2/3', label: '×2', action: 'fromExtras', … }, { space: 'bomb', … }, { space: 'legendarybomb', … }]
 barSummary(account);        // 'Fast bar: DM Gun (4 free) · Extras: Mega Shield, 3× Healing Potion' or
                             // 'Fast bar is empty: you get the free Gun. Fill it in your Inventory!'
+// The trash (#53): the words of the "are you sure?" box (only ONE is destroyed; count = how many are in the space)
+trashPrompt('weapon', 'icesword');               // { question: 'Are you sure you want to destroy this weapon?',
+                                                 //   note: 'It will be gone forever. No coins back.', yes: 'YES', no: 'NO', name, icon, … }
+trashPrompt('potion', 'potion', { count: 3 });   // 'Are you sure you want to destroy this Healing Potion?',
+                                                 // note 'Only ONE is destroyed. You keep 2. No coins back.' (null for unknown items)
 // helpers: inventoryItemKinds(), spaceSize(kind, id), itemLook(kind, id), inventoryCount(account, kind, id)
 swatchBackground(card);     // CSS background for a color card (gradients for patterns)
 ```
