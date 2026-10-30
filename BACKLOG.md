@@ -85,6 +85,7 @@ The live list is on GitHub Issues: https://github.com/henriquemedeiros23-dev/pvp
 | 48 | ✅ | **Get back your old practice player** | Old practice players (no password) can be claimed by creating an account with that name, keeping everything. |
 | 49 | 🔲 | **Right mouse = shield, Shift = aim** | Swap the computer controls for shield and aim. |
 | 50 | 🔲 | **Extras bar** | Shield, potions, Bombs and Legendary Bombs get their own bar with drawings; the fast bar is weapons only. |
+| 51 | 🔲 | **Bug: durability resets** | Weapons came back at full durability after going to the menu; keep it saved. |
 
 ## Later ideas
 - Sounds and music
