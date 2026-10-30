@@ -10,7 +10,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import WebSocket from 'ws';
-import { RUN, SKIP, SLOW, startServer, launchBrowser, newPage } from './helpers.js';
+import { RUN, SKIP, startServer, launchBrowser, newPage, openAndLogIn } from './helpers.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const SHOTS = path.join(HERE, '..', '..', '..', '..', 'docs', 'screenshots');
@@ -67,9 +67,7 @@ test('RANKING: top players by knockouts, medals, my row highlighted, my place be
 
   // a phone, standing up
   const { context, page, errors } = await newPage(browser, { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
-  await page.addInitScript(t => localStorage.setItem('pvp.token', t), myToken);
-  await page.goto(`${server.url}/?debug=1`);
-  await page.locator('#menu').waitFor({ state: 'visible', timeout: SLOW });
+  await openAndLogIn(page, server.url, 'Boss_Kid'); // the Account screen comes first (#46)
   await page.locator('#btnRanking').click();
   await page.locator('#ranking').waitFor({ state: 'visible' });
   await page.waitForFunction(() => document.querySelectorAll('#rankingList .rank-row').length > 0);
