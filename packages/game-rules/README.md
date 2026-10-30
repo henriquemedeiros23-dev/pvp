@@ -15,7 +15,7 @@ import {
   chestChance, droppedDurability, rarityStyle, isShield, rarityRank, validateRules, POTION, MAX_POTIONS, potionHeal, itemPrice,
   BOMBS, isBomb, bombPrice, bombMaxCarry, bombCounts, inBombArea, CHARGING_DAMAGE, MIN_FIRE_GAP_MS, chargingDamage,
   HEADSHOT_BONUS, HEAD_ZONE, isHeadshot, headshotDamage,
-  aimDef, canAim, aimMultipliers,
+  aimDef, canAim, aimMultipliers, extrasSpaces, extrasSpaceOf,
 } from '@pvp/game-rules';
 // In the browser without a bundler: import from '/path/to/packages/game-rules/src/index.js'
 
@@ -35,6 +35,9 @@ CHEST_COINS;                    // 3 coins from every normal chest; GOLDEN_CHEST
 POTION;                         // { id: 'potion', name: 'Healing Potion', healPercent: 100, drinkMs: 5000,
                                 //   chestChance: 15, price: 10, rarity: 'common' }
 MAX_POTIONS;                    // 3 potions carried at most (a counter, not weapon slots)
+extrasSpaces();                 // the extras bar (#50): [{ space: 'shield', kind: 'weapon', id: null, max: 1 },
+                                //   { space: 'potion', …, max: 3 }, { space: 'bomb', …, max: 5 }, { space: 'legendarybomb', …, max: 3 }]
+extrasSpaceOf('weapon', 'megashield'); // 'shield' (a hand weapon: null, it goes in the fast bar)
 potionHeal(20, 100);            // 100: a potion gives full H.P
 itemPrice('potion', 'potion');  // 10 (the shop kind and id are both 'potion')
 BOMBS.bomb;                     // { name: 'Bomb', dmg: 3, area: 2, maxThrow: 7, fuseMs: 3000, hurtsThrower: true,

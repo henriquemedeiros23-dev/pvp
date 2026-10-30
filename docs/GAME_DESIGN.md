@@ -12,6 +12,16 @@ Decided by the boss through 22 questions.
 ## Main menu
 - **Join Arena:** jump into the running match.
 - **Shop:** buy skins and weapons with coins.
+- **🎒 Inventory (#39, #50):** everything you bought or brought back waits here, safe. Below it are two bars, and
+  **only the two bars come into the arena**:
+  - the **fast bar**: 5 slots for **hand weapons** only (swords and guns). Tap a weapon to put it in the first free slot
+    (or tap an empty slot first, then the weapon). No weapon in the fast bar: you get the free Gun.
+  - the **extras bar**: 4 fixed spaces, each showing a faint drawing of what goes there:
+    🛡️ **Shield** (one shield: Shield or Mega Shield), 🧪 **Healing Potions** (up to 3), 💣 **Bombs** (up to 5) and
+    💥 **Legendary Bombs** (up to 3). Tapping a potion or bomb **fills its space with one tap** (as many as fit), so a kid
+    does not have to tap 5 times; tap the space to put them all back.
+  - Tap anything in a bar to put it back into the Inventory. Leave the arena alive and what is left goes back into the
+    same slot or space; get knocked out and you lose only what was in the bars.
 - **🏆 Ranking (#47):** the **top 50 players** with the most **knockouts** (not coins). 🥇🥈🥉 for the first three,
   your own row in gold, and if you are not in the top 50 your place is shown at the bottom.
   - Every time you knock out another player, your account gets **+1 knockout** (saved). Your own bomb does not count.
@@ -60,22 +70,22 @@ Decided by the boss through 22 questions.
   - A raised shield blocks hits from the **front** (the half you are looking at): 0 damage, no shock or freeze,
     and the shield loses 1 block (5 for the Supersword). At 0 it breaks and disappears.
   - The **Mega Shield** also sends 25% of the blocked damage back to the attacker (25 for a Supersword hit).
-  - **Which shield do you wear?** Joining: your best (most expensive) shield from the backpack comes with you,
-    other shields stay in the backpack. Walking over a shield: you pick it up if you wear none, or if it is
+  - **Which shield do you wear?** Joining: the shield in the shield space of your extras bar comes with you,
+    other shields stay in the Inventory. Walking over a shield: you pick it up if you wear none, or if it is
     rarer than yours (Mega Shield over Shield): then your old one drops on the ground. Otherwise it stays there.
-    Leaving alive puts your shield back in the backpack; when you are knocked out it drops like your weapons.
+    Leaving alive puts your shield back in its space; when you are knocked out it drops like your weapons.
 - **The Gun** (starting weapon): a pistol. Damage 2, one shot every 2 seconds, 15 shots, Common, costs 3 coins,
-  15% chance to come out of a chest. You get one free every time you join (slot 1), then your backpack weapons.
-  A bought Gun goes into the backpack like any other weapon and comes with you in slot 2.
+  15% chance to come out of a chest. You get one free when your fast bar has no weapon.
+  A bought Gun goes into the Inventory like any other weapon; put it in the fast bar to take it along.
 - **Rarities** (weakest to strongest), each with its own color everywhere in the game (shop, HUD slots, rings on the ground):
   - 🟩 **Common** = green (Gun, Shootbm, Bomb)
   - 🟪 **Epic** = purple (DM Gun, Electric Sword, Ice Sword, Shield)
   - 🟨 **Legendary** = yellow (Supergun, Mega Shield, Legendary Bomb)
   - 🟦⬛ **Megalegend** = blue + black (Supersword)
 - **Copies:** you can carry the same weapon more than once (for example 2 Guns, or 2 Ice Swords), each copy in its
-  own slot with its own durability. When you join you get the free Gun in slot 1, then your backpack weapons,
-  most expensive first (copies too), up to 5 slots. You can pick up a weapon you already have if a slot is free.
-  When you leave alive, every weapon except the free Gun goes back into your backpack.
+  own slot with its own durability. When you join you get the weapons of your fast bar, in its order
+  (copies too), up to 5 slots. You can pick up a weapon you already have if a slot is free.
+  When you leave alive, every weapon except the free Gun goes back into your fast bar (or the Inventory).
 - **Durability:** every weapon wears out a little each time you use it: each shot, each sword hit on a player or a
   raised shield (a swing that hits only air costs nothing, #34), and a shield each time it blocks.
 - **Drop weapon (#34):** press **G** (computer) or the small **⬇️** button next to the slots (phone) to drop the weapon
@@ -87,7 +97,7 @@ Decided by the boss through 22 questions.
   - Drinking takes **5 seconds** (a ring fills up) and gives **full H.P**.
   - Moving or getting hit does **not** stop it. Switching to a weapon before the 5 s are done **cancels** it and the potion is **wasted**.
   - Carry **max 3** potions (a counter next to the H.P bar, not a weapon slot). Phone: tap the potion button; computer: **Q**.
-  - Shop: **10 coins**, Common (green). Bought potions wait in the backpack and come into the arena with you (up to 3);
+  - Shop: **10 coins**, Common (green). Bought potions wait in the Inventory; the ones in the potion space of the extras bar come along (up to 3);
     leave alive and the unused ones go back. Knocked out: your potions drop on the ground.
 
 - **Bombs (#32)** are thrown, not held: like potions they are a **counter** (not a weapon slot), shown as small
@@ -100,7 +110,7 @@ Decided by the boss through 22 questions.
   | **Bomb** (round, black) | 3 | 2×2 m | 7 m | yes | 5 | 10 | 3 coins for 1 | Common |
   | **Legendary Bomb** (round, gold) | 10 | 5×5 m | 15 m | no | 3 | 2 | 60 coins for a pack of 3 | Legendary |
 
-  Bought bombs wait in the backpack and come into the arena like potions (up to the max); leave alive and the rest go back.
+  Bought bombs wait in the Inventory; the ones in their extras space come along (up to the max); leave alive and the rest go back.
   The chest number of a bomb is a **percent**: next to its weapon, every chest also drops a Bomb 10% of the time and a pack of
   3 Legendary Bombs 2% of the time (like the extra potion). You pick up as many as fit; the rest of a pack stays on the ground.
   Knocked out: your bombs drop too.

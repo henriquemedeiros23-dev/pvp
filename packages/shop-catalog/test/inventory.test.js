@@ -1,15 +1,16 @@
-// The Inventory screen and the fast bar (#39) as data.
+// The Inventory screen, the fast bar (#39) and the extras bar (#50) as data.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { RULES } from '@pvp/game-rules';
-import { WEAPON_ICONS, POTION_ICON_SVG } from '@pvp/hud-model';
+import { WEAPON_ICONS, POTION_ICON_SVG, bombIconSvg } from '@pvp/hud-model';
 import {
   MIN_SPACES, inventoryItemKinds, spaceSize, itemLook, inventoryCount, inventoryCards, barSlots, barSummary,
-  shopWeaponIds, inventorySummary, backpackSummary,
+  extrasSlots, extrasSpaceFor, isHandWeapon, shopWeaponIds, inventorySummary, backpackSummary,
 } from '../src/index.js';
 
 const EMPTY_BAR = [null, null, null, null, null];
-const account = (o = {}) => ({ coins: 0, stash: {}, potions: 0, bombs: { bomb: 0, legendarybomb: 0 }, bar: EMPTY_BAR, ...o });
+const EMPTY_EXTRAS = { shield: null, potion: null, bomb: null, legendarybomb: null };
+const account = (o = {}) => ({ coins: 0, stash: {}, potions: 0, bombs: { bomb: 0, legendarybomb: 0 }, bar: EMPTY_BAR, extras: EMPTY_EXTRAS, ...o });
 const kindsOf = cards => [...new Set(cards.map(c => `${c.kind}:${c.id}`))];
 
 test('every item kind: weapons in shop order, then the Healing Potion, then the bombs', () => {
@@ -44,7 +45,10 @@ test('owning more makes more spaces (no limit); stacks fill spaces like bar slot
   assert.deepEqual(of('potion').map(c => c.count), [3, 3, 1], '7 potions: 3 + 3 + 1');
   assert.deepEqual(of('potion').map(c => c.label), ['×3', '×3', '×1']);
   assert.deepEqual(of('bomb').map(c => c.count), [4, 0]);
-  assert.ok(of('shootbm').every(c => c.owned === 3 && c.action === 'toBar' && c.label === ''));
+  assert.ok(of('shootbm').every(c => c.owned === 3 && c.action === 'toBar' && c.place === 'bar' && c.label === ''));
+  assert.ok(of('potion').every(c => c.action === 'toExtras' && c.place === 'extras'), 'potions go into the extras bar (#50)');
+  assert.equal(of('bomb')[0].action, 'toExtras');
+  assert.equal(of('bomb')[1].action, null, 'a ghost does nothing');
   const many = inventoryCards(account({ stash: { gun: 40 } })).filter(c => c.id === 'gun');
   assert.equal(many.length, 40);
 });
@@ -59,6 +63,7 @@ test('cards carry the look: icon, name, rarity colors, durability, shield', () =
   assert.deepEqual(ice.durability, { uses: 50, max: 50, percent: 100, label: '50' });
   assert.equal(ice.isShield, false);
   assert.equal(cards.find(c => c.id === 'megashield').isShield, true);
+  assert.equal(cards.find(c => c.id === 'megashield').place, 'extras', 'a shield goes into the extras bar (#50)');
   const sup = cards.find(c => c.id === 'supersword');
   assert.notEqual(sup.rarityBackground, sup.rarityColor, 'Megalegend has two colors');
   const pot = cards.find(c => c.id === 'potion');
@@ -71,10 +76,11 @@ test('cards carry the look: icon, name, rarity colors, durability, shield', () =
   assert.equal(itemLook('potion', 'medkit'), null);
 });
 
-test('inBar counts what is in the fast bar; inventoryCount counts only the Inventory', () => {
+test('inBar counts what is in the fast bar and the extras bar; inventoryCount counts only the Inventory', () => {
   const acc = account({
     stash: { shootbm: 1 }, potions: 2,
-    bar: [{ kind: 'weapon', id: 'shootbm', n: 1 }, { kind: 'potion', id: 'potion', n: 3 }, null, { kind: 'weapon', id: 'shootbm', n: 1 }, null],
+    bar: [{ kind: 'weapon', id: 'shootbm', n: 1 }, null, null, { kind: 'weapon', id: 'shootbm', n: 1 }, null],
+    extras: { ...EMPTY_EXTRAS, potion: { kind: 'potion', id: 'potion', n: 3 } },
   });
   const cards = inventoryCards(acc);
   assert.ok(cards.filter(c => c.id === 'shootbm').every(c => c.inBar === 2 && c.owned === 1));
@@ -85,29 +91,63 @@ test('inBar counts what is in the fast bar; inventoryCount counts only the Inven
   assert.equal(inventoryCount(acc, 'weapon', '__proto__'), 0);
 });
 
-test('the bar view: always 5 slots, keys 1-5, empty ones too', () => {
+test('the bar view: always 5 slots, keys 1-5, empty ones too; hand weapons only', () => {
   const empty = barSlots(account());
   assert.equal(empty.length, RULES.MAX_SLOTS);
   assert.deepEqual(empty.map(s => s.key), ['1', '2', '3', '4', '5']);
   assert.ok(empty.every(s => s.empty && s.action === null));
   assert.equal(barSlots({}).length, 5, 'an old account without a bar');
   const slots = barSlots(account({
-    bar: [null, { kind: 'weapon', id: 'dmgun', n: 1 }, { kind: 'bomb', id: 'bomb', n: 5 }, { kind: 'weapon', id: 'nope', n: 1 }, { kind: 'potion', id: 'potion', n: 2 }],
+    bar: [null, { kind: 'weapon', id: 'dmgun', n: 1 }, { kind: 'bomb', id: 'bomb', n: 5 }, { kind: 'weapon', id: 'nope', n: 1 }, { kind: 'weapon', id: 'shield', n: 1 }],
   }));
   assert.equal(slots[0].empty, true);
   assert.deepEqual([slots[1].name, slots[1].icon, slots[1].count, slots[1].label, slots[1].action], ['DM Gun', WEAPON_ICONS.dmgun, 1, '', 'fromBar']);
   assert.deepEqual(slots[1].durability, { uses: 30, max: 30, percent: 100, label: '30' });
-  assert.deepEqual([slots[2].name, slots[2].count, slots[2].label], ['Bomb', 5, '×5']);
-  assert.match(slots[2].iconSvg, /<svg/);
+  assert.equal(slots[2].empty, true, 'a bomb is not a hand weapon (#50)');
   assert.equal(slots[3].empty, true, 'an unknown item shows as empty');
-  assert.deepEqual([slots[4].name, slots[4].label], ['Healing Potion', '×2']);
+  assert.equal(slots[4].empty, true, 'a shield is not a hand weapon (#50)');
+});
+
+test('the extras bar (#50): 4 fixed spaces with a drawing of what goes there', () => {
+  const empty = extrasSlots(account());
+  assert.deepEqual(empty.map(s => [s.space, s.hintName, s.max, s.fill]), [
+    ['shield', 'Shield', 1, ''], ['potion', 'Healing Potions', 3, '0/3'], ['bomb', 'Bombs', 5, '0/5'], ['legendarybomb', 'Legendary Bombs', 3, '0/3'],
+  ]);
+  assert.ok(empty.every(s => s.empty && s.action === null && s.count === 0));
+  assert.equal(empty[0].hintIcon, WEAPON_ICONS.shield);
+  assert.equal(empty[0].hintColor, RULES.RARITY_COLORS.epic.color, 'the Shield is epic');
+  assert.equal(empty[1].hintIconSvg, POTION_ICON_SVG);
+  assert.equal(empty[2].hintIconSvg, bombIconSvg(RULES.BOMBS.bomb.color));
+  assert.equal(empty[3].hintIconSvg, bombIconSvg(RULES.BOMBS.legendarybomb.color));
+  assert.equal(empty[3].hintColor, RULES.RARITY_COLORS.legendary.color);
+  assert.equal(extrasSlots({}).length, 4, 'an old account without extras');
+  const slots = extrasSlots(account({
+    extras: {
+      shield: { kind: 'weapon', id: 'megashield', n: 1 }, potion: { kind: 'potion', id: 'potion', n: 2 },
+      bomb: { kind: 'bomb', id: 'legendarybomb', n: 1 }, // the wrong space: shows as empty
+      legendarybomb: { kind: 'bomb', id: 'legendarybomb', n: 3 },
+    },
+  }));
+  assert.deepEqual([slots[0].name, slots[0].icon, slots[0].action, slots[0].fill, slots[0].isShield], ['Mega Shield', WEAPON_ICONS.megashield, 'fromExtras', '', true]);
+  assert.deepEqual(slots[0].durability, { uses: 70, max: 70, percent: 100, label: '70' });
+  assert.deepEqual([slots[1].name, slots[1].count, slots[1].label, slots[1].fill], ['Healing Potion', 2, '×2', '2/3']);
+  assert.equal(slots[2].empty, true);
+  assert.deepEqual([slots[3].name, slots[3].fill, slots[3].rarityColor], ['Legendary Bomb', '3/3', RULES.RARITY_COLORS.legendary.color]);
+  assert.equal(extrasSpaceFor('weapon', 'shield'), 'shield');
+  assert.equal(extrasSpaceFor('bomb', 'bomb'), 'bomb');
+  assert.equal(extrasSpaceFor('weapon', 'gun'), null);
+  assert.equal(isHandWeapon('weapon', 'gun'), true);
+  assert.equal(isHandWeapon('weapon', 'megashield'), false);
 });
 
 test('barSummary and inventorySummary for the menu', () => {
   assert.equal(barSummary(account()), 'Fast bar is empty: you get the free Gun. Fill it in your Inventory!');
   assert.equal(barSummary(account({
-    bar: [{ kind: 'weapon', id: 'shootbm', n: 1 }, { kind: 'weapon', id: 'megashield', n: 1 }, { kind: 'potion', id: 'potion', n: 3 }, null, null],
-  })), 'Fast bar: Shootbm, Mega Shield, 3× Healing Potion (2 free)');
+    bar: [{ kind: 'weapon', id: 'shootbm', n: 1 }, null, null, null, null],
+    extras: { ...EMPTY_EXTRAS, shield: { kind: 'weapon', id: 'megashield', n: 1 }, potion: { kind: 'potion', id: 'potion', n: 3 } },
+  })), 'Fast bar: Shootbm (4 free) · Extras: Mega Shield, 3× Healing Potion');
+  assert.equal(barSummary(account({ extras: { ...EMPTY_EXTRAS, bomb: { kind: 'bomb', id: 'bomb', n: 2 } } })),
+    'Fast bar is empty: you get the free Gun. Fill it in your Inventory! · Extras: 2× Bomb');
   const full = Array.from({ length: 5 }, () => ({ kind: 'weapon', id: 'gun', n: 1 }));
   assert.equal(barSummary(account({ bar: full })), 'Fast bar: Gun, Gun, Gun, Gun, Gun');
   assert.equal(inventorySummary(account({ stash: { gun: 2 } })), 'Inventory: 2× Gun');
@@ -115,10 +155,11 @@ test('barSummary and inventorySummary for the menu', () => {
 });
 
 test('pure: same input, same output; the account is not changed', () => {
-  const acc = account({ stash: { shootbm: 2 }, potions: 4, bar: [{ kind: 'bomb', id: 'bomb', n: 2 }, null, null, null, null] });
+  const acc = account({ stash: { shootbm: 2 }, potions: 4, bar: [{ kind: 'weapon', id: 'gun', n: 1 }, null, null, null, null], extras: { bomb: { kind: 'bomb', id: 'bomb', n: 2 } } });
   const copy = JSON.parse(JSON.stringify(acc));
   assert.deepEqual(inventoryCards(acc), inventoryCards(acc));
   assert.deepEqual(barSlots(acc), barSlots(acc));
+  assert.deepEqual(extrasSlots(acc), extrasSlots(acc));
   assert.deepEqual(acc, copy);
 });
 

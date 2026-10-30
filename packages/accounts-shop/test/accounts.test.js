@@ -32,6 +32,7 @@ test('signup gives a token and a fresh account with free items and the default s
     owned: ['color:black', 'hat:none', 'face:none', 'back:none', 'shirt:none'],
     skin: { ...DEFAULT_SKIN }, stash: {}, potions: 0, bombs: { bomb: 0, legendarybomb: 0 },
     bar: [null, null, null, null, null],
+    extras: { shield: null, potion: null, bomb: null, legendarybomb: null },
   });
   for (const secret of ['hash', 'salt', 'tokens']) assert.ok(!(secret in view));
   assert.notEqual(account.hash, 'pass');
@@ -234,14 +235,14 @@ test('Healing Potions: buy for 10 coins (many times) into the Inventory; up to 3
   assert.equal(view.coins, 5, '4 potions cost 40 coins');
   rejects(() => accounts.buy(account, 'potion', 'medkit'), 'UNKNOWN_ITEM');
   rejects(() => accounts.buy(account, 'potion', 'bandage'), 'UNKNOWN_ITEM');
-  // 3 fit in one bar slot; joining takes only those
+  // 3 fit in the potion space of the extras bar (#50); joining takes only those
   rejects(() => accounts.toBar(account, 'potion', 'potion', { n: 5 }), 'NOT_OWNED');
-  assert.deepEqual(accounts.toBar(account, 'potion', 'potion').bar[0], { kind: 'potion', id: 'potion', n: 3 });
+  assert.deepEqual(accounts.toBar(account, 'potion', 'potion').extras.potion, { kind: 'potion', id: 'potion', n: 3 });
   assert.equal(accounts.publicView(account).potions, 1);
   assert.equal(accounts.takeBar(account).potions, 3, 'at most 3 go into the arena');
   assert.equal(accounts.publicView(account).potions, 1, 'the 4th stays in the Inventory');
-  // left alive with 2 unused: back into the bar slot; bad counts are ignored
-  assert.deepEqual(accounts.returnFromArena(account, { potions: 2 }).bar[0], { kind: 'potion', id: 'potion', n: 2 });
+  // left alive with 2 unused: back into the potion space; bad counts are ignored
+  assert.deepEqual(accounts.returnFromArena(account, { potions: 2 }).extras.potion, { kind: 'potion', id: 'potion', n: 2 });
   accounts.returnFromArena(account, { potions: -5 });
   accounts.returnFromArena(account, { potions: 'x' });
   assert.equal(accounts.publicView(account).potions, 1, 'bad counts are ignored');
@@ -282,9 +283,9 @@ test('bombs (#32): a Bomb for 3 coins, a pack of 3 Legendary Bombs for 60; take 
   assert.deepEqual(accounts.takeBar(account).bombs, { bomb: 5, legendarybomb: 3 }, 'carry max 5 Bombs and 3 Legendary Bombs');
   assert.deepEqual(accounts.publicView(account).bombs, { bomb: 2, legendarybomb: 3 });
   const back = accounts.returnFromArena(account, { bombs: { bomb: 4, legendarybomb: 1, rocket: 9 } });
-  assert.deepEqual(back.bar.slice(0, 2), [{ kind: 'bomb', id: 'bomb', n: 4 }, { kind: 'bomb', id: 'legendarybomb', n: 1 }]);
-  accounts.fromBar(account, 0);
-  accounts.fromBar(account, 1);
+  assert.deepEqual([back.extras.bomb, back.extras.legendarybomb], [{ kind: 'bomb', id: 'bomb', n: 4 }, { kind: 'bomb', id: 'legendarybomb', n: 1 }]);
+  accounts.fromExtras(account, 'bomb');
+  accounts.fromBar(account, 'legendarybomb'); // a string slot is an extras space too
   accounts.returnFromArena(account, { bombs: { bomb: -2, legendarybomb: 'x' } });
   accounts.returnFromArena(account, { bombs: null });
   assert.deepEqual(accounts.publicView(account).bombs, { bomb: 6, legendarybomb: 4 }, 'bad counts are ignored');

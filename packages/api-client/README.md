@@ -17,11 +17,13 @@ await api.buy('hat', 'crown');       // kind: 'color' | 'hat' | 'face' | 'back' 
 await api.equip('hat', 'crown');     // each resolves { account }
 const { top, me } = await api.ranking(); // the ranking (#47): top 50 by knockouts and my place (me.place null = none yet)
 
-// the Inventory and the fast bar (#39), each resolves { account } (account.bar: 5 slots, null or { kind, id, n })
+// the Inventory, the fast bar (#39) and the extras bar (#50), each resolves { account } (account.bar: 5 slots, account.extras: 4 spaces)
 await api.inventory();
-await api.toBar('weapon', 'icesword');               // into the first free bar slot
-await api.toBar('potion', 'potion', { slot: 2, n: 3 }); // into slot 3, 3 potions (default: as many as fit)
-await api.fromBar(0);                                // slot 1 back into the Inventory
+await api.toBar('weapon', 'icesword');               // into the first free fast-bar slot (hand weapons only)
+await api.toBar('weapon', 'icesword', { slot: 2 });  // into fast-bar slot 3
+await api.toBar('potion', 'potion');                 // shield, potions, bombs: into their extras space (#50), as many as fit
+await api.fromBar(0);                                // fast-bar slot 1 back into the Inventory
+await api.fromExtras('potion');                      // an extras space back ('shield', 'potion', 'bomb', 'legendarybomb')
 
 await api.rename('Boss_Kid');        // { account }; a refused name throws with a kid-friendly message (#41)
 api.lastName;                         // the last name used on this device ('' if none): pre-fill the log in box (#46)

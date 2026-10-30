@@ -130,7 +130,7 @@ export function createLocalServer({
       // The Inventory and the fast bar (#39), like the server
       if (url === '/api/inventory') return [200, { account: accounts.publicView(acc) }];
       if (url === '/api/bar/put') return [200, { account: accounts.toBar(acc, body.kind, body.id, { slot: body.slot, n: body.n }) }];
-      if (url === '/api/bar/take') return [200, { account: accounts.fromBar(acc, body.slot) }];
+      if (url === '/api/bar/take') return [200, { account: body.space !== undefined ? accounts.fromExtras(acc, body.space) : accounts.fromBar(acc, body.slot) }];
       return [404, { error: 'Not found' }];
     } catch (e) {
       if (e instanceof AccountError) return [400, { error: e.message }];

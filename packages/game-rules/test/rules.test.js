@@ -439,3 +439,20 @@ test('bad aim numbers are reported', () => {
     'weapon dmgun: aim must be { zoom, spreadMul, moveMul }',
   ]);
 });
+
+test('the extras bar spaces (#50): one shield, the potions, one space per bomb', () => {
+  assert.deepEqual(rules.extrasSpaces(), [
+    { space: 'shield', kind: 'weapon', id: null, max: 1 },
+    { space: 'potion', kind: 'potion', id: 'potion', max: 3 },
+    { space: 'bomb', kind: 'bomb', id: 'bomb', max: 5 },
+    { space: 'legendarybomb', kind: 'bomb', id: 'legendarybomb', max: 3 },
+  ]);
+  assert.deepEqual(rules.extrasSpaces(rules.RULES), rules.extrasSpaces());
+  assert.equal(rules.extrasSpaceOf('weapon', 'megashield'), 'shield');
+  assert.equal(rules.extrasSpaceOf('weapon', 'gun'), null);
+  assert.equal(rules.extrasSpaceOf('potion', 'potion'), 'potion');
+  assert.equal(rules.extrasSpaceOf('bomb', 'legendarybomb'), 'legendarybomb');
+  assert.equal(rules.extrasSpaceOf('bomb', 'rocket'), null);
+  assert.equal(rules.extrasSpaceOf('weapon', undefined), null);
+  assert.deepEqual(rules.extrasSpaces({ WEAPONS: {}, BOMBS: {} }), [], 'rules without extras: no spaces');
+});

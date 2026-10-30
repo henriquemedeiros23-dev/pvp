@@ -133,19 +133,22 @@
     <p id="rankingError" class="error"></p>
   </section>
 
-  <!-- Inventory (#39): everything you own (at least 2 spaces of every item), and below it your fast bar:
-       only the fast bar comes into the arena, the rest stays safe here. Cards and slots come from @pvp/shop-catalog. -->
+  <!-- Inventory (#39): everything you own (at least 2 spaces of every item), and below it your fast bar (hand
+       weapons) and the extras bar (#50: shield, potions, bombs; empty spaces show a drawing of what goes there):
+       only the two bars come into the arena, the rest stays safe here. Cards and slots come from @pvp/shop-catalog. -->
   <section id="inventory" class="screen hidden">
     <header class="topbar">
       <button id="btnInvBack" class="back">‹ Back</button>
       <h2 class="inv-title">🎒 Inventory</h2>
       <div class="coins"><span class="coin"></span><span id="invCoins">0</span></div>
     </header>
-    <p id="invHint" class="hint">Tap an item to put it in your fast bar. Tap a bar item to put it back.</p>
+    <p id="invHint" class="hint">Tap a weapon to put it in your fast bar, a shield, potion or bomb to put it in your extras. Tap a bar item to put it back.</p>
     <div id="invGrid" class="inv-grid" role="list" aria-label="Inventory"></div>
     <div class="inv-barbox">
-      <div class="inv-barhead"><b>Fast bar</b><span id="invBarHint">Only these come into the arena</span></div>
+      <div class="inv-barhead"><b>Fast bar</b><span id="invBarHint">Swords and guns. Only the bars come along</span></div>
       <div id="invBar" class="inv-bar" role="list" aria-label="Fast bar"></div>
+      <div class="inv-barhead"><b>Extras</b><span>Shield, potions and bombs</span></div>
+      <div id="invExtras" class="inv-bar inv-extras" role="list" aria-label="Extras bar"></div>
       <p id="invError" class="error"></p>
     </div>
   </section>

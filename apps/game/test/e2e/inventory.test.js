@@ -1,10 +1,11 @@
-// Browser check for the Inventory and the fast bar (issue #39) in the real game with the real server.
+// Browser check for the Inventory, the fast bar (issue #39) and the extras bar (#50) in the real game with the real server.
 // Skipped in a normal `npm test`. Run it with:  npm run test:e2e   (from the repo root)
 //
 // On a phone: get coins (test-only 'debugCoins', the server runs with PVP_TEST_HOOKS=1), buy a Shootbm, a DM Gun
-// and a Healing Potion, open the Inventory (at least 2 spaces of everything), put the DM Gun and the potion into
-// the fast bar, join: ONLY those are in the arena (no Shootbm, no free Gun). Leave: the Shootbm is still in the
-// Inventory, the DM Gun and the potion are back in their bar slots. No console errors.
+// and a Healing Potion, open the Inventory (at least 2 spaces of everything), put the DM Gun into the fast bar and
+// the potion into its extras space (the 4 extras spaces show drawings when empty), join: ONLY those are in the
+// arena (no Shootbm, no free Gun). Leave: the Shootbm is still in the Inventory, the DM Gun and the potion are
+// back in their slot and space. No console errors.
 // Saves docs/screenshots/inventory.png (phone upright) and inventory-landscape.png.
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
@@ -44,8 +45,9 @@ async function checkTouchable(page, selector, { min = 44 } = {}) {
 
 const filled = (page, id) => page.locator(`#invGrid .inv-card[data-id="${id}"][data-filled="1"]`);
 const barIds = page => page.locator('#invBar .slot').evaluateAll(els => els.map(e => e.dataset.id || null));
+const extrasIds = page => page.locator('#invExtras .slot').evaluateAll(els => els.map(e => [e.dataset.space, e.dataset.id || null]));
 
-test('inventory: buy 2 weapons, put one in the fast bar, only the bar comes into the arena', { skip: SKIP, timeout: 300000 }, async () => {
+test('inventory: buy 2 weapons and a potion, the weapon into the fast bar, the potion into the extras bar, only the bars come into the arena', { skip: SKIP, timeout: 300000 }, async () => {
   const tab = await newPage(browser, PHONE, { hooks: true }); // tab.toServer is set once the game connects
   const { context, page, errors } = tab;
   try {
@@ -90,25 +92,38 @@ test('inventory: buy 2 weapons, put one in the fast bar, only the bar comes into
     assert.equal(await page.locator('#invGrid .inv-card.ghost[data-id="supersword"]').count(), 2, 'not owned: 2 ghost spaces');
     assert.deepEqual(await barIds(page), [null, null, null, null, null], '5 empty bar slots');
     assert.equal(await page.locator('#invGrid .inv-card[data-id="potion"] .icon svg .liquid').count() >= 2, true, 'the flask icon');
+    // the extras bar (#50): 4 empty spaces, each with a drawing of what goes there
+    assert.deepEqual(await extrasIds(page), [['shield', null], ['potion', null], ['bomb', null], ['legendarybomb', null]]);
+    assert.equal(await page.locator('#invExtras .slot.empty').count(), 4);
+    assert.equal(await page.textContent('#invExtras .slot[data-space="shield"] .icon'), '🛡️');
+    assert.equal(await page.locator('#invExtras .slot[data-space="potion"] .icon svg .liquid').count(), 1, 'a faint flask');
+    assert.equal(await page.locator('#invExtras .slot[data-space="bomb"] .icon svg').count(), 1, 'a faint bomb');
+    assert.equal(await page.textContent('#invExtras .slot[data-space="potion"] .cnt'), '0/3');
+    const faint = await page.locator('#invExtras .slot[data-space="shield"] .icon').evaluate(e => Number(getComputedStyle(e).opacity));
+    assert.ok(faint < 0.5, `an empty space's drawing is faint: ${faint}`);
+    await page.click('#invExtras .slot[data-space="shield"]');
+    assert.match(await page.textContent('#invError'), /Shield/);
 
-    // tap the DM Gun: it goes into the first free bar slot
-    await filled(page, 'dmgun').click();
-    await page.locator('#invBar .slot[data-id="dmgun"]').waitFor();
-    assert.deepEqual(await barIds(page), ['dmgun', null, null, null, null]);
-    assert.equal(await filled(page, 'dmgun').count(), 0, 'it left the Inventory');
-    assert.equal(await filled(page, 'shootbm').count(), 1);
-    // tap bar slot 3 first, then the potion: it goes into slot 3
+    // tap bar slot 3 first, then the DM Gun: it goes into slot 3
     await page.click('#invBar .slot[data-slot="2"]');
     await page.locator('#invBar .slot.picked[data-slot="2"]').waitFor();
+    await filled(page, 'dmgun').click();
+    await page.locator('#invBar .slot[data-slot="2"][data-id="dmgun"]').waitFor();
+    assert.deepEqual(await barIds(page), [null, null, 'dmgun', null, null]);
+    assert.equal(await filled(page, 'dmgun').count(), 0, 'it left the Inventory');
+    assert.equal(await filled(page, 'shootbm').count(), 1);
+    // tap the potion: it goes into its own extras space, not the fast bar
     await filled(page, 'potion').click();
-    await page.locator('#invBar .slot[data-slot="2"][data-id="potion"]').waitFor();
-    assert.deepEqual(await barIds(page), ['dmgun', null, 'potion', null, null]);
+    await page.locator('#invExtras .slot[data-space="potion"][data-id="potion"]').waitFor();
+    assert.equal(await page.textContent('#invExtras .slot[data-space="potion"] .cnt'), '1/3');
+    assert.deepEqual(await barIds(page), [null, null, 'dmgun', null, null]);
     // a ghost space says where to get it
     await page.click('#invGrid .inv-card.ghost[data-id="supersword"] >> nth=0');
     assert.match(await page.textContent('#invError'), /SHOP/);
 
     // phone upright and sideways: big touch targets, all on screen
     await checkTouchable(page, '#invBar .slot', { min: 48 });
+    await checkTouchable(page, '#invExtras .slot', { min: 48 });
     await checkTouchable(page, '#btnInvBack');
     const firstCard = page.locator('#invGrid .inv-card').first();
     const box = await firstCard.boundingBox();
@@ -118,38 +133,46 @@ test('inventory: buy 2 weapons, put one in the fast bar, only the bar comes into
     await page.setViewportSize({ width: 844, height: 390 });
     await page.waitForTimeout(200);
     await checkTouchable(page, '#invBar .slot', { min: 44 });
+    await checkTouchable(page, '#invExtras .slot', { min: 44 });
     await checkTouchable(page, '#btnInvBack');
     const gridBox = await page.locator('#invGrid').boundingBox();
     assert.ok(gridBox.height >= 100, `the grid still has room sideways: ${gridBox.height}`);
     await page.screenshot({ path: path.join(SHOTS, 'inventory-landscape.png') });
     await page.setViewportSize(PHONE.viewport);
 
-    // tap a bar item: back to the Inventory; tap it again in the Inventory: into the bar again
-    await page.click('#invBar .slot[data-id="potion"]');
+    // tap a bar item: back to the Inventory; tap it again in the Inventory: into the first free slot
+    await page.click('#invBar .slot[data-id="dmgun"]');
     await page.locator('#invBar .slot[data-slot="2"].empty').waitFor();
+    await filled(page, 'dmgun').click();
+    await page.locator('#invBar .slot[data-slot="0"][data-id="dmgun"]').waitFor();
+    assert.deepEqual(await barIds(page), ['dmgun', null, null, null, null]);
+    // the same for an extras space
+    await page.click('#invExtras .slot[data-space="potion"]');
+    await page.locator('#invExtras .slot.empty[data-space="potion"]').waitFor();
+    assert.equal(await filled(page, 'potion').count(), 1, 'back in the Inventory');
     await filled(page, 'potion').click();
-    await page.locator('#invBar .slot[data-slot="1"][data-id="potion"]').waitFor();
-    assert.deepEqual(await barIds(page), ['dmgun', 'potion', null, null, null]);
+    await page.locator('#invExtras .slot[data-space="potion"][data-id="potion"]').waitFor();
 
     await page.click('#btnInvBack');
     await page.locator('#menu').waitFor({ state: 'visible' });
-    assert.match(await page.textContent('#menuBackpack'), /Fast bar: DM Gun, Healing Potion \(3 free\)/);
+    assert.match(await page.textContent('#menuBackpack'), /Fast bar: DM Gun \(4 free\) · Extras: Healing Potion/);
 
     // join: ONLY the bar comes along (no free Gun, no Shootbm)
     await page.click('#btnJoin');
     await page.locator('#hud').waitFor({ state: 'visible', timeout: SLOW });
     const inArena = await waitDebug(page, s => s.mode === 'play' && s.inv && s.inv.weapons.length > 0 && s.inv.weapons[0] !== 'gun', { what: 'joined with the bar' });
     assert.deepEqual(inArena.inv.weapons, ['dmgun'], 'only the DM Gun from the bar');
-    assert.equal(inArena.inv.potions, 1, 'the potion from the bar');
+    assert.equal(inArena.inv.potions, 1, 'the potion from the extras bar');
     assert.equal(await page.locator('#slots .slot:not(.empty)').count(), 1);
 
-    // leave: the DM Gun and the potion go back into their bar slots, the Shootbm never left the Inventory
+    // leave: the DM Gun and the potion go back into their slot and space, the Shootbm never left the Inventory
     await page.click('#btnLeave');
     await page.locator('#menu').waitFor({ state: 'visible' });
-    await page.waitForFunction(() => /Fast bar: DM Gun, Healing Potion/.test(document.getElementById('menuBackpack').textContent));
+    await page.waitForFunction(() => /Fast bar: DM Gun.*Extras: Healing Potion/.test(document.getElementById('menuBackpack').textContent));
     await page.click('#btnInventory');
     await page.locator('#invBar .slot[data-slot="0"][data-id="dmgun"]').waitFor();
-    assert.deepEqual(await barIds(page), ['dmgun', 'potion', null, null, null]);
+    assert.deepEqual(await barIds(page), ['dmgun', null, null, null, null]);
+    assert.deepEqual(await extrasIds(page), [['shield', null], ['potion', 'potion'], ['bomb', null], ['legendarybomb', null]]);
     assert.equal(await filled(page, 'shootbm').count(), 1, 'the Shootbm is still in the Inventory');
     assert.equal(await filled(page, 'dmgun').count(), 0);
 

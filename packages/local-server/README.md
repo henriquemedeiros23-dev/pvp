@@ -16,7 +16,7 @@ import { createLocalServer } from '@pvp/local-server';
 const server = createLocalServer({ seed: 'abc', storage: localStorage, bots: 3 });
 // options: now (clock), timer ({ setInterval, clearInterval }), autoStart, defer, randomBytes, island, storagePrefix
 
-const api = server.createApi();          // an @pvp/api-client: signup/login/me/buy/equip/rename/inventory/toBar/fromBar,
+const api = server.createApi();          // an @pvp/api-client: signup/login/me/buy/equip/rename/inventory/toBar/fromBar/fromExtras,
                                          // token and lastName in storage
 server.ensurePlayer();                   // optional: a local 'Player_1234' right away, no log in (kept on reload).
                                          // The practice page does not use it: it shows the Account screen (#46).
@@ -34,7 +34,7 @@ server.teleport(api.token, 10, 20);      // practice/test helper, like the serve
   to the normal game code; nothing else changes.
 - Same glue as `apps/game/server.js`: client messages are checked with `parseClientMessage` (bad ones are dropped),
   the arena's outbox goes out as JSON, chest coins are added to the account, the account's coin total wins,
-  joining takes ONLY the fast bar (#39: weapons, shield, potions, bombs; an empty bar gets the free Gun), the rest of
+  joining takes ONLY the fast bar (#39: hand weapons) and the extras bar (#50: shield, potions, bombs; no hand weapon gets the free Gun), the rest of
   the Inventory stays in the account; knocked out = the bar is lost, leaving alive = what survived goes back into its
   bar slots (chest loot into the Inventory). The `throw` message throws a bomb (#32). `/api/inventory`, `/api/bar/put`
   and `/api/bar/take` work like on the server.

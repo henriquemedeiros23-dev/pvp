@@ -177,6 +177,12 @@ input:focus { border-color: var(--gold); }
 .inv-bar .slot.empty { cursor: pointer; border-style: dashed; }
 .inv-bar .slot.picked { border-color: var(--gold); border-style: solid; box-shadow: 0 0 14px rgba(255,197,49,0.7); transform: translateY(-3px); }
 .inv-bar .slot .name { display: block; }
+/* the extras bar (#50): one space each for the shield, potions and bombs; empty = a faint drawing */
+.inv-extras { --slot: 58px; }
+.inv-extras .slot.empty .icon { opacity: 0.3; filter: grayscale(0.6); }
+.inv-extras .slot.empty .name { opacity: 0.55; }
+.inv-extras .slot.empty .cnt { background: rgba(0,0,0,0.4); color: rgba(255,255,255,0.6); }
+.inv-extras .slot .icon svg { width: 30px; height: 30px; }
 #invError { min-height: 1.1em; margin: 0; font-size: 13px; }
 @media (max-height: 430px) {
   #inventory .topbar { padding-top: 6px; padding-bottom: 4px; }
@@ -188,11 +194,14 @@ input:focus { border-color: var(--gold); }
   .inv-barbox { flex-direction: row; justify-content: center; padding-top: 6px; gap: 12px; }
   .inv-barhead { flex-direction: column; gap: 2px; align-items: flex-start; }
   .inv-bar { --slot: 54px; padding: 5px 8px; }
+  .inv-extras { --slot: 50px; }
+  .inv-barhead span { display: none; }
   .inv-bar .slot .name { display: none; }
   #invError { position: absolute; bottom: calc(70px + var(--safe-b)); left: 0; right: 0; }
 }
 @media (max-width: 380px) {
   .inv-bar { --slot: 56px; gap: 5px; padding: 6px; }
+  .inv-extras { --slot: 54px; }
 }
 
 /* ---------- HUD ---------- */

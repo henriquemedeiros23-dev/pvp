@@ -64,6 +64,7 @@ test('accounts survive a reload from disk', async t => {
   accounts.buy(account, 'potion', 'potion');
   accounts.equip(account, 'hat', 'cap');
   accounts.toBar(account, 'weapon', 'electricsword', { slot: 2 }); // the fast bar is saved too (#39)
+  accounts.toBar(account, 'potion', 'potion'); // and the extras bar (#50)
   await accounts.flush();
 
   const again = createAccounts({ store: createJsonFileStore(file) });
@@ -74,9 +75,10 @@ test('accounts survive a reload from disk', async t => {
     owned: ['color:black', 'hat:none', 'face:none', 'back:none', 'shirt:none', 'hat:cap'],
     skin: { color: 'black', hat: 'cap', face: 'none', back: 'none', shirt: 'none' },
     stash: {},
-    potions: 1,
+    potions: 0,
     bombs: { bomb: 0, legendarybomb: 0 },
     bar: [null, null, { kind: 'weapon', id: 'electricsword', n: 1 }, null, null],
+    extras: { shield: null, potion: { kind: 'potion', id: 'potion', n: 1 }, bomb: null, legendarybomb: null },
   });
   assert.equal(again.login('BOB', 'pass').account, back);
 });

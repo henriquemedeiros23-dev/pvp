@@ -76,7 +76,7 @@ function handleApi(req, res, body) {
     // The Inventory and the fast bar (#39): read it, put an item into a bar slot, take a slot back.
     if (url === '/api/inventory') return send(200, { account: accounts.publicView(acc) });
     if (url === '/api/bar/put') return send(200, { account: accounts.toBar(acc, body.kind, body.id, { slot: body.slot, n: body.n }) });
-    if (url === '/api/bar/take') return send(200, { account: accounts.fromBar(acc, body.slot) });
+    if (url === '/api/bar/take') return send(200, { account: body.space !== undefined ? accounts.fromExtras(acc, body.space) : accounts.fromBar(acc, body.slot) });
     return send(404, { error: 'Not found' });
   } catch (e) {
     if (e instanceof AccountError) return send(400, { error: e.message });

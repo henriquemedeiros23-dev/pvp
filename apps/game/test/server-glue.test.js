@@ -85,7 +85,7 @@ function messages(ws) {
 test('sign up, join the arena, bad messages are dropped, leave', async () => {
   const signup = await post('/api/signup', { name: NAME, password: 'secret1' });
   assert.equal(signup.status, 200);
-  assert.deepEqual(Object.keys(signup.body.account).sort(), ['bar', 'bombs', 'coins', 'name', 'owned', 'potions', 'skin', 'stash']);
+  assert.deepEqual(Object.keys(signup.body.account).sort(), ['bar', 'bombs', 'coins', 'extras', 'name', 'owned', 'potions', 'skin', 'stash']);
 
   // the Inventory and the fast bar (#39): an empty bar; you can't put in what you don't own
   const inv = await post('/api/inventory', {}, signup.body.token);
@@ -96,6 +96,11 @@ test('sign up, join the arena, bad messages are dropped, leave', async () => {
   assert.equal(notOwned.body.error, "You don't have that in your Inventory");
   assert.equal((await post('/api/bar/put', { kind: 'hat', id: 'cap', slot: 'x' }, signup.body.token)).status, 400);
   assert.equal((await post('/api/bar/take', { slot: 0 }, signup.body.token)).body.error, 'That bar slot is empty');
+  // the extras bar (#50): its own spaces, checked by the server too
+  assert.deepEqual(inv.body.account.extras, { shield: null, potion: null, bomb: null, legendarybomb: null });
+  assert.equal((await post('/api/bar/take', { space: 'potion' }, signup.body.token)).body.error, 'That space is empty');
+  assert.equal((await post('/api/bar/take', { space: 'rocket' }, signup.body.token)).status, 400);
+  assert.equal((await post('/api/bar/take', { space: { x: 1 } }, signup.body.token)).status, 400);
   assert.equal((await post('/api/bar/take', { slot: 0 })).status, 401);
 
   const taken = await post('/api/signup', { name: NAME, password: 'secret1' });

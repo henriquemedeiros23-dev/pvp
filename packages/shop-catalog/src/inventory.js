@@ -1,6 +1,8 @@
-// The Inventory screen and the fast bar (#39) as plain data: what each space and each bar slot shows.
-// Pure functions of the account (from the server: stash, potions, bombs, bar) and the rules.
-import { RULES, rarityStyle } from '@pvp/game-rules';
+// The Inventory screen, the fast bar (#39) and the extras bar (#50) as plain data: what each space and each
+// bar slot shows. Pure functions of the account (from the server: stash, potions, bombs, bar, extras) and the rules.
+// The fast bar holds hand weapons only (swords, guns); the extras bar has one fixed space for the shield,
+// the Healing Potions and each bomb (extrasSpaces in @pvp/game-rules).
+import { RULES, rarityStyle, extrasSpaces } from '@pvp/game-rules';
 import { WEAPON_ICONS, POTION_ICON_SVG, bombIconSvg } from '@pvp/hud-model';
 import { shopWeaponIds } from './index.js';
 
@@ -60,14 +62,34 @@ export function inventoryCount(account, kind, id) {
   return isPosInt(n) ? n : 0;
 }
 
+const isEntry = e => e && typeof e === 'object' && typeof e.kind === 'string' && isPosInt(e.n);
+/** Is this a hand weapon (sword, gun: the only things the fast bar takes)? */
+export const isHandWeapon = (kind, id, rules = RULES) => kind === 'weapon' && !!own(rules.WEAPONS, id) && own(rules.WEAPONS, id).type !== 'shield';
+
 const barOf = (account, rules) => {
   const size = isPosInt(rules.MAX_SLOTS) ? rules.MAX_SLOTS : 5;
   const bar = Array.isArray(account?.bar) ? account.bar : [];
   return Array.from({ length: Math.max(size, bar.length) }, (_, i) => {
     const e = bar[i];
-    return e && typeof e === 'object' && typeof e.kind === 'string' && isPosInt(e.n) ? e : null;
+    return isEntry(e) && isHandWeapon(e.kind, e.id, rules) ? e : null;
   });
 };
+
+// The extras bar entries in space order: [{ ...space, entry (or null) }]
+const extrasOf = (account, rules) => {
+  const ex = account?.extras && typeof account.extras === 'object' ? account.extras : {};
+  return extrasSpaces(rules).map(s => {
+    const e = own(ex, s.space);
+    const fits = isEntry(e) && e.kind === s.kind && (s.id === null ? own(rules.WEAPONS, e.id)?.type === 'shield' : e.id === s.id);
+    return { ...s, entry: fits ? e : null };
+  });
+};
+
+/** Which extras space an item goes into ('shield', 'potion', a bomb id), or null (hand weapons, unknown items). */
+export function extrasSpaceFor(kind, id, rules = RULES) {
+  const s = extrasSpaces(rules).find(x => x.kind === kind && (x.id === null ? own(rules.WEAPONS, id)?.type === 'shield' : x.id === id));
+  return s ? s.space : null;
+}
 
 // Durability shown for a weapon in a space or slot: the Inventory keeps no wear, so it is always full.
 const durabilityOf = look => (look.kind === 'weapon'
@@ -82,17 +104,21 @@ const durabilityOf = look => (look.kind === 'weapon'
  * Card: { key, kind, id, name, icon | iconSvg, rarity, rarityName, rarityColor, rarityBackground, isShield,
  *   filled, ghost, count (in this space, 0 for a ghost), label ('×3' for a stack, '' otherwise),
  *   owned (all of this item in the Inventory), inBar (how many are in the bar), durability ({ uses, max,
- *   percent, label } for a filled weapon space, else null), first (first space of its kind), action ('toBar' or null) }.
+ *   percent, label } for a filled weapon space, else null), first (first space of its kind),
+ *   place ('bar' for hand weapons, 'extras' for a shield, potions and bombs: where a tap puts it),
+ *   action ('toBar' / 'toExtras' when filled, else null) }.
+ * inBar counts both bars (the fast bar and the extras bar).
  */
 export function inventoryCards(account, rules = RULES, { minSpaces = MIN_SPACES } = {}) {
-  const bar = barOf(account, rules);
+  const carried = [...barOf(account, rules), ...extrasOf(account, rules).map(s => s.entry)];
   const cards = [];
   for (const { kind, id } of inventoryItemKinds(rules)) {
     const look = itemLook(kind, id, rules);
     const size = spaceSize(kind, id, rules);
     if (!look || !size) continue;
     const owned = inventoryCount(account, kind, id);
-    const inBar = bar.reduce((sum, e) => sum + (e && e.kind === kind && e.id === id ? e.n : 0), 0);
+    const place = isHandWeapon(kind, id, rules) ? 'bar' : 'extras';
+    const inBar = carried.reduce((sum, e) => sum + (e && e.kind === kind && e.id === id ? e.n : 0), 0);
     const spaces = Math.max(minSpaces, Math.ceil(owned / size));
     let left = owned;
     for (let i = 0; i < spaces; i++) {
@@ -103,7 +129,7 @@ export function inventoryCards(account, rules = RULES, { minSpaces = MIN_SPACES 
         key: `${kind}:${id}:${i}`, ...look, filled, ghost: !filled, count,
         label: filled && size > 1 ? `×${count}` : '',
         owned, inBar, durability: filled ? durabilityOf(look) : null, first: i === 0,
-        action: filled ? 'toBar' : null,
+        place, action: filled ? (place === 'bar' ? 'toBar' : 'toExtras') : null,
       });
     }
   }
@@ -111,7 +137,8 @@ export function inventoryCards(account, rules = RULES, { minSpaces = MIN_SPACES 
 }
 
 /**
- * The fast bar below the Inventory, looking like the in-game HUD bar: always all slots (5).
+ * The fast bar below the Inventory, looking like the in-game HUD bar: always all slots (5), hand weapons only
+ * (anything else in the data shows as empty).
  * Slot: { index, key ('1'..'5'), empty, kind, id, name, icon | iconSvg, rarity, rarityName, rarityColor,
  *   rarityBackground, isShield, count, label ('×3' for a stack), durability, action ('fromBar' or null) }.
  */
@@ -126,18 +153,58 @@ export function barSlots(account, rules = RULES) {
   });
 }
 
+// The drawing an empty extras space shows: what belongs there (#50).
+const SPACE_NAMES = { shield: 'Shield', potion: 'Healing Potions', bomb: 'Bombs' };
+function spaceHint(s, rules) {
+  if (s.kind === 'weapon') {
+    // the cheapest shield shows the drawing (the Shield, not the Mega Shield)
+    const id = Object.keys(rules.WEAPONS ?? {}).filter(w => rules.WEAPONS[w]?.type === 'shield')
+      .sort((a, b) => (rules.WEAPONS[a].price ?? 0) - (rules.WEAPONS[b].price ?? 0))[0];
+    const look = id ? itemLook('weapon', id, rules) : null;
+    return { hintName: SPACE_NAMES.shield, hintIcon: look?.icon ?? '🛡️', hintIconSvg: undefined, hintColor: look?.rarityColor ?? '#888888' };
+  }
+  const look = itemLook(s.kind, s.id, rules);
+  const name = s.kind === 'potion' ? SPACE_NAMES.potion : (look?.name ? `${look.name}s` : SPACE_NAMES.bomb);
+  return { hintName: name, hintIcon: undefined, hintIconSvg: look?.iconSvg, hintColor: look?.rarityColor ?? '#888888' };
+}
+
 /**
- * One line for the menu about the fast bar, e.g. 'Fast bar: Shootbm, Mega Shield, 3× Healing Potion (2 free)'
- * or 'Fast bar is empty: you get the free Gun. Fill it in your Inventory!'
+ * The extras bar (#50) under the fast bar: always one space per extra, in order: Shield, Healing Potions,
+ * Bombs, Legendary Bombs. An empty space shows a faint drawing of what belongs there.
+ * Space: { space ('shield', 'potion', 'bomb', 'legendarybomb'), key (same as space), max (how many fit),
+ *   hintName ('Shield', 'Healing Potions', 'Bombs', 'Legendary Bombs'), hintIcon (emoji) | hintIconSvg, hintColor,
+ *   empty, count, fill ('2/3'; '' for the shield), label ('×2' for a stack), action ('fromExtras' or null),
+ *   and when filled the item's look: kind, id, name, icon | iconSvg, rarity, rarityName, rarityColor,
+ *   rarityBackground, isShield, durability }.
+ */
+export function extrasSlots(account, rules = RULES) {
+  return extrasOf(account, rules).map(s => {
+    const hint = spaceHint(s, rules);
+    const look = s.entry ? itemLook(s.entry.kind, s.entry.id, rules) : null;
+    const base = { space: s.space, key: s.space, max: s.max, ...hint };
+    if (!look) return { ...base, empty: true, kind: s.kind, id: s.id, name: '', count: 0, fill: s.max > 1 ? `0/${s.max}` : '', label: '', durability: null, action: null };
+    const count = Math.min(s.entry.n, s.max);
+    return {
+      ...base, ...look, empty: false, count, fill: s.max > 1 ? `${count}/${s.max}` : '',
+      label: s.max > 1 ? `×${count}` : '', durability: durabilityOf(look), action: 'fromExtras',
+    };
+  });
+}
+
+/**
+ * One line for the menu about what comes into the arena, e.g.
+ * 'Fast bar: Shootbm (4 free) · Extras: Mega Shield, 3× Healing Potion'
+ * or 'Fast bar is empty: you get the free Gun. Fill it in your Inventory!' (plus the extras, if any).
  */
 export function barSummary(account, rules = RULES) {
   const slots = barSlots(account, rules);
   const full = slots.filter(s => !s.empty);
+  const extras = extrasSlots(account, rules).filter(s => !s.empty).map(s => (s.count > 1 ? `${s.count}× ${s.name}` : s.name));
+  const tail = extras.length ? ` · Extras: ${extras.join(', ')}` : '';
   if (!full.length) {
     const gun = own(rules.WEAPONS, rules.STARTING_WEAPON)?.name;
-    return `Fast bar is empty: ${gun ? `you get the free ${gun}. ` : ''}Fill it in your Inventory!`;
+    return `Fast bar is empty: ${gun ? `you get the free ${gun}. ` : ''}Fill it in your Inventory!${tail}`;
   }
   const free = slots.length - full.length;
-  const parts = full.map(s => (s.count > 1 ? `${s.count}× ${s.name}` : s.name));
-  return `Fast bar: ${parts.join(', ')}${free ? ` (${free} free)` : ''}`;
+  return `Fast bar: ${full.map(s => s.name).join(', ')}${free ? ` (${free} free)` : ''}${tail}`;
 }

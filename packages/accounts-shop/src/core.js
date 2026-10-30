@@ -94,10 +94,11 @@ export function createAccounts({
     // Weapons that are no longer in the game (e.g. the old wooden sword, or the Pistol and the others removed
     // in #26) are dropped from the Inventory.
     for (const id of Object.keys(rec.stash)) if (!Object.hasOwn(WEAPONS, id)) delete rec.stash[id];
-    // The fast bar (#39). Accounts saved before it existed get a bar filled like the old automatic pick
-    // (so their first match feels the same); a saved bar is checked (anything that does not fit goes back
-    // into the Inventory).
-    if (rec.bar === undefined) fastBar.autoFillBar(rec, rules);
+    // The fast bar (#39) and the extras bar (#50). Accounts saved before the bar existed get bars filled like
+    // the old automatic pick (so their first match feels the same); saved bars are checked: shields, potions
+    // and bombs in old fast-bar slots move into the extras bar, anything that does not fit goes back into the
+    // Inventory.
+    if (rec.bar === undefined && rec.extras === undefined) fastBar.autoFillBar(rec, rules);
     else fastBar.cleanBar(rec, rules);
     for (const t of rec.tokens) tokens.set(t, rec);
     if (typeof rec.name === 'string') indexName(rec.name, true);
@@ -212,6 +213,7 @@ export function createAccounts({
       kills: 0,
       lastKillAt: 0,
       bar: fastBar.emptyBar(rules),
+      extras: fastBar.emptyExtras(rules),
       tokens: [],
       createdAt: now(),
     };
@@ -261,6 +263,7 @@ export function createAccounts({
       // An old name that would not be allowed today (#41): the menu asks for a new one. Missing when the name is fine.
       ...(checkName(a.name).ok ? {} : { mustRename: true }),
       bar: fastBar.copyBar(a.bar),
+      extras: fastBar.copyExtras(a.extras),
     };
   }
 
@@ -352,9 +355,10 @@ export function createAccounts({
   }
 
   /**
-   * Move an item from the Inventory into the fast bar (#39). kind: 'weapon' (shields too), 'potion' or 'bomb'.
-   * opts.slot: bar slot 0..4 (default: its stack, else the first empty one); opts.n: how many (default: as many
-   * as fit). Must own it; at most one shield; potions up to MAX_POTIONS, bombs up to their maxCarry in a slot.
+   * Move an item from the Inventory into its bar. kind: 'weapon', 'potion' or 'bomb'.
+   * A hand weapon (sword, gun) goes into the fast bar (#39): opts.slot = bar slot 0..4 (default: the first
+   * empty one). A shield, Healing Potions or a bomb go into their own extras space (#50): opts.n = how many
+   * (default: as many as fit). Must own it; one shield; potions up to MAX_POTIONS, bombs up to their maxCarry.
    * Returns publicView.
    */
   function toBar(account, kind, id, opts = {}) {
@@ -364,16 +368,27 @@ export function createAccounts({
     return publicView(a);
   }
 
-  /** Move everything in a bar slot (0..4) back into the Inventory. Returns publicView. */
+  /**
+   * Move everything in a fast-bar slot (0..4) back into the Inventory. A string is an extras space instead
+   * ('shield', 'potion', 'bomb', 'legendarybomb'), like fromExtras. Returns publicView.
+   */
   function fromBar(account, slot) {
     const a = own(account);
-    barCall(() => fastBar.takeFromBar(a, slot));
+    barCall(() => (typeof slot === 'string' ? fastBar.takeFromExtras(a, slot) : fastBar.takeFromBar(a, slot)));
+    save();
+    return publicView(a);
+  }
+
+  /** Move everything in an extras space ('shield', 'potion', a bomb id) back into the Inventory (#50). Returns publicView. */
+  function fromExtras(account, space) {
+    const a = own(account);
+    barCall(() => fastBar.takeFromExtras(a, space));
     save();
     return publicView(a);
   }
 
   /**
-   * Joining the arena: ONLY the bar's contents come along (they leave the account); the Inventory stays.
+   * Joining the arena: ONLY the fast bar's and the extras bar's contents come along (they leave the account); the Inventory stays.
    * Returns { loadout, potions, bombs, starter } for arena.join (starter: true when the bar has no hand
    * weapon, then the arena gives the free starting Gun).
    */
@@ -398,7 +413,7 @@ export function createAccounts({
 
   return {
     signup, login, logout, byToken, publicView, addCoins, buy, equip, rename,
-    toBar, fromBar, takeBar, returnFromArena,
+    toBar, fromBar, fromExtras, takeBar, returnFromArena,
     byName, addKnockout, rankingEntries,
     /** Write any pending changes now (tests, shutdown). */
     flush: () => store.flush(),

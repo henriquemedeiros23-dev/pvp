@@ -19,6 +19,7 @@ export { MAX_POTIONS, POTION, potionPrice, potionHeal } from './potion.js';
 export { CHARGING_DAMAGE, MIN_FIRE_GAP_MS, chargingDamage } from './charge.js';
 export { HEADSHOT_BONUS, HEAD_ZONE, isHeadshot, headshotDamage } from './headshot.js';
 export { BOMBS, isBomb, bombPrice, bombMaxCarry, bombCounts, inBombArea } from './bombs.js';
+export { extrasSpaces, extrasSpaceOf } from './extras.js';
 export { COLORS, OUTFITS, SKIN_SLOTS, DEFAULT_SKIN, skinPrice } from './skins.js';
 export { validateRules } from './validate.js';
 export { deepFreeze } from './freeze.js';

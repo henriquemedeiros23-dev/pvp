@@ -3,7 +3,10 @@
 import { RULES, rarityStyle } from '@pvp/game-rules';
 
 // The Inventory screen and the fast bar (#39)
-export { MIN_SPACES, inventoryItemKinds, spaceSize, itemLook, inventoryCount, inventoryCards, barSlots, barSummary } from './inventory.js';
+export {
+  MIN_SPACES, inventoryItemKinds, spaceSize, itemLook, inventoryCount, inventoryCards, barSlots, barSummary,
+  isHandWeapon, extrasSpaceFor, extrasSlots,
+} from './inventory.js';
 
 const TABS = Object.freeze([
   Object.freeze({ id: 'color', label: 'Colors', hint: 'Pick the color of your stickman.' }),
@@ -13,15 +16,15 @@ const TABS = Object.freeze([
   Object.freeze({ id: 'shirt', label: 'Clothes', hint: 'Dress up your stickman.' }),
   Object.freeze({
     id: 'weapon', label: 'Weapons',
-    hint: 'Weapons go to your Inventory. Put them in your fast bar to take them into the arena. Shields go on your other arm. Get knocked out and you drop what you carry!',
+    hint: 'Weapons go to your Inventory. Put them in your fast bar to take them into the arena. Shields go in the shield space of your extras bar (your other arm). Get knocked out and you drop what you carry!',
   }),
   Object.freeze({
     id: 'potion', label: 'Potions',
-    hint: 'A Healing Potion gives you full H.P in 5 seconds. It goes to your Inventory: put up to 3 in your fast bar to take them along. Switch weapons while drinking and it is wasted!',
+    hint: 'A Healing Potion gives you full H.P in 5 seconds. It goes to your Inventory: put up to 3 in the potion space of your extras bar to take them along. Switch weapons while drinking and it is wasted!',
   }),
   Object.freeze({
     id: 'bomb', label: 'Bombs',
-    hint: 'Bombs go to your Inventory: put them in your fast bar to take them along. Throw one (B or N, or the bomb buttons): a red square shows where it lands, and 3 seconds after the throw it explodes. A Bomb hurts you too!',
+    hint: 'Bombs go to your Inventory: put them in their space in your extras bar to take them along. Throw one (B or N, or the bomb buttons): a red square shows where it lands, and 3 seconds after the throw it explodes. A Bomb hurts you too!',
   }),
 ]);
 

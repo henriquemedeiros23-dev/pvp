@@ -256,10 +256,11 @@ test('bombs (#32): bought bombs come along, "throw" throws one, it explodes afte
   for (let i = 0; i < 6; i++) await api.buy('bomb', 'bomb');
   const bought = await api.buy('bomb', 'legendarybomb');
   assert.deepEqual(bought.account.bombs, { bomb: 6, legendarybomb: 3 });
-  // into the fast bar (#39): only what is in the bar comes along
+  // into the extras bar (#50): only what is in the bars comes along
   await api.toBar('bomb', 'bomb');
   const inBar = await api.toBar('bomb', 'legendarybomb');
-  assert.deepEqual(inBar.account.bar.slice(0, 2), [{ kind: 'bomb', id: 'bomb', n: 5 }, { kind: 'bomb', id: 'legendarybomb', n: 3 }]);
+  assert.deepEqual([inBar.account.extras.bomb, inBar.account.extras.legendarybomb], [{ kind: 'bomb', id: 'bomb', n: 5 }, { kind: 'bomb', id: 'legendarybomb', n: 3 }]);
+  assert.deepEqual(inBar.account.bar, [null, null, null, null, null], 'bombs never take a fast-bar slot');
   const c = await open(server, token);
   c.send('join');
   await settle();
@@ -282,7 +283,10 @@ test('bombs (#32): bought bombs come along, "throw" throws one, it explodes afte
   c.send('leave');
   await settle();
   const back = (await api.me()).account;
-  assert.deepEqual(back.bar.slice(0, 2), [{ kind: 'bomb', id: 'bomb', n: 3 }, { kind: 'bomb', id: 'legendarybomb', n: 3 }], 'unused bombs go back into the bar');
+  assert.deepEqual([back.extras.bomb, back.extras.legendarybomb], [{ kind: 'bomb', id: 'bomb', n: 3 }, { kind: 'bomb', id: 'legendarybomb', n: 3 }], 'unused bombs go back into their spaces');
+  // tap the space: back into the Inventory
+  assert.deepEqual((await api.fromExtras('bomb')).account.bombs, { bomb: 4, legendarybomb: 0 });
+  await assert.rejects(api.fromExtras('rocket'), /does not exist/);
   assert.deepEqual(back.bombs, { bomb: 1, legendarybomb: 0 }, 'the Inventory was never touched');
 });
 

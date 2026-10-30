@@ -2,7 +2,7 @@
 
 ## What it does
 
-Player accounts (sign up, log in on up to 2 devices, log out), coins, the shop (buy and equip skins, buy weapons, Healing Potions and bombs into the Inventory: `stash`, `potions`, `bombs`) and the fast bar (#39): 5 slots the player fills from the Inventory. Only the fast bar goes into the arena; everything else stays safe in the Inventory. Storage is pluggable: in memory, one JSON file, or `localStorage`. The main entry is for Node (uses `node:crypto` and `node:fs`); `@pvp/accounts-shop/browser` works in the browser. Prices and limits come from `@pvp/game-rules`.
+Player accounts (sign up, log in on up to 2 devices, log out), coins, the shop (buy and equip skins, buy weapons, Healing Potions and bombs into the Inventory: `stash`, `potions`, `bombs`) the fast bar (#39): 5 slots for hand weapons (swords, guns) the player fills from the Inventory, and the extras bar (#50): one fixed space each for a shield, the Healing Potions and each bomb. Only the two bars go into the arena; everything else stays safe in the Inventory. Storage is pluggable: in memory, one JSON file, or `localStorage`. The main entry is for Node (uses `node:crypto` and `node:fs`); `@pvp/accounts-shop/browser` works in the browser. Prices and limits come from `@pvp/game-rules`.
 
 ## How to use
 
@@ -27,15 +27,19 @@ accounts.buy(acc, 'potion', 'potion');      // Healing Potions (10 coins) stack 
 accounts.buy(acc, 'bomb', 'legendarybomb'); // bombs (#32): one pack (Bomb 1 for 3 coins, Legendary Bomb 3 for 60): account.bombs
 accounts.equip(acc, 'hat', 'crown');        // must own it
 
-// The fast bar (#39): 5 slots (the rules' MAX_SLOTS). A slot is null or { kind, id, n }:
-// one weapon copy (a shield too, at most ONE shield), a stack of Healing Potions (up to MAX_POTIONS = 3)
-// or a stack of one bomb (up to its maxCarry: Bomb 5, Legendary Bomb 3). Bar items are moved OUT of the Inventory.
-accounts.toBar(acc, 'weapon', 'icesword');                // first free slot; returns publicView (with .bar)
-accounts.toBar(acc, 'potion', 'potion', { slot: 2, n: 2 }); // into slot 3 (0-based 2), 2 potions (default: as many as fit)
-accounts.fromBar(acc, 0);                                 // slot 1 back into the Inventory
-// errors: NOT_OWNED, BAR_FULL, SLOT_TAKEN, STACK_FULL, ONE_SHIELD, BAD_SLOT, BAD_COUNT, EMPTY_SLOT, UNKNOWN_ITEM
+// The fast bar (#39): 5 slots (the rules' MAX_SLOTS) for HAND WEAPONS only. A slot is null or { kind: 'weapon', id, n: 1 }.
+// The extras bar (#50): account.extras = { shield, potion, bomb, legendarybomb }, each null or { kind, id, n }:
+// ONE shield (Shield or Mega Shield), Healing Potions up to MAX_POTIONS (3), each bomb up to its maxCarry (5 / 3).
+// Bar items are moved OUT of the Inventory. toBar puts every item into the right bar by itself.
+accounts.toBar(acc, 'weapon', 'icesword');                // first free fast-bar slot; returns publicView (.bar, .extras)
+accounts.toBar(acc, 'weapon', 'icesword', { slot: 2 });   // into fast-bar slot 3 (0-based 2)
+accounts.toBar(acc, 'potion', 'potion');                  // into the potion space, as many as fit (opts.n: how many)
+accounts.toBar(acc, 'weapon', 'megashield');              // into the shield space
+accounts.fromBar(acc, 0);                                 // fast-bar slot 1 back into the Inventory
+accounts.fromExtras(acc, 'potion');                       // the potion space back into the Inventory
+// errors: NOT_OWNED, BAR_FULL, SLOT_TAKEN, STACK_FULL, ONE_SHIELD, BAD_SLOT, BAD_SPACE, BAD_COUNT, EMPTY_SLOT, UNKNOWN_ITEM
 
-const { loadout, potions, bombs, starter } = accounts.takeBar(acc); // joining: ONLY the bar, it leaves the account
+const { loadout, potions, bombs, starter } = accounts.takeBar(acc); // joining: ONLY the two bars, they leave the account
 arena.join(key, { loadout, potions, bombs, starter, ... });         // starter: true when no hand weapon in the bar
                                                                     // (then the free starting Gun comes)
 accounts.returnFromArena(acc, { weapons, potions, bombs });         // left alive (or not taken by the arena):
@@ -67,12 +71,14 @@ number); older saved accounts without them load with 0. There is no limit on how
 Knockouts for the ranking (`kills`, `lastKillAt`) are kept on the account record (not in `publicView`);
 older accounts load with 0.
 
-**The fast bar** (`account.bar`, the pure logic is in `src/bar.js`): accounts saved before the bar existed get a bar
-filled like the old automatic pick, so their first match feels the same (the 2 best weapons, the best shield, up to 3
-potions, the bombs, then more weapons while slots are free). A new account starts with an empty bar. A broken saved bar
-is cleaned on load: anything that does not fit (a second shield, too many potions) goes back into the Inventory.
+**The fast bar and the extras bar** (`account.bar` and `account.extras`, the pure logic is in `src/bar.js`; the spaces
+come from `extrasSpaces` in `@pvp/game-rules`): accounts saved before the bar existed get bars filled like the old
+automatic pick, so their first match feels the same (the 5 best hand weapons; the best shield, up to 3 potions and the
+bombs in the extras). A new account starts with empty bars. Accounts saved with the #39 bar (shields, potions and bombs
+in fast-bar slots) are migrated on load: those move into their extras space (the remembered layout too). A broken saved
+bar is cleaned on load: anything that does not fit (a second shield, too many potions) goes back into the Inventory.
 
-Error codes: `BAD_NAME`, `BAD_WORD`, `BAD_PASSWORD`, `NAME_TAKEN`, `WRONG_LOGIN`, `UNKNOWN_ITEM`, `ALREADY_OWNED`, `NOT_ENOUGH_COINS`, `NOT_OWNED`, and for the bar `BAR_FULL`, `SLOT_TAKEN`, `STACK_FULL`, `ONE_SHIELD`, `BAD_SLOT`, `BAD_COUNT`, `EMPTY_SLOT` (all `AccountError`). Passing an account object that didn't come from this service throws a `TypeError`.
+Error codes: `BAD_NAME`, `BAD_WORD`, `BAD_PASSWORD`, `NAME_TAKEN`, `WRONG_LOGIN`, `UNKNOWN_ITEM`, `ALREADY_OWNED`, `NOT_ENOUGH_COINS`, `NOT_OWNED`, and for the bars `BAR_FULL`, `SLOT_TAKEN`, `STACK_FULL`, `ONE_SHIELD`, `BAD_SLOT`, `BAD_SPACE`, `BAD_COUNT`, `EMPTY_SLOT` (all `AccountError`). Passing an account object that didn't come from this service throws a `TypeError`.
 
 A store is any object with `load()` (all records), `save(data)` (may be delayed) and `flush()` (Promise). The JSON file store writes to `<file>.tmp`, then renames it over the file, so a crash can't leave half a file. A broken file throws on load instead of silently starting empty.
 

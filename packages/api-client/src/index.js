@@ -128,16 +128,22 @@ export function createApiClient({ baseUrl = '', fetch: fetchFn, storage, tokenKe
     },
     /** The name of the last account that logged in (or signed up, or renamed) on this device, or ''. Kept after logout. */
     get lastName() { return store.get(lastNameKey) || ''; },
-    /** The Inventory and the fast bar (#39): resolves { account } (account.stash/potions/bombs and account.bar). */
+    /**
+     * The Inventory, the fast bar (#39) and the extras bar (#50): resolves { account }
+     * (account.stash/potions/bombs, account.bar and account.extras).
+     */
     inventory: () => post('/api/inventory', {}, true),
     /**
-     * Move an item from the Inventory into the fast bar. kind: 'weapon' (shields too), 'potion' or 'bomb'.
-     * opts.slot: bar slot 0..4 (default: its stack or the first empty one); opts.n: how many (default: as many as fit).
+     * Move an item from the Inventory into its bar. kind: 'weapon', 'potion' or 'bomb'.
+     * A hand weapon goes into the fast bar (opts.slot: bar slot 0..4, default the first empty one); a shield,
+     * Healing Potions or a bomb go into their extras space (opts.n: how many, default as many as fit).
      * Resolves { account }.
      */
     toBar: (kind, id, { slot, n } = {}) => post('/api/bar/put', { kind, id, slot, n }, true),
-    /** Move a bar slot (0..4) back into the Inventory. Resolves { account }. */
+    /** Move a fast-bar slot (0..4) back into the Inventory. Resolves { account }. */
     fromBar: slot => post('/api/bar/take', { slot }, true),
+    /** Move an extras space ('shield', 'potion', 'bomb', 'legendarybomb') back into the Inventory (#50). Resolves { account }. */
+    fromExtras: space => post('/api/bar/take', { space }, true),
     /** Forget the token on this device (no server call). The last name stays. */
     logout() { store.remove(tokenKey); },
   };

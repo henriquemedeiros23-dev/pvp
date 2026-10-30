@@ -3,7 +3,7 @@
 // @pvp/shop-catalog (what the shop and the Inventory show).
 import { createApiClient } from '@pvp/api-client';
 import { checkLoginForm, checkSignupForm } from '@pvp/account-form';
-import { shopTabs, shopItems, swatchBackground, inventoryCards, barSlots, barSummary } from '@pvp/shop-catalog';
+import { shopTabs, shopItems, swatchBackground, inventoryCards, barSlots, extrasSlots, barSummary } from '@pvp/shop-catalog';
 import { WEAPONS, BOMBS } from '@pvp/game-rules';
 import { WEAPON_ICONS, POTION_ICON_SVG, bombIconSvg, coinIconDataUrl } from '@pvp/hud-model';
 import { Game } from './game.js';
@@ -356,11 +356,13 @@ function invCardElement(c) {
     d.append(fill);
     b.append(d);
   }
-  const label = `${c.name}${c.count > 1 ? ` ×${c.count}` : ''}${c.durability ? ` (durability ${c.durability.label})` : ''}: tap to put it in your fast bar`;
+  const where = c.place === 'extras' ? 'your extras bar' : 'your fast bar';
+  const label = `${c.name}${c.count > 1 ? ` ×${c.count}` : ''}${c.durability ? ` (durability ${c.durability.label})` : ''}: tap to put it in ${where}`;
   b.title = label;
   b.setAttribute('aria-label', label);
   b.addEventListener('click', () => {
-    const slot = pickedSlot;
+    // a weapon goes into the picked fast-bar slot (or the first free one); extras fill their own space (#50)
+    const slot = c.place === 'bar' ? pickedSlot : null;
     invAction(() => api.toBar(c.kind, c.id, slot == null ? {} : { slot }));
   });
   return b;
@@ -388,6 +390,30 @@ function barSlotElement(s) {
   return b;
 }
 
+// One space of the extras bar (#50): empty spaces show a faint drawing of what goes there.
+function extrasSlotElement(s) {
+  const b = el('button', 'slot' + (s.empty ? ' empty' : ''));
+  b.dataset.space = s.space;
+  if (!s.empty) Object.assign(b.dataset, { kind: s.kind, id: s.id });
+  b.setAttribute('role', 'listitem');
+  const icon = s.empty ? itemIcon({ icon: s.hintIcon, iconSvg: s.hintIconSvg }) : itemIcon(s);
+  b.append(icon, el('small', 'name', s.empty ? s.hintName : s.name), el('span', 'cnt', s.fill));
+  if (s.empty) {
+    b.style.borderColor = `${s.hintColor}66`;
+    b.setAttribute('aria-label', `${s.hintName} space: empty. Tap ${s.max > 1 ? 'them' : 'one'} in your Inventory to put ${s.max > 1 ? `up to ${s.max}` : 'it'} here`);
+    b.addEventListener('click', () => { $('invError').textContent = `This space is for ${s.hintName}. Tap ${s.max > 1 ? 'them' : 'one'} in your Inventory!`; });
+  } else {
+    rarityLook(b, s);
+    b.style.background = s.rarityBackground !== s.rarityColor
+      ? `radial-gradient(circle at 50% 40%, ${s.rarityColor}aa, rgba(10,8,16,0.85) 75%)`
+      : `radial-gradient(circle at 50% 40%, ${s.rarityColor}66, rgba(10,8,16,0.6) 70%)`;
+    b.setAttribute('aria-label', `${s.hintName} space: ${s.name}${s.max > 1 ? ` ${s.fill}` : ''}. Tap to put it back`);
+    b.addEventListener('click', () => invAction(() => api.fromExtras(s.space)));
+  }
+  b.title = b.getAttribute('aria-label');
+  return b;
+}
+
 function renderInventory() {
   if (!account) return;
   $('invCoins').textContent = account.coins;
@@ -395,7 +421,8 @@ function renderInventory() {
   grid.replaceChildren(...inventoryCards(account).map(invCardElement));
   grid.scrollTop = top; // stay where you were
   $('invBar').replaceChildren(...barSlots(account).map(barSlotElement));
-  $('invBarHint').textContent = pickedSlot != null ? `Now tap an item for slot ${pickedSlot + 1}` : 'Only these come into the arena';
+  $('invExtras').replaceChildren(...extrasSlots(account).map(extrasSlotElement));
+  $('invBarHint').textContent = pickedSlot != null ? `Now tap a weapon for slot ${pickedSlot + 1}` : 'Swords and guns. Only the bars come along';
 }
 
 async function invAction(call) {
