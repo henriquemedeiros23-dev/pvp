@@ -119,6 +119,16 @@ export function createApiClient({ baseUrl = '', fetch: fetchFn, storage, tokenKe
     },
     /** The name of the last account that logged in (or signed up, or renamed) on this device, or ''. Kept after logout. */
     get lastName() { return store.get(lastNameKey) || ''; },
+    /** The Inventory and the fast bar (#39): resolves { account } (account.stash/potions/bombs and account.bar). */
+    inventory: () => post('/api/inventory', {}, true),
+    /**
+     * Move an item from the Inventory into the fast bar. kind: 'weapon' (shields too), 'potion' or 'bomb'.
+     * opts.slot: bar slot 0..4 (default: its stack or the first empty one); opts.n: how many (default: as many as fit).
+     * Resolves { account }.
+     */
+    toBar: (kind, id, { slot, n } = {}) => post('/api/bar/put', { kind, id, slot, n }, true),
+    /** Move a bar slot (0..4) back into the Inventory. Resolves { account }. */
+    fromBar: slot => post('/api/bar/take', { slot }, true),
     /** Forget the token on this device (no server call). The last name stays. */
     logout() { store.remove(tokenKey); },
   };

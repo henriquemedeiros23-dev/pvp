@@ -1,15 +1,15 @@
-// Glue for the screens: Account screen (log in / create an account), menu, shop, loading, death screen.
+// Glue for the screens: Account screen (log in / create an account), menu, shop, Inventory, loading, death screen.
 // The real work lives in packages: @pvp/api-client (server calls), @pvp/account-form (the Account screen's checks),
-// @pvp/shop-catalog (what the shop shows).
+// @pvp/shop-catalog (what the shop and the Inventory show).
 import { createApiClient } from '@pvp/api-client';
 import { checkLoginForm, checkSignupForm } from '@pvp/account-form';
-import { shopTabs, shopItems, backpackSummary, swatchBackground } from '@pvp/shop-catalog';
+import { shopTabs, shopItems, swatchBackground, inventoryCards, barSlots, barSummary } from '@pvp/shop-catalog';
 import { WEAPONS, BOMBS } from '@pvp/game-rules';
 import { WEAPON_ICONS, POTION_ICON_SVG, bombIconSvg, coinIconDataUrl } from '@pvp/hud-model';
 import { Game } from './game.js';
 
 const $ = id => document.getElementById(id);
-const SCREENS = ['login', 'menu', 'shop', 'dead'];
+const SCREENS = ['login', 'menu', 'shop', 'inventory', 'dead'];
 const ONLINE_REFRESH_MS = 5000;
 
 // Practice mode (practice.html) sets globalThis.pvpInject = { api, openSocket } before this file runs,
@@ -66,9 +66,11 @@ function setAccount(acc) {
   $('menuName').textContent = acc.name;
   $('menuCoins').textContent = acc.coins;
   $('shopCoins').textContent = acc.coins;
-  $('menuBackpack').textContent = backpackSummary(acc);
+  $('invCoins').textContent = acc.coins;
+  $('menuBackpack').textContent = barSummary(acc); // what comes into the arena (#39)
   preview();
   if (visible('shop')) renderShop();
+  if (visible('inventory')) renderInventory();
 }
 
 function handleError(e, where) {
@@ -150,6 +152,7 @@ setInterval(() => {
 }, ONLINE_REFRESH_MS);
 
 $('btnShop').addEventListener('click', () => { closeRename(); $('shopError').textContent = ''; show('shop'); renderShop(); });
+$('btnInventory').addEventListener('click', () => { closeRename(); openInventory(); });
 
 // ------------------------------------------------------------ change your name (#41)
 // The ✏️ next to the name opens a small panel. The server checks the name (@pvp/name-filter in accounts-shop):
@@ -258,7 +261,7 @@ function cardElement(c) {
       Object.assign(rar.style, { color: '#fff', background: c.rarityBackground, padding: '0 6px', borderRadius: '6px' });
     }
     tag.append(rar);
-    if (c.stashCount) tag.append(` · ${c.stashCount} in backpack`);
+    if (c.stashCount) tag.append(` · ${c.stashCount} in Inventory`);
     card.append(tag);
   }
 
@@ -298,6 +301,110 @@ async function shopAction(call) {
     setAccount(res.account);
   } catch (e) {
     handleError(e, $('shopError'));
+  } finally {
+    busy = false;
+  }
+}
+
+// ------------------------------------------------------------ Inventory and fast bar (#39)
+// Tap an item: it goes into the first free bar slot (or the bar slot you tapped first). Tap a bar item: back
+// into the Inventory. The server checks everything (@pvp/accounts-shop); cards come from @pvp/shop-catalog.
+let pickedSlot = null; // an empty bar slot the player tapped first, or null
+
+$('btnInvBack').addEventListener('click', () => showMenu());
+
+function openInventory() {
+  pickedSlot = null;
+  $('invError').textContent = '';
+  show('inventory');
+  renderInventory();
+  api.inventory().then(res => setAccount(res.account)).catch(e => handleError(e, $('invError')));
+}
+
+// Rarity look (colors from RARITY_COLORS in @pvp/game-rules, via the view-model)
+function rarityLook(e, c) {
+  if (c.rarityColor) e.style.setProperty('--rc', c.rarityColor);
+  e.style.setProperty('--rbg', c.rarityBackground !== c.rarityColor ? `${c.rarityColor}aa` : `${c.rarityColor}55`);
+}
+
+function itemIcon(c) {
+  const icon = el('span', 'icon');
+  if (c.iconSvg) icon.innerHTML = c.iconSvg; // the potion flask / the bomb (@pvp/hud-model)
+  else icon.textContent = c.icon || '';
+  return icon;
+}
+
+function invCardElement(c) {
+  const b = el('button', 'inv-card' + (c.ghost ? ' ghost' : ''));
+  Object.assign(b.dataset, { kind: c.kind, id: c.id, filled: c.filled ? '1' : '0' });
+  b.setAttribute('role', 'listitem');
+  b.append(itemIcon(c), el('span', 'name', c.name), el('span', 'cnt', c.label));
+  if (c.ghost) {
+    b.title = `${c.name}: buy it in the shop`;
+    b.setAttribute('aria-label', `${c.name}: empty space`);
+    b.addEventListener('click', () => { $('invError').textContent = `No ${c.name} here yet. Buy one in the SHOP!`; });
+    return b;
+  }
+  rarityLook(b, c);
+  if (c.durability) {
+    const d = el('span', 'dur');
+    const fill = el('i');
+    fill.style.width = `${c.durability.percent}%`;
+    d.append(fill);
+    b.append(d);
+  }
+  const label = `${c.name}${c.count > 1 ? ` ×${c.count}` : ''}${c.durability ? ` (durability ${c.durability.label})` : ''}: tap to put it in your fast bar`;
+  b.title = label;
+  b.setAttribute('aria-label', label);
+  b.addEventListener('click', () => {
+    const slot = pickedSlot;
+    invAction(() => api.toBar(c.kind, c.id, slot == null ? {} : { slot }));
+  });
+  return b;
+}
+
+function barSlotElement(s) {
+  const b = el('button', 'slot' + (s.empty ? ' empty' : '') + (s.empty && pickedSlot === s.index ? ' picked' : ''));
+  b.dataset.slot = s.index;
+  if (!s.empty) Object.assign(b.dataset, { kind: s.kind, id: s.id });
+  b.setAttribute('role', 'listitem');
+  b.append(el('span', 'key', s.key), itemIcon(s), el('small', 'name', s.name), el('span', 'cnt', s.label));
+  if (s.empty) {
+    b.setAttribute('aria-label', `Bar slot ${s.key}: empty. Tap it, then tap an item`);
+    b.addEventListener('click', () => { pickedSlot = pickedSlot === s.index ? null : s.index; renderInventory(); });
+  } else {
+    rarityLook(b, s);
+    // like the HUD slots: a soft glow in the rarity color
+    b.style.background = s.rarityBackground !== s.rarityColor
+      ? `radial-gradient(circle at 50% 40%, ${s.rarityColor}aa, rgba(10,8,16,0.85) 75%)`
+      : `radial-gradient(circle at 50% 40%, ${s.rarityColor}66, rgba(10,8,16,0.6) 70%)`;
+    b.setAttribute('aria-label', `Bar slot ${s.key}: ${s.name}${s.count > 1 ? ` ×${s.count}` : ''}. Tap to put it back`);
+    b.addEventListener('click', () => invAction(() => api.fromBar(s.index)));
+  }
+  b.title = b.getAttribute('aria-label');
+  return b;
+}
+
+function renderInventory() {
+  if (!account) return;
+  $('invCoins').textContent = account.coins;
+  const grid = $('invGrid'), top = grid.scrollTop;
+  grid.replaceChildren(...inventoryCards(account).map(invCardElement));
+  grid.scrollTop = top; // stay where you were
+  $('invBar').replaceChildren(...barSlots(account).map(barSlotElement));
+  $('invBarHint').textContent = pickedSlot != null ? `Now tap an item for slot ${pickedSlot + 1}` : 'Only these come into the arena';
+}
+
+async function invAction(call) {
+  if (busy) return;
+  busy = true;
+  $('invError').textContent = '';
+  try {
+    const res = await call();
+    pickedSlot = null;
+    setAccount(res.account);
+  } catch (e) {
+    handleError(e, $('invError'));
   } finally {
     busy = false;
   }

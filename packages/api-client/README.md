@@ -2,7 +2,7 @@
 
 ## What it does
 
-Talks to the game server's account and shop API (sign up, log in, who am I, buy, equip, rename) and remembers the login token, with short friendly error messages. Plain ES module with no dependencies, so it works in Node and directly in the browser.
+Talks to the game server's account and shop API (sign up, log in, who am I, buy, equip, rename, the Inventory and the fast bar) and remembers the login token, with short friendly error messages. Plain ES module with no dependencies, so it works in Node and directly in the browser.
 
 ## How to use
 
@@ -15,8 +15,15 @@ const { account } = await api.signup('Bob', 'secret');     // or api.login(name,
 const { account: me, online } = await api.me();
 await api.buy('hat', 'crown');       // kind: 'color' | 'hat' | 'face' | 'back' | 'shirt' | 'weapon'
 await api.equip('hat', 'crown');     // each resolves { account }
-await api.rename('Boss_Kid');        // { account }; a refused name throws with a kid-friendly message
-api.lastName;                         // the last name used on this device ('' if none): pre-fill the log in box
+
+// the Inventory and the fast bar (#39), each resolves { account } (account.bar: 5 slots, null or { kind, id, n })
+await api.inventory();
+await api.toBar('weapon', 'icesword');               // into the first free bar slot
+await api.toBar('potion', 'potion', { slot: 2, n: 3 }); // into slot 3, 3 potions (default: as many as fit)
+await api.fromBar(0);                                // slot 1 back into the Inventory
+
+await api.rename('Boss_Kid');        // { account }; a refused name throws with a kid-friendly message (#41)
+api.lastName;                         // the last name used on this device ('' if none): pre-fill the log in box (#46)
 api.logout();                         // forgets the token on this device (the last name stays; never the password)
 
 try { await api.buy('weapon', 'icesword'); }

@@ -53,7 +53,8 @@ function openSpot(r = 12) {
   return null;
 }
 
-// Sign up, get 3 coins (test hook 'debugCoins' on a plain WebSocket), buy a second Gun, then log the page in.
+// Sign up, get 6 coins (test hook 'debugCoins' on a plain WebSocket), buy two Guns and put them in the fast bar
+// (#39: only the bar comes into the arena), then log the page in.
 async function signedInWithTwoGuns(page, prefix) {
   const name = prefix + Date.now().toString(36).slice(-7);
   const post = async (url, body, token) => {
@@ -66,14 +67,17 @@ async function signedInWithTwoGuns(page, prefix) {
   const { token } = await post('/api/signup', { name, password: 'secret1' });
   const ws = new WebSocket(`ws://127.0.0.1:${server.port}/?token=${encodeURIComponent(token)}`);
   await new Promise((resolve, reject) => { ws.once('open', resolve); ws.once('error', reject); });
-  ws.send(JSON.stringify({ t: 'debugCoins', n: RULES.WEAPONS.gun.price }));
+  ws.send(JSON.stringify({ t: 'debugCoins', n: 2 * RULES.WEAPONS.gun.price }));
   let coins = 0;
-  for (let i = 0; i < 100 && coins < RULES.WEAPONS.gun.price; i++) {
+  for (let i = 0; i < 100 && coins < 2 * RULES.WEAPONS.gun.price; i++) {
     await new Promise(r => setTimeout(r, 30));
     coins = (await post('/api/me', {}, token)).account.coins;
   }
   ws.close();
-  await post('/api/buy', { kind: 'weapon', id: 'gun' }, token);
+  for (let i = 0; i < 2; i++) {
+    await post('/api/buy', { kind: 'weapon', id: 'gun' }, token);
+    await post('/api/bar/put', { kind: 'weapon', id: 'gun' }, token);
+  }
   await openAndLogIn(page, server.url, name); // the Account screen (#46)
 }
 
@@ -128,7 +132,7 @@ test('phone: "Charging" after a shot, and damage numbers above heads', { skip: S
     await page.click('#btnJoin');
     await page.locator('#hud').waitFor({ state: 'visible' });
     const joined = await waitDebug(page, s => s.mode === 'play' && s.inv, { what: 'joined' });
-    assert.deepEqual(joined.inv.weapons, ['gun', 'gun'], 'the free Gun and the bought one');
+    assert.deepEqual(joined.inv.weapons, ['gun', 'gun'], 'the two Guns from the fast bar');
 
     // stand in an open place
     const spot = openSpot();

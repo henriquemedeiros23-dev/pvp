@@ -185,3 +185,28 @@ test('the default fetch is the global fetch, called later', async () => {
     globalThis.fetch = saved;
   }
 });
+
+test('inventory, toBar and fromBar (#39) send the token and the right body', async () => {
+  const fetch = fakeFetch(
+    { status: 200, body: { account: ACCOUNT } },
+    { status: 200, body: { account: ACCOUNT } },
+    { status: 200, body: { account: ACCOUNT } },
+    { status: 200, body: { account: ACCOUNT } },
+    { status: 400, body: { error: 'Your bar is full' } },
+  );
+  const storage = memoryStorage();
+  storage.setItem(TOKEN_KEY, 't9');
+  const api = createApiClient({ fetch, storage });
+  assert.deepEqual((await api.inventory()).account, ACCOUNT);
+  await api.toBar('weapon', 'shootbm');
+  await api.toBar('potion', 'potion', { slot: 2, n: 3 });
+  await api.fromBar(4);
+  await assert.rejects(api.toBar('weapon', 'gun'), e => e instanceof ApiError && e.status === 400 && e.message === 'Your bar is full');
+  assert.deepEqual(fetch.calls.map(c => [c.url, c.opts.headers['x-token'], c.body]), [
+    ['/api/inventory', 't9', {}],
+    ['/api/bar/put', 't9', { kind: 'weapon', id: 'shootbm' }],
+    ['/api/bar/put', 't9', { kind: 'potion', id: 'potion', slot: 2, n: 3 }],
+    ['/api/bar/take', 't9', { slot: 4 }],
+    ['/api/bar/put', 't9', { kind: 'weapon', id: 'gun' }],
+  ]);
+});
