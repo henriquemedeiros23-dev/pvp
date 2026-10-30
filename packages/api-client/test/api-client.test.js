@@ -154,3 +154,28 @@ test('ranking (#47) posts with the token and checks the answer', async () => {
   assert.deepEqual([fetch.calls[0].url, fetch.calls[0].opts.headers['x-token']], ['/api/ranking', 't9']);
   await assert.rejects(api.ranking(), e => e instanceof ApiError && e.message.length > 0);
 });
+
+test('inventory, toBar and fromBar (#39) send the token and the right body', async () => {
+  const fetch = fakeFetch(
+    { status: 200, body: { account: ACCOUNT } },
+    { status: 200, body: { account: ACCOUNT } },
+    { status: 200, body: { account: ACCOUNT } },
+    { status: 200, body: { account: ACCOUNT } },
+    { status: 400, body: { error: 'Your bar is full' } },
+  );
+  const storage = memoryStorage();
+  storage.setItem(TOKEN_KEY, 't9');
+  const api = createApiClient({ fetch, storage });
+  assert.deepEqual((await api.inventory()).account, ACCOUNT);
+  await api.toBar('weapon', 'shootbm');
+  await api.toBar('potion', 'potion', { slot: 2, n: 3 });
+  await api.fromBar(4);
+  await assert.rejects(api.toBar('weapon', 'gun'), e => e instanceof ApiError && e.status === 400 && e.message === 'Your bar is full');
+  assert.deepEqual(fetch.calls.map(c => [c.url, c.opts.headers['x-token'], c.body]), [
+    ['/api/inventory', 't9', {}],
+    ['/api/bar/put', 't9', { kind: 'weapon', id: 'shootbm' }],
+    ['/api/bar/put', 't9', { kind: 'potion', id: 'potion', slot: 2, n: 3 }],
+    ['/api/bar/take', 't9', { slot: 4 }],
+    ['/api/bar/put', 't9', { kind: 'weapon', id: 'gun' }],
+  ]);
+});

@@ -65,6 +65,7 @@
         <button id="btnJoin" class="huge">JOIN ARENA</button>
         <button id="btnShop" class="huge alt">SHOP</button>
         <button id="btnRanking" class="huge gold">🏆 RANKING</button>
+        <button id="btnInventory" class="huge inv">INVENTORY</button>
       </div>
       <p class="online"><span class="dot"></span><span id="menuOnline">0</span> players in the arena</p>
       <p id="menuBackpack" class="backpack"></p>
@@ -103,6 +104,21 @@
     <ol id="rankingList" class="ranking-list"></ol>
     <p id="rankingEmpty" class="hint hidden">No knockouts yet. Join the arena and be the first!</p>
     <p id="rankingError" class="error"></p>
+  <!-- Inventory (#39): everything you own (at least 2 spaces of every item), and below it your fast bar:
+       only the fast bar comes into the arena, the rest stays safe here. Cards and slots come from @pvp/shop-catalog. -->
+  <section id="inventory" class="screen hidden">
+    <header class="topbar">
+      <button id="btnInvBack" class="back">‹ Back</button>
+      <h2 class="inv-title">🎒 Inventory</h2>
+      <div class="coins"><span class="coin"></span><span id="invCoins">0</span></div>
+    </header>
+    <p id="invHint" class="hint">Tap an item to put it in your fast bar. Tap a bar item to put it back.</p>
+    <div id="invGrid" class="inv-grid" role="list" aria-label="Inventory"></div>
+    <div class="inv-barbox">
+      <div class="inv-barhead"><b>Fast bar</b><span id="invBarHint">Only these come into the arena</span></div>
+      <div id="invBar" class="inv-bar" role="list" aria-label="Fast bar"></div>
+      <p id="invError" class="error"></p>
+    </div>
   </section>
 
   <!-- In-game HUD -->
@@ -182,7 +198,7 @@
       <div class="poof">💫</div>
       <h2>Knocked out!</h2>
       <p id="deadBy"></p>
-      <p class="muted">You dropped your weapons on the island.</p>
+      <p class="muted">You dropped what was in your fast bar. Your Inventory is safe!</p>
       <button id="btnDeadMenu" class="big">Back to menu</button>
     </div>
   </section>

@@ -88,6 +88,73 @@ input:focus { border-color: var(--gold); }
 .card button.on { background: var(--good); color: #062; cursor: default; }
 .card button:disabled { opacity: 0.45; }
 
+/* ---------- Inventory (#39): the grid on top, the fast bar (looks like the HUD bar) below ---------- */
+.huge.inv { background: linear-gradient(180deg, #4fd27a, #22a64e); box-shadow: 0 5px 0 #146b31; }
+.huge.inv:active { box-shadow: 0 2px 0 #146b31; }
+#inventory { background: linear-gradient(180deg, rgba(14,10,24,0.9), rgba(14,10,24,0.96)); overflow: hidden; }
+.inv-title { margin: 0; font-size: 20px; font-weight: 900; }
+#inventory .back { min-height: 46px; padding: 10px 20px; font-size: 17px; }
+#inventory .hint { margin-top: 0; }
+.inv-grid {
+  flex: 1 1 auto; min-height: 0; overflow-y: auto; touch-action: pan-y; width: 100%; max-width: 980px; align-content: start;
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(78px, 1fr)); gap: 8px;
+  padding: 10px calc(16px + var(--safe-r)) 12px calc(16px + var(--safe-l));
+}
+.inv-card {
+  position: relative; min-height: 84px; padding: 6px 4px 8px; border-radius: 14px; border: 2px solid var(--rc, var(--line));
+  background: radial-gradient(circle at 50% 38%, var(--rbg, rgba(255,255,255,0.08)), rgba(10,8,16,0.75) 72%);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; line-height: 1.05;
+  transition: transform 0.08s;
+}
+.inv-card:active { transform: scale(0.94); }
+.inv-card .icon { font-size: 30px; height: 36px; display: flex; align-items: center; justify-content: center; }
+.inv-card .icon svg, .inv-bar .slot .icon svg { width: 34px; height: 34px; }
+.inv-card .name { font-size: 11px; font-weight: 800; max-width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.inv-card .cnt, .inv-bar .slot .cnt {
+  position: absolute; top: 4px; right: 5px; min-width: 20px; padding: 1px 5px; border-radius: 999px; font-size: 11px; font-weight: 900;
+  background: rgba(0,0,0,0.65); color: #fff;
+}
+.inv-card .cnt:empty, .inv-bar .slot .cnt:empty { display: none; }
+.inv-card .dur { position: absolute; left: 10px; right: 10px; bottom: 4px; height: 4px; border-radius: 999px; background: rgba(0,0,0,0.6); overflow: hidden; }
+.inv-card .dur i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 999px; background: linear-gradient(90deg, #3aa61c, #8ee04a); }
+.inv-card.ghost { border-style: dashed; border-color: rgba(255,255,255,0.18); background: rgba(255,255,255,0.03); cursor: default; }
+.inv-card.ghost .icon { opacity: 0.22; filter: grayscale(1); }
+.inv-card.ghost .name { opacity: 0.35; }
+.inv-card.ghost:active { transform: none; }
+.inv-barbox {
+  flex: none; width: 100%; display: flex; flex-direction: column; align-items: center; gap: 6px;
+  padding: 10px calc(12px + var(--safe-r)) calc(6px + var(--safe-b)) calc(12px + var(--safe-l));
+  background: rgba(0,0,0,0.45); border-top: 1px solid var(--line);
+}
+.inv-barhead { display: flex; gap: 10px; align-items: baseline; font-size: 14px; }
+.inv-barhead b { color: var(--gold); text-transform: uppercase; letter-spacing: 0.06em; }
+.inv-barhead span { color: var(--muted); font-size: 12px; }
+.inv-bar {
+  --slot: 66px; display: flex; gap: 8px; padding: 8px 10px; border-radius: 16px;
+  background: rgba(10, 8, 16, 0.55); border: 1px solid rgba(255,255,255,0.14); box-shadow: 0 4px 14px rgba(0,0,0,0.25);
+}
+.inv-bar .slot { cursor: pointer; }
+.inv-bar .slot.empty { cursor: pointer; border-style: dashed; }
+.inv-bar .slot.picked { border-color: var(--gold); border-style: solid; box-shadow: 0 0 14px rgba(255,197,49,0.7); transform: translateY(-3px); }
+.inv-bar .slot .name { display: block; }
+#invError { min-height: 1.1em; margin: 0; font-size: 13px; }
+@media (max-height: 430px) {
+  #inventory .topbar { padding-top: 6px; padding-bottom: 4px; }
+  #inventory .hint { display: none; }
+  .inv-grid { grid-template-columns: repeat(auto-fill, minmax(70px, 1fr)); gap: 6px; padding-top: 4px; }
+  .inv-card { min-height: 70px; }
+  .inv-card .icon { font-size: 24px; height: 28px; }
+  .inv-card .icon svg { width: 28px; height: 28px; }
+  .inv-barbox { flex-direction: row; justify-content: center; padding-top: 6px; gap: 12px; }
+  .inv-barhead { flex-direction: column; gap: 2px; align-items: flex-start; }
+  .inv-bar { --slot: 54px; padding: 5px 8px; }
+  .inv-bar .slot .name { display: none; }
+  #invError { position: absolute; bottom: calc(70px + var(--safe-b)); left: 0; right: 0; }
+}
+@media (max-width: 380px) {
+  .inv-bar { --slot: 56px; gap: 5px; padding: 6px; }
+}
+
 /* ---------- HUD ---------- */
 #hud { position: fixed; inset: 0; z-index: 5; pointer-events: none; }
 #hud button { pointer-events: auto; }

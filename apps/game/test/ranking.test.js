@@ -77,6 +77,7 @@ test('a real knockout counts for the attacker; /api/ranking gives the top list a
     a.send({ t: 'debugCoins', n: 250 });
     await wait(200);
     assert.equal((await api(base, '/api/buy', { kind: 'weapon', id: 'supersword' }, ann)).status, 200); // one hit knocks out
+    assert.equal((await api(base, '/api/bar/put', { kind: 'weapon', id: 'supersword' }, ann)).status, 200); // fast bar slot 1 (#39)
     a.send({ t: 'join' });
     b.send({ t: 'join' });
     await a.until(() => a.seen.some(m => m.t === 'welcome'), 'Ann joined');
@@ -84,7 +85,7 @@ test('a real knockout counts for the attacker; /api/ranking gives the top list a
     await wait(3200); // spawn protection is over
     a.send({ t: 'debugTeleport', x: 0, z: 0 });
     b.send({ t: 'debugTeleport', x: 0, z: 0.4 }); // so close that facing does not matter
-    a.send({ t: 'slot', i: 1 });
+    a.send({ t: 'slot', i: 0 });
     await wait(200);
     a.send({ t: 'fire', d: [0, 0, 1] });
     await b.until(() => b.seen.some(m => m.t === 'dead'), 'Bob was knocked out');

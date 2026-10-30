@@ -23,6 +23,7 @@ graph LR
   worldgen --> random
   accounts["@pvp/accounts-shop"] --> rules
   shop["@pvp/shop-catalog"] --> rules
+  shop --> hud
   hud["@pvp/hud-model"] --> rules
   stickman["@pvp/stickman-3d"] --> rules
   stickman --> three(["three (outside)"])
@@ -49,18 +50,18 @@ graph LR
 | Package | What it does | Runs in | Determinism | Tests |
 |---|---|---|---|---|
 | `@pvp/seeded-random` | Random numbers from a seed: same seed, same numbers. | both | fully: only the seed and the calls decide | 11 |
-| `@pvp/game-rules` | All the game's numbers (the boss's weapons and shields, rarities and their colors, chest weights, which guns can aim, the Healing Potion, the bombs, skins, prices, limits) as frozen data. | both | fully: constant data and pure helpers | 28 |
-| `@pvp/collision` | Walls, jumping, landing and ray hits in a world made of boxes. | both | fully: pure math, no random, no time | 18 |
+| `@pvp/game-rules` | All the game's numbers (the boss's weapons and shields, rarities and their colors, chest weights, which guns can aim, the Healing Potion, the bombs, skins, prices, limits) as frozen data. | both | fully: constant data and pure helpers | 32 |
+| `@pvp/collision` | Walls, jumping, landing and ray hits in a world made of boxes. | both | fully: pure math, no random, no time | 19 |
 | `@pvp/world-gen` | Builds the island of ruins (houses, towers, chests) from a seed. | both | fully: all random comes from the seed | 12 |
 | `@pvp/net-protocol` | Every message between phone and server, with builders and checks. | both | fully: pure functions and frozen data | 21 |
-| `@pvp/accounts-shop` | Accounts, log in, coins, buying skins, weapons, potions and bombs, the backpack. | Node (browser via `/browser`) | partly: logic is pure, tokens/clock are passed in, file saving is real I/O | 37 |
-| `@pvp/arena` | The fight itself: players, chests, loot, weapons, shields, shock and freeze, drinking potions, aiming, thrown bombs, damage, knockouts, damage numbers for nearby players. | both | fully: time and seeded random are passed in (replay tests) | 133 |
-| `@pvp/shop-catalog` | Turns the rules and an account into the cards the shop screen shows. | both | fully: pure functions of their inputs | 12 |
-| `@pvp/hud-model` | Turns your inventory and health into the in-game HUD: Durability bar of the held weapon, H.P bar, 5 slots, shield pill, potion button with drinking ring, "Charging 1.4s" after a shot, damage numbers above heads, aiming (zoom, scope ring, AIM / AIM ON button), bomb buttons, the coin icon from the boss's drawing. | both | fully: pure functions of their inputs (time passed in) | 39 |
-| `@pvp/api-client` | Talks to the server's account and shop API and keeps the login token. | both | fully: fetch and storage are passed in | 11 |
+| `@pvp/accounts-shop` | Accounts, log in, coins, buying skins, weapons, potions and bombs, the Inventory and the 5-slot fast bar (only the bar goes into the arena). | Node (browser via `/browser`) | partly: logic is pure, tokens/clock are passed in, file saving is real I/O | 46 |
+| `@pvp/arena` | The fight itself: players, chests, loot, weapons, shields, shock and freeze, drinking potions, aiming, thrown bombs, damage, knockouts, damage numbers for nearby players. | both | fully: time and seeded random are passed in (replay tests) | 134 |
+| `@pvp/shop-catalog` | Turns the rules and an account into the cards the shop screen shows, and the Inventory screen: spaces (at least 2 of everything) and the fast bar. | both | fully: pure functions of their inputs | 21 |
+| `@pvp/hud-model` | Turns your inventory and health into the in-game HUD: Durability bar of the held weapon, H.P bar, 5 slots, shield pill, potion button with drinking ring, "Charging 1.4s" after a shot, damage numbers above heads, aiming (zoom, scope ring, AIM / AIM ON button), bomb buttons, the coin icon from the boss's drawing. | both | fully: pure functions of their inputs (time passed in) | 42 |
+| `@pvp/api-client` | Talks to the server's account, shop and Inventory/fast bar API and keeps the login token. | both | fully: fetch and storage are passed in | 12 |
 | `@pvp/stickman-3d` | A three.js stickman with skins, outfits, the boss's weapons and shields, the Healing Potion flask, bombs and their red area, frozen/shocked looks and animation. | browser (pose math also in Node) | partly: pose math is pure, how it looks depends on the renderer | 27 |
 | `@pvp/island-scene` | The 3D island: sky with clouds, warm sun, green grass ground with dirt paths, grass tufts, flowers, bushes, rocks, beach with wet sand, waves, palms, ruins and chests, and gold coins popping out of opened chests. A lighter version for phones. | browser (also builds in Node) | partly: all placement and colors from a seed, time passed in, how it looks depends on the renderer | 19 |
-| `@pvp/local-server` | The game server inside the page (practice mode): arena, accounts in localStorage, tick, fake WebSocket, bots. | browser (also Node) | partly: seeded arena and bots, time and timer passed in; tokens and localStorage are real | 17 |
+| `@pvp/local-server` | The game server inside the page (practice mode): arena, accounts in localStorage, tick, fake WebSocket, bots. | browser (also Node) | partly: seeded arena and bots, time and timer passed in; tokens and localStorage are real | 18 |
 | `@pvp/leaderboard` | The ranking: top 50 players by knockouts (a tie: who got there first), your own place even outside the top, 🥇🥈🥉 rows for the screen. | both | fully: pure functions (the knockout time is passed in) | 8 |
 | `@pvp/touch-controls` | Joystick, aim by dragging, buttons, held actions (shield), toggled actions (aim: on until pressed again), buttons that hide and show, keyboard and mouse (right click aims). | browser (core also in Node) | partly: the core is pure, the DOM part depends on real fingers and mice | 27 |
 
@@ -161,16 +162,16 @@ graph LR
 
 ## `@pvp/accounts-shop`
 
-**Purpose:** player accounts (sign up, log in, log out, rename), coins, the shop (buy and equip skins, buy weapons into the backpack) and the loadout taken into the arena. Storage is pluggable. Node entry, plus `@pvp/accounts-shop/browser` (no Node imports, hashing passed in).
+**Purpose:** player accounts (sign up, log in, log out, rename), coins, the shop (buy and equip skins, buy weapons, potions and bombs into the Inventory) and the fast bar (#39): 5 slots filled from the Inventory; only the bar is taken into the arena, the Inventory stays safe. Storage is pluggable. Node entry, plus `@pvp/accounts-shop/browser` (no Node imports, hashing passed in).
 
 | Export | Example |
 |---|---|
 | `createAccounts({ store })` | `const accounts = createAccounts({ store: createMemoryStore() });` |
 | `accounts.signup` / `accounts.login` | `const { token, account } = accounts.signup('Stick_Kid', 'secret');` |
 | `accounts.buy` / `accounts.equip` | `accounts.buy(acc, 'hat', 'crown'); accounts.equip(acc, 'hat', 'crown');` |
-| `accounts.takeLoadout` / `returnLoadout` | `const weapons = accounts.takeLoadout(acc);` |
-| `accounts.takePotions` / `returnPotions` | `const potions = accounts.takePotions(acc); // up to 3` |
-| `accounts.takeBombs` / `returnBombs` | `const bombs = accounts.takeBombs(acc); // { bomb: 5, legendarybomb: 3 } at most` |
+| `accounts.toBar` / `fromBar` | `accounts.toBar(acc, 'potion', 'potion', { slot: 2 }); accounts.fromBar(acc, 0); // checked: must own it, 1 shield, stacks capped` |
+| `accounts.takeBar` | `const { loadout, potions, bombs, starter } = accounts.takeBar(acc); // ONLY the bar goes into the arena` |
+| `accounts.returnFromArena` | `accounts.returnFromArena(acc, { weapons, potions, bombs }); // back into the bar slots, loot into the Inventory` |
 | `createJsonFileStore(file, opts)` | `createJsonFileStore('data/accounts.json', { saveDelayMs: 1000 });` |
 | `createWebStorageStore(storage, key)` | `createWebStorageStore(localStorage, 'pvp.accounts'); // memory if blocked` |
 | `accounts.rename` | `accounts.rename(acc, 'New_Name');` |
@@ -187,7 +188,7 @@ graph LR
 | Export | Example |
 |---|---|
 | `createArena(opts)` | `const arena = createArena({ island: generateIsland(), rules: RULES, random: createRandom(1234), now: 0 });` |
-| `arena.join` / `arena.leave` | `const r = arena.join('alice', { name: 'Alice', skin, loadout: ['shootbm', 'shield'] }, now);` |
+| `arena.join` / `arena.leave` | `const r = arena.join('alice', { name: 'Alice', skin, loadout: ['shootbm', 'shield'], starter: false }, now); // starter: false = no free Gun (#39)` |
 | `arena.setState` / `arena.fire` | `arena.fire(id, [dx, dy, dz], now); // each slot charges on its own; charging = 25% damage (#38); a gun headshot +3 (#45)` |
 | `arena.aimState(id)`, `AIM_FLAG` | `arena.aimState(id); // { aiming: true, zoom: 2, spreadMul: 0.3, moveMul: 0.6 } while state.f has 16 and a Shootbm / DM Gun is in hand (#37)` |
 | `arena.setShield` | `arena.setShield(id, true, now); // raise the shield (no firing while up)` |
@@ -206,7 +207,7 @@ graph LR
 
 ## `@pvp/shop-catalog`
 
-**Purpose:** pure functions that turn the rules and an account into what the shop screen shows: tabs, item cards with buy/equip state, and a backpack line.
+**Purpose:** pure functions that turn the rules and an account into what the shop screen shows (tabs, item cards with buy/equip state) and what the Inventory screen shows (#39): a space per item copy or stack, at least 2 of every item (empty "ghost" spaces too), and the 5-slot fast bar.
 
 | Export | Example |
 |---|---|
@@ -215,11 +216,15 @@ graph LR
 | `potionCard(account)` | `potionCard(account); // the Healing Potion card (tab 'potion')` |
 | `bombCards(account)` | `bombCards(account); // the Bomb and Legendary Bomb cards (tab 'bomb')` |
 | `shopWeaponIds(rules)` | `shopWeaponIds(); // every weapon, sorted by rarity, then price` |
-| `backpackSummary(account)` | `backpackSummary(account); // 'Backpack: 2× Shootbm, 1× Supersword'` |
+| `inventorySummary(account)` | `inventorySummary(account); // 'Inventory: 2× Shootbm, 1× Supersword' (old name: backpackSummary)` |
+| `inventoryCards(account)` | `inventoryCards(account); // [{ key, kind, id, name, icon or iconSvg, rarityColor, filled, ghost, count, label, durability, action: 'toBar' }, …]` |
+| `barSlots(account)` | `barSlots(account); // 5 slots: { index, key: '1', empty, name, icon, count, label, action: 'fromBar' }` |
+| `barSummary(account)` | `barSummary(account); // 'Fast bar: DM Gun, 3× Healing Potion (3 free)'` |
+| `inventoryItemKinds` / `spaceSize` / `itemLook` / `MIN_SPACES` | `spaceSize('potion', 'potion'); // 3 (a space holds as much as a bar slot)` |
 | `swatchBackground(card)` | `el.style.background = swatchBackground(card);` |
 | `OUTFIT_ICONS` | `OUTFIT_ICONS.hat.crown; // '👑'` |
 
-**Depends on:** `@pvp/game-rules`.
+**Depends on:** `@pvp/game-rules`, `@pvp/hud-model` (the icons).
 **Determinism:** fully. Pure functions of their inputs; fixed sort order.
 
 ## `@pvp/hud-model`
@@ -253,7 +258,7 @@ graph LR
 
 ## `@pvp/api-client`
 
-**Purpose:** talks to the server's account and shop API (sign up, log in, me, buy, equip) and remembers the login token, with friendly error messages.
+**Purpose:** talks to the server's account and shop API (sign up, log in, me, buy, equip, the Inventory and the fast bar) and remembers the login token, with friendly error messages.
 
 | Export | Example |
 |---|---|
@@ -262,6 +267,7 @@ graph LR
 | `api.me` | `const { account, online } = await api.me();` |
 | `api.buy` / `api.equip` | `await api.buy('hat', 'crown');` |
 | `api.ranking` | `const { top, me } = await api.ranking(); // top 50 by knockouts + my place (#47)` |
+| `api.inventory` / `api.toBar` / `api.fromBar` | `await api.toBar('weapon', 'icesword', { slot: 0 }); await api.fromBar(0); // #39` |
 | `ApiError` | `catch (e) { show(e.message); /* e.status 0 = no connection */ }` |
 | `safeStorage(storage)` | `const s = safeStorage(localStorage); s.set('k', 'v');` |
 

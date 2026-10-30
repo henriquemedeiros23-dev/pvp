@@ -2,7 +2,7 @@
 
 ## What it does
 
-Talks to the game server's account and shop API (sign up, log in, who am I, buy, equip) and remembers the login token, with short friendly error messages. Plain ES module with no dependencies, so it works in Node and directly in the browser.
+Talks to the game server's account and shop API (sign up, log in, who am I, buy, equip, the Inventory and the fast bar) and remembers the login token, with short friendly error messages. Plain ES module with no dependencies, so it works in Node and directly in the browser.
 
 ## How to use
 
@@ -16,6 +16,12 @@ const { account: me, online } = await api.me();
 await api.buy('hat', 'crown');       // kind: 'color' | 'hat' | 'face' | 'back' | 'shirt' | 'weapon'
 await api.equip('hat', 'crown');     // each resolves { account }
 const { top, me } = await api.ranking(); // the ranking (#47): top 50 by knockouts and my place (me.place null = none yet)
+
+// the Inventory and the fast bar (#39), each resolves { account } (account.bar: 5 slots, null or { kind, id, n })
+await api.inventory();
+await api.toBar('weapon', 'icesword');               // into the first free bar slot
+await api.toBar('potion', 'potion', { slot: 2, n: 3 }); // into slot 3, 3 potions (default: as many as fit)
+await api.fromBar(0);                                // slot 1 back into the Inventory
 api.logout();                         // forgets the token on this device
 
 try { await api.buy('weapon', 'icesword'); }

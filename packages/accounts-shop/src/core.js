@@ -1,7 +1,8 @@
-// Player accounts, coins, the shop and the weapon backpack (stash).
+// Player accounts, coins, the shop, the Inventory (stash, potions, bombs) and the fast bar (#39).
 // Browser-safe core: no Node imports. Hashing and random bytes are passed in
 // (accounts.js gives the Node defaults: scrypt and crypto.randomBytes).
 import * as gameRules from '@pvp/game-rules';
+import * as fastBar from './bar.js';
 
 const NAME_RE = /^[A-Za-z0-9_]{3,16}$/;
 const MIN_PASSWORD = 4;
@@ -51,8 +52,7 @@ export function createAccounts({
   if (!store) throw new TypeError('createAccounts needs a store');
   if (typeof randomBytes !== 'function') throw new TypeError('createAccounts needs randomBytes');
   if (typeof hashPassword !== 'function') throw new TypeError('createAccounts needs hashPassword');
-  const { STARTING_WEAPON, WEAPONS, MAX_SLOTS, DEFAULT_SKIN, COLORS, OUTFITS, SKIN_SLOTS } = rules;
-  const MAX_POTIONS = Number.isInteger(rules.MAX_POTIONS) ? rules.MAX_POTIONS : 0;
+  const { WEAPONS, DEFAULT_SKIN, COLORS, OUTFITS, SKIN_SLOTS } = rules;
   const itemPrice = rules.itemPrice ?? gameRules.itemPrice;
   // Bombs (#32): { bombId: { pack, maxCarry, ... } } ({} for rules without bombs)
   const BOMBS = rules.BOMBS && typeof rules.BOMBS === 'object' ? rules.BOMBS : {};
@@ -70,16 +70,21 @@ export function createAccounts({
     rec.owned ??= freeItems();
     rec.skin ??= { ...DEFAULT_SKIN };
     rec.stash ??= {};
-    // Healing Potions in the backpack (older accounts have none: 0).
+    // Healing Potions in the Inventory (older accounts have none: 0).
     rec.potions = safeCount(rec.potions);
-    // Bombs in the backpack, one count per bomb (older accounts have none: 0 each).
+    // Bombs in the Inventory, one count per bomb (older accounts have none: 0 each).
     rec.bombs = bombCounts(rec.bombs);
     // Knockouts for the ranking (#47; older accounts start at 0) and when the last one happened.
     rec.kills = safeCount(rec.kills);
     rec.lastKillAt = Number.isFinite(rec.lastKillAt) && rec.lastKillAt > 0 ? rec.lastKillAt : 0;
     // Weapons that are no longer in the game (e.g. the old wooden sword, or the Pistol and the others removed
-    // in #26) are dropped from the backpack.
+    // in #26) are dropped from the Inventory.
     for (const id of Object.keys(rec.stash)) if (!Object.hasOwn(WEAPONS, id)) delete rec.stash[id];
+    // The fast bar (#39). Accounts saved before it existed get a bar filled like the old automatic pick
+    // (so their first match feels the same); a saved bar is checked (anything that does not fit goes back
+    // into the Inventory).
+    if (rec.bar === undefined) fastBar.autoFillBar(rec, rules);
+    else fastBar.cleanBar(rec, rules);
     for (const t of rec.tokens) tokens.set(t, rec);
   }
 
@@ -135,6 +140,7 @@ export function createAccounts({
       bombs: bombCounts(null),
       kills: 0,
       lastKillAt: 0,
+      bar: fastBar.emptyBar(rules),
       tokens: [],
       createdAt: now(),
     };
@@ -180,6 +186,7 @@ export function createAccounts({
       stash: { ...a.stash },
       potions: a.potions,
       bombs: { ...a.bombs },
+      bar: fastBar.copyBar(a.bar),
     };
   }
 
@@ -258,86 +265,62 @@ export function createAccounts({
     return publicView(a);
   }
 
-  /**
-   * Weapons to carry into the arena from the backpack: the most expensive stashed weapons first,
-   * every copy counts (2 Ice Swords take 2 slots), until the slots are full. They leave the stash.
-   * The arena gives the free starting weapon itself, so one slot is kept for it (when the rules have one).
-   * Shields never take a slot: the best (most expensive) shield in the backpack comes along too, at the
-   * end of the list, to be worn on the other arm. Other shields stay in the backpack.
-   */
-  function takeLoadout(account) {
-    const a = own(account);
-    const weapons = [];
-    const isShield = id => WEAPONS[id].type === 'shield';
-    const room = MAX_SLOTS - (STARTING_WEAPON && Object.hasOwn(WEAPONS, STARTING_WEAPON) ? 1 : 0);
-    const best = Object.keys(a.stash)
-      .filter(id => a.stash[id] > 0 && Object.hasOwn(WEAPONS, id))
-      .sort((x, y) => WEAPONS[y].price - WEAPONS[x].price || (x < y ? -1 : x > y ? 1 : 0));
-    const take = id => { weapons.push(id); a.stash[id]--; if (!a.stash[id]) delete a.stash[id]; };
-    for (const id of best.filter(id => !isShield(id))) {
-      while (weapons.length < room && a.stash[id] > 0) take(id);
+  // Bar errors become AccountErrors (same friendly message and code).
+  function barCall(fn) {
+    try { return fn(); } catch (e) {
+      if (e instanceof fastBar.BarError) fail(e.code, e.message);
+      throw e;
     }
-    const shield = best.find(isShield);
-    if (shield) take(shield);
-    save();
-    return weapons;
   }
 
-  /** Left the arena alive (or the arena did not take them): weapons go back into the stash. Unknown ids are ignored. */
-  function returnLoadout(account, weapons) {
+  /**
+   * Move an item from the Inventory into the fast bar (#39). kind: 'weapon' (shields too), 'potion' or 'bomb'.
+   * opts.slot: bar slot 0..4 (default: its stack, else the first empty one); opts.n: how many (default: as many
+   * as fit). Must own it; at most one shield; potions up to MAX_POTIONS, bombs up to their maxCarry in a slot.
+   * Returns publicView.
+   */
+  function toBar(account, kind, id, opts = {}) {
     const a = own(account);
-    for (const id of weapons ?? []) {
-      if (typeof id !== 'string' || !Object.hasOwn(WEAPONS, id)) continue;
-      a.stash[id] = (a.stash[id] || 0) + 1;
-    }
+    barCall(() => fastBar.putInBar(a, rules, kind, id, opts ?? {}));
+    save();
+    return publicView(a);
+  }
+
+  /** Move everything in a bar slot (0..4) back into the Inventory. Returns publicView. */
+  function fromBar(account, slot) {
+    const a = own(account);
+    barCall(() => fastBar.takeFromBar(a, slot));
     save();
     return publicView(a);
   }
 
   /**
-   * Healing Potions to carry into the arena: as many as the backpack has, at most MAX_POTIONS (3).
-   * They leave the backpack. Returns how many.
+   * Joining the arena: ONLY the bar's contents come along (they leave the account); the Inventory stays.
+   * Returns { loadout, potions, bombs, starter } for arena.join (starter: true when the bar has no hand
+   * weapon, then the arena gives the free starting Gun).
    */
-  function takePotions(account) {
+  function takeBar(account) {
     const a = own(account);
-    const n = Math.min(a.potions, MAX_POTIONS);
-    a.potions -= n;
-    save();
-    return n;
-  }
-
-  /** Left the arena alive (or the arena did not take them): unused potions go back. Bad counts are ignored. */
-  function returnPotions(account, n) {
-    const a = own(account);
-    a.potions += safeCount(n);
-    save();
-    return publicView(a);
-  }
-
-  /**
-   * Bombs to carry into the arena (#32): of every bomb, as many as the backpack has, at most its maxCarry
-   * (Bomb 5, Legendary Bomb 3). They leave the backpack. Returns { bombId: count }.
-   */
-  function takeBombs(account) {
-    const a = own(account);
-    const out = bombCounts(a.bombs, { cap: true });
-    for (const id of Object.keys(out)) a.bombs[id] -= out[id];
+    const out = fastBar.takeBar(a, rules);
     save();
     return out;
   }
 
-  /** Left the arena alive (or the arena did not take them): unused bombs go back. Bad counts and ids are ignored. */
-  function returnBombs(account, bombs) {
+  /**
+   * Left the arena alive, or things the arena did not take: { weapons, potions, bombs } go back into the
+   * bar slots they came from (if still empty), the rest (chest loot too) into the Inventory. Unknown ids and
+   * bad counts are ignored. Knocked out: don't call it, the things are lost. opts.refill = false: all to the Inventory.
+   */
+  function returnFromArena(account, items, opts) {
     const a = own(account);
-    const back = bombCounts(bombs);
-    for (const id of Object.keys(back)) a.bombs[id] = (a.bombs[id] || 0) + back[id];
+    fastBar.returnToAccount(a, rules, items ?? {}, opts ?? {});
     save();
     return publicView(a);
   }
 
   return {
-    signup, login, logout, byToken, publicView, addCoins, buy, equip, rename, takeLoadout, returnLoadout,
-    takePotions, returnPotions, takeBombs, returnBombs,
+    signup, login, logout, byToken, publicView, addCoins, buy, equip, rename,
+    toBar, fromBar, takeBar, returnFromArena,
     byName, addKnockout, rankingEntries,
     /** Write any pending changes now (tests, shutdown). */
     flush: () => store.flush(),
