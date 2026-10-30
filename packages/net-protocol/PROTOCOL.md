@@ -18,7 +18,7 @@ The exact rules live in `src/messages.js`.
 | `slot` | `i` int 0–31 | Switch to weapon slot `i` (0 = the first slot; it may hold nothing if your weapons broke). |
 | `open` | `id` int or `"golden"` | Open the chest next to me (chest index, or the golden chest). |
 | `drop` | – | Drop the weapon in my hand on the ground, with exactly the durability it has (#34). Anyone can pick it up. Ignored while drinking. |
-| `shield` | `up` bool | Raise (`true`, Shift / the shield button held) or lower my shield. Ignored without a shield or while frozen. |
+| `shield` | `up` bool | Raise (`true`, right mouse button / the shield button held) or lower my shield. Ignored without a shield or while frozen. |
 | `throw` | `b` bomb id, `d` vec3 | Throw one bomb (#32), aiming in direction `d`. It lands where the aim meets the ground or a wall, at most the bomb's `maxThrow` meters away. Ignored with none left, shield up, frozen, drinking or right after another throw. |
 | `drink` | – | Start drinking a Healing Potion (the only heal). Takes `POTION.drinkMs` (5 s). Moving or getting hit does not stop it; switching weapon slots (`slot`) before it is done cancels it and the potion is wasted. |
 

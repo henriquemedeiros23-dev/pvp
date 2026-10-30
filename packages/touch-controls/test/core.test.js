@@ -181,29 +181,36 @@ test('same event sequence gives the same result', () => {
   assert.deepEqual(run(), run());
 });
 
-test('shield: hold Shift or the shield button; held while any of them is down', () => {
+test('shield (#49): hold the right mouse button or the shield button; held while any of them is down', () => {
   const s = createInputState();
   assert.equal(s.shield, false);
   s.key('Shift', true);
+  assert.equal(s.shield, false, 'Shift does not raise the shield any more');
+  s.key('Shift', false);
+  s.mouseButton(2, true);
   assert.equal(s.shield, true);
+  assert.equal(s.aim, false, 'right click does not aim any more');
   assert.equal(s.held('shield'), true);
   let t = s.take();
   assert.equal(t.shield, true);
   assert.deepEqual(t.holds, { shield: true, aim: false });
   assert.deepEqual(t.ev, [], 'holding is not an action');
   s.button('shield', true);   // phone button too
-  s.key('shift', false);
+  s.mouseButton(2, false);
   assert.equal(s.shield, true, 'the button is still held');
   s.button('shield', false);
   assert.equal(s.take().shield, false);
+  s.mouseButton(2, true);
+  s.mouseButton(2, false);
+  assert.equal(s.shield, false, 'letting go lowers it (not a toggle)');
   // disabled: new presses are ignored, releases still work
-  s.key('Shift', true);
+  s.mouseButton(2, true);
   s.enabled = false;
   s.button('shield', true);
-  s.key('Shift', false);
+  s.mouseButton(2, false);
   assert.equal(s.shield, false);
   s.enabled = true;
-  s.key('Shift', true);
+  s.mouseButton(2, true);
   s.blur();
   assert.equal(s.shield, false, 'blur lets go');
   s.button('shield', true);
@@ -218,16 +225,17 @@ test('held actions are configurable', () => {
   s.key('b', true);
   assert.equal(s.held('block'), true);
   s.button('guard', true);
-  assert.deepEqual(s.take().holds, { block: true, guard: true, aim: false }, 'aim is still there (toggleButtons / toggleMouse)');
+  assert.deepEqual(s.take().holds, { block: true, guard: true, shield: false, aim: false },
+    'shield (holdMouse) and aim (toggleButtons / toggleKeys) are still there');
 });
 
-test('aim (#37, #40): a tap on the aim button or a right click switches aiming on, the next one off', () => {
+test('aim (#37, #40, #49): a tap on the aim button or a press of Shift switches aiming on, the next one off', () => {
   const s = createInputState();
   assert.equal(s.shown('aim'), false, 'the aim button starts hidden');
   s.button('aim', true);
   assert.equal(s.aim, false, 'a hidden button cannot be pressed');
-  s.mouseButton(2, true);
-  assert.equal(s.aim, false, 'a hidden toggle cannot be switched on with the mouse either (weapon cannot aim)');
+  s.key('Shift', true); s.key('Shift', false);
+  assert.equal(s.aim, false, 'a hidden toggle cannot be switched on with Shift either (weapon cannot aim)');
 
   const seen = [], toggles = [];
   const stop = s.onShow((name, visible) => seen.push(`${name}:${visible}`));
@@ -254,16 +262,25 @@ test('aim (#37, #40): a tap on the aim button or a right click switches aiming o
   s.button('aim', false);
   assert.equal(s.aim, false, 'letting go does nothing');
 
-  // the right mouse button: press = switch, release does nothing; it is the same toggle as the button
-  s.mouseButton(2, true);
-  s.mouseButton(2, false);
-  assert.equal(s.aim, true, 'right click: on');
+  // Shift: press = switch, release does nothing, key repeat does nothing; it is the same toggle as the button
+  s.key('Shift', true);
+  assert.equal(s.aim, true, 'Shift: on');
+  for (let i = 0; i < 5; i++) s.key('Shift', true, true);
+  assert.equal(s.aim, true, 'key repeat does not switch it again');
+  s.key('Shift', true);
+  assert.equal(s.aim, true, 'a second keydown while still down does not switch it either');
+  s.key('Shift', false);
+  assert.equal(s.aim, true, 'letting go of Shift does nothing');
+  assert.deepEqual(s.take().ev, [], 'Shift is not an action');
   s.button('aim', true);
   assert.equal(s.aim, false, 'the button switches the same toggle off');
+  s.key('shift', true); s.key('shift', false);
+  s.key('SHIFT', true);
+  assert.equal(s.aim, false, 'Shift again: off');
+  s.key('Shift', false);
   s.mouseButton(2, true);
+  assert.equal(s.aim, false, 'right click does not aim any more');
   s.mouseButton(2, false);
-  s.mouseButton(2, true);
-  assert.equal(s.aim, false, 'right click again: off');
 
   // blur keeps it on (nothing is held down)
   s.button('aim', true);
@@ -287,9 +304,10 @@ test('aim (#37, #40): a tap on the aim button or a right click switches aiming o
   // disabled: cannot switch on, but can switch off; reset switches off
   s.button('aim', true);
   s.enabled = false;
-  s.mouseButton(2, true);
+  s.key('Shift', true); s.key('Shift', false);
   assert.equal(s.aim, false, 'switching off works while disabled');
   s.button('aim', true);
+  s.key('Shift', true); s.key('Shift', false);
   assert.equal(s.aim, false, 'switching on does not');
   s.enabled = true;
   s.button('aim', true);
@@ -317,7 +335,7 @@ test('aim is deterministic: the same events give the same result', () => {
     const out = [];
     s.show('aim', true);
     for (const [kind, v] of [['b', true], ['b', false], ['m', true], ['m', false], ['m', true], ['b', true], ['b', false]]) {
-      if (kind === 'b') s.button('aim', v); else s.mouseButton(2, v);
+      if (kind === 'b') s.button('aim', v); else s.key('Shift', v);
       out.push(s.take().aim);
     }
     return out;
@@ -327,10 +345,13 @@ test('aim is deterministic: the same events give the same result', () => {
 });
 
 test('hiddenButtons, holdMouse and toggles are configurable', () => {
-  const s = createInputState({ hiddenButtons: [], holdMouse: { 1: 'zoom' }, toggleMouse: {}, toggleButtons: ['map'] });
+  const s = createInputState({ hiddenButtons: [], holdMouse: { 1: 'zoom' }, toggleKeys: {}, toggleButtons: ['map'] });
   assert.equal(s.shown('aim'), true);
   s.mouseButton(2, true);
-  assert.equal(s.aim, false, 'right button not bound any more');
+  assert.equal(s.aim, false, 'right button does not aim');
+  assert.equal(s.shield, false, 'right button not bound any more');
+  s.key('Shift', true);
+  assert.equal(s.aim, false, 'Shift not bound any more');
   s.mouseButton(1, true);
   assert.equal(s.held('zoom'), true);
   s.mouseButton(1, false);
@@ -340,8 +361,23 @@ test('hiddenButtons, holdMouse and toggles are configurable', () => {
   assert.deepEqual(s.take().toggles, { map: true });
   s.button('aim', true);
   assert.deepEqual(s.take().ev, ['aim'], 'aim is a plain tap button when it is not a toggle');
-  assert.deepEqual(DEFAULT_CONFIG.holdMouse, {});
-  assert.deepEqual(DEFAULT_CONFIG.toggleMouse, { 2: 'aim' });
+  assert.deepEqual(DEFAULT_CONFIG.holdMouse, { 2: 'shield' });
+  assert.deepEqual(DEFAULT_CONFIG.holdKeys, {});
+  assert.deepEqual(DEFAULT_CONFIG.toggleKeys, { aim: ['shift'] });
+  assert.deepEqual(DEFAULT_CONFIG.toggleMouse, {});
   assert.deepEqual(DEFAULT_CONFIG.toggleButtons, ['aim']);
   assert.deepEqual(DEFAULT_CONFIG.hiddenButtons, ['aim']);
+});
+
+test('the old controls can be set back (#49): Shift held = shield, right click = aim toggle', () => {
+  const s = createInputState({ holdKeys: { shield: ['shift'] }, holdMouse: {}, toggleKeys: {}, toggleMouse: { 2: 'aim' } });
+  s.show('aim', true);
+  s.key('Shift', true);
+  assert.equal(s.shield, true);
+  s.key('Shift', false);
+  assert.equal(s.shield, false);
+  s.mouseButton(2, true); s.mouseButton(2, false);
+  assert.equal(s.aim, true);
+  s.mouseButton(2, true);
+  assert.equal(s.aim, false);
 });

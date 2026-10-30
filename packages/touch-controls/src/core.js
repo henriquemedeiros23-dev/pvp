@@ -9,14 +9,15 @@ export const DEFAULT_CONFIG = Object.freeze({
   walkSpeed: 0.6,             // move length while a walk key is held
   fireButton: 'fire',         // button name that is held to shoot
   // Held actions besides fire: true while any of their keys or buttons is held down.
-  // Shift (computer) or the shield button (phone) raises the shield.
-  holdKeys: Object.freeze({ shield: Object.freeze(['shift']) }),
+  // The right mouse button (computer) or the shield button (phone) raises the shield (#49).
+  holdKeys: Object.freeze({}),  // held action -> keys, e.g. { shield: ['shift'] }
   holdButtons: Object.freeze(['shield']),
-  holdMouse: Object.freeze({}), // mouse button number -> held action (0 is always fire)
+  holdMouse: Object.freeze({ 2: 'shield' }), // mouse button number -> held action (0 is always fire)
   // Toggled actions: a press switches them on, the next press switches them off (letting go does nothing).
-  // The aim button (phone) or the right mouse button (computer) toggles aiming (#37, #40).
+  // The aim button (phone) or Shift (computer) toggles aiming (#37, #40, #49).
   toggleButtons: Object.freeze(['aim']),
-  toggleMouse: Object.freeze({ 2: 'aim' }), // mouse button number -> toggled action
+  toggleKeys: Object.freeze({ aim: Object.freeze(['shift']) }), // toggled action -> keys (key repeat does not switch again)
+  toggleMouse: Object.freeze({}), // mouse button number -> toggled action, e.g. { 2: 'aim' }
   // On-screen buttons hidden at the start (show them with state.show(name, true)), e.g. aim only with a weapon that can aim.
   // A hidden toggle is switched off and cannot be switched on (not even with the mouse).
   hiddenButtons: Object.freeze(['aim']),
@@ -27,7 +28,7 @@ export const DEFAULT_CONFIG = Object.freeze({
     back: Object.freeze(['s', 'arrowdown']),
     left: Object.freeze(['a', 'arrowleft']),
     right: Object.freeze(['d', 'arrowright']),
-    walk: Object.freeze([]),  // no walk key by default (Shift raises the shield)
+    walk: Object.freeze([]),  // no walk key by default (Shift toggles aiming)
   }),
   actionKeys: Object.freeze({
     ' ': 'jump',
@@ -60,6 +61,7 @@ export function createInputState(config = {}) {
     holdButtons: [...(config.holdButtons || DEFAULT_CONFIG.holdButtons)],
     holdMouse: { ...(config.holdMouse || DEFAULT_CONFIG.holdMouse) },
     toggleButtons: [...(config.toggleButtons || DEFAULT_CONFIG.toggleButtons)],
+    toggleKeys: { ...(config.toggleKeys || DEFAULT_CONFIG.toggleKeys) },
     toggleMouse: { ...(config.toggleMouse || DEFAULT_CONFIG.toggleMouse) },
     hiddenButtons: [...(config.hiddenButtons || DEFAULT_CONFIG.hiddenButtons)],
   };
@@ -77,7 +79,9 @@ export function createInputState(config = {}) {
   };
   const toggleButtons = new Set(cfg.toggleButtons);
   const toggleMouse = new Map(Object.entries(cfg.toggleMouse).map(([b, n]) => [Number(b), n]));
-  const toggleNames = [...new Set([...toggleButtons, ...toggleMouse.values()])];
+  const toggleKeys = new Map(); // key -> toggled action name
+  for (const [name, list] of Object.entries(cfg.toggleKeys)) for (const k of list) toggleKeys.set(lower(k), name);
+  const toggleNames = [...new Set([...toggleButtons, ...toggleKeys.values(), ...toggleMouse.values()])];
   const toggledOn = new Set(); // toggled action names switched on right now
   const toggleListeners = new Set();
   const hidden = new Set(cfg.hiddenButtons); // on-screen buttons hidden right now
@@ -140,7 +144,7 @@ export function createInputState(config = {}) {
     /** Is a held action (e.g. 'shield') held down right now, or a toggled one (e.g. 'aim') switched on? */
     held: isHeld,
     get shield() { return isHeld('shield'); },
-    /** Aiming (#37, #40): switched on by a tap on the aim button or a right click, off by the next one. */
+    /** Aiming (#37, #40, #49): switched on by a tap on the aim button or a press of Shift, off by the next one. */
     get aim() { return isHeld('aim'); },
     /** Is a toggled action (e.g. 'aim') switched on? */
     toggled: name => toggledOn.has(name),
@@ -207,7 +211,7 @@ export function createInputState(config = {}) {
     /**
      * Show or hide an on-screen button (the DOM adapter hides its element). Hiding a held button lets go of it,
      * and a hidden button cannot be pressed. Keys and holdMouse still work. Hiding a toggle switches it off, and it
-     * cannot be switched on while hidden (not with the mouse either: e.g. no aiming with a weapon that cannot aim).
+     * cannot be switched on while hidden (not with a key or the mouse either: e.g. no aiming with a weapon that cannot aim).
      */
     show(name, visible = true) {
       const was = !hidden.has(name);
@@ -224,7 +228,8 @@ export function createInputState(config = {}) {
     /** Call fn(name, visible) whenever a button is shown or hidden. Returns a function that stops it. */
     onShow(fn) { showListeners.add(fn); return () => showListeners.delete(fn); },
 
-    // --- mouse: button 0 fires, holdMouse buttons are held, toggleMouse buttons switch on / off (2 = right button aims),
+    // --- mouse: button 0 fires, holdMouse buttons are held (2 = right button raises the shield), toggleMouse buttons
+    //     switch on / off,
     //     movement looks (only while pointer is locked) ---
     mouseButton(button, down) {
       if (toggleMouse.has(button)) {
@@ -254,6 +259,11 @@ export function createInputState(config = {}) {
     key(key, down, repeat = false) {
       const k = lower(key);
       if (!down) { keys.delete(k); if (holdKeys.has(k)) hold(holdKeys.get(k), 'key:' + k, false); updateKeys(); return; }
+      // toggle keys (Shift = aim): a press switches, key repeat (or a second keydown while still down) does not
+      if (toggleKeys.has(k) && !repeat && !keys.has(k)) {
+        const name = toggleKeys.get(k);
+        setToggle(name, !toggledOn.has(name)); // switching off works while disabled, switching on does not
+      }
       if (!enabled) return;
       if (holdKeys.has(k)) hold(holdKeys.get(k), 'key:' + k, true);
       if (!repeat && actionKeys.has(k)) actions.push(actionKeys.get(k));

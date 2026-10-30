@@ -110,7 +110,7 @@ export class Game {
     this.bombs = new Map();     // id -> a thrown bomb that has not exploded yet (#32)
     this.booms = 0;             // explosions seen (for tests)
     this.effects = [];
-    this.shieldUp = false; // my shield is raised (Shift / the shield button)
+    this.shieldUp = false; // my shield is raised (right mouse button / the shield button)
     this.aimAmount = 0; // aiming (#37): how far the zoom is in (0..1, see aimBlend in @pvp/hud-model)
     this.aim = aimView(null); // the aim view of this frame (zoom, scope, AIM button)
     this.aimHand = null; // the weapon in hand last frame (aimHandKey): when it changes aiming switches off (#40)
@@ -916,7 +916,7 @@ export class Game {
     const { ev, look, fire } = frozen ? { ev: [], look: { x: 0, y: 0 }, fire: false } : input;
     const move = frozen ? { x: 0, y: 0 } : input.move;
 
-    // shield: raised while Shift / the shield button is held (if you wear one); the server is told when it changes
+    // shield: raised while the right mouse button / the shield button is held (if you wear one); the server is told when it changes
     const wantShield = !frozen && input.shield && !!this.inv?.shield;
     if (!frozen && wantShield !== this.shieldUp) {
       this.shieldUp = wantShield;
@@ -925,7 +925,7 @@ export class Game {
     }
     me.sm.shieldUp = this.shieldUp;
 
-    // aiming (#37, #40): a tap on AIM / a right click switches it on, the next one off (a toggle in @pvp/touch-controls),
+    // aiming (#37, #40, #49): a tap on AIM / a press of Shift switches it on, the next one off (a toggle in @pvp/touch-controls),
     // only with a weapon that can aim (Shootbm, DM Gun). It switches off when the weapon in hand changes (switched,
     // broke, dropped); it is paused (no zoom) with the shield up, while drinking or frozen. The zoom goes in smoothly (@pvp/hud-model).
     const hand = aimHandKey(this.inv);

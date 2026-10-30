@@ -34,7 +34,7 @@ arena.setState(id, { x, y, z, ry, pitch, f }, now); // false + a 'pos' correctio
 arena.fire(id, [dx, dy, dz], now);                  // or { x, y, z }
 arena.selectSlot(id, i);
 arena.dropWeapon(id, now);                          // drop the weapon in hand (#34): exact durability, returns the item id
-arena.setShield(id, true, now);                     // raise the shield (Shift / shield button), false lowers it
+arena.setShield(id, true, now);                     // raise the shield (right mouse button / shield button), false lowers it
 arena.openChest(id, 3, now);                        // chest index, or 'golden'
 arena.drink(id, now);                               // start drinking a Healing Potion (full H.P after 5 s)
 arena.throwBomb(id, 'bomb', [dx, dy, dz], now);     // throw a bomb (#32): returns its id or null

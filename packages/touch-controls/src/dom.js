@@ -143,7 +143,7 @@ export function attachDesktopControls(state, { canvas, target = globalThis.windo
       if (!locked()) { canvas.requestPointerLock?.(); return; }
       state.mouseButton(e.button, true);
     });
-    // the right mouse button switches aiming on / off (#37, #40): no browser menu on the game
+    // the right mouse button raises the shield (#49): no browser menu on the game
     listen(off, canvas, 'contextmenu', e => e.preventDefault());
   }
   listen(off, target, 'mouseup', e => state.mouseButton(e.button, false));

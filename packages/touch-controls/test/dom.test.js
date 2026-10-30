@@ -148,7 +148,7 @@ test('touch adapter: the aim button is hidden until shown, then a tap switches i
   assert.ok(aim.classList.has('hidden') && !aim.classList.has('on'), 'detached: the element is not changed any more');
 });
 
-test('desktop adapter: a right click switches aiming on / off, no context menu (#37, #40)', () => {
+test('desktop adapter (#49): hold the right button = shield, Shift = aim on / off, no context menu', () => {
   const s = createInputState();
   s.show('aim', true); // a weapon that can aim
   const canvas = fakeEl();
@@ -156,12 +156,19 @@ test('desktop adapter: a right click switches aiming on / off, no context menu (
   const win = fakeEl();
   attachDesktopControls(s, { canvas, target: win, doc });
   canvas.fire('mousedown', { button: 2 });
-  win.fire('mouseup', { button: 2 });
-  assert.equal(s.aim, true, 'stays on after letting go');
+  assert.equal(s.shield, true, 'right button held: shield up');
+  assert.equal(s.aim, false, 'right click does not aim');
   assert.equal(s.fire, false);
-  canvas.fire('mousedown', { button: 2 });
-  assert.equal(s.aim, false, 'right click again = off');
   win.fire('mouseup', { button: 2 });
+  assert.equal(s.shield, false, 'let go: shield down');
+  win.fire('keydown', { key: 'Shift' });
+  win.fire('keydown', { key: 'Shift', repeat: true });
+  win.fire('keyup', { key: 'Shift' });
+  assert.equal(s.aim, true, 'Shift: aim on, stays on after letting go');
+  assert.equal(s.shield, false, 'Shift does not raise the shield');
+  win.fire('keydown', { key: 'Shift' });
+  assert.equal(s.aim, false, 'Shift again = off');
+  win.fire('keyup', { key: 'Shift' });
   assert.equal(s.aim, false);
   let prevented = false;
   canvas.fire('contextmenu', { preventDefault() { prevented = true; } });
