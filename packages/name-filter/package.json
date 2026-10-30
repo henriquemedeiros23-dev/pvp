@@ -1,0 +1,15 @@
+{
+  "name": "@pvp/name-filter",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Checks player names: length, letters, no swear words or slurs (tricky spellings too), and a look-alike key for unique names.",
+  "type": "module",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./words": "./src/words.js"
+  },
+  "scripts": {
+    "test": "node --test"
+  }
+}

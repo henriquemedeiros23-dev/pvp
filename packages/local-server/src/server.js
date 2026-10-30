@@ -40,7 +40,7 @@ function defaultRandomBytes(fallback) {
  * @param {object} [o]
  * @param {string|number} [o.seed='practice']  seed for the arena (loot, spawns, gun spread) and the bots
  * @param {object} [o.storage]   localStorage-like; accounts and the token are kept there (memory if missing or blocked)
- * @param {string} [o.storagePrefix='pvp.practice']  storage keys: <prefix>.accounts and <prefix>.token
+ * @param {string} [o.storagePrefix='pvp.practice']  storage keys: <prefix>.accounts, <prefix>.token and <prefix>.lastName
  * @param {Function} [o.now]     clock in ms (default Date.now)
  * @param {object} [o.timer]     { setInterval, clearInterval } for the tick (default the global ones)
  * @param {boolean} [o.autoStart=true]  start the 50 ms tick right away (tests: false, then call tick(now))
@@ -77,6 +77,12 @@ export function createLocalServer({
   const tokens = safeStorage(storage);
   const tokenStorage = { getItem: k => tokens.get(k), setItem: (k, v) => tokens.set(k, v), removeItem: k => tokens.remove(k) };
 
+  // Rename (#41, like the server's /api/rename): not while in the arena; accounts-shop checks the name.
+  function renameAccount(acc, name) {
+    if (arena.idOf(playerKey(acc)) !== undefined) throw new AccountError('IN_ARENA', 'Leave the arena first');
+    return accounts.rename(acc, name);
+  }
+
   // ---------------------------------------------------------------- API (like the server's /api/*)
   function handleApi(url, body, token) {
     try {
@@ -99,6 +105,7 @@ export function createLocalServer({
         const me = { name: acc.name, kills: acc.kills, lastKillAt: acc.lastKillAt };
         return [200, rankPlayers(accounts.rankingEntries(), { me })];
       }
+      if (url === '/api/rename') return [200, { account: renameAccount(acc, body.name) }];
       // The Inventory and the fast bar (#39), like the server
       if (url === '/api/inventory') return [200, { account: accounts.publicView(acc) }];
       if (url === '/api/bar/put') return [200, { account: accounts.toBar(acc, body.kind, body.id, { slot: body.slot, n: body.n }) }];
@@ -283,7 +290,7 @@ export function createLocalServer({
     fetch: fetchFn,
     connect,
     /** An @pvp/api-client that talks to this server (token kept in <storagePrefix>.token). */
-    createApi: () => createApiClient({ fetch: fetchFn, storage: tokenStorage, tokenKey }),
+    createApi: () => createApiClient({ fetch: fetchFn, storage: tokenStorage, tokenKey, lastNameKey: `${storagePrefix}.lastName` }),
     /**
      * Make sure someone is logged in, right now (no waiting): keeps a saved, working token, or signs up
      * a new local player 'Player_1234' (random password: practice accounts never leave the page).
@@ -310,8 +317,7 @@ export function createLocalServer({
     rename(token, name) {
       const acc = accounts.byToken(token);
       if (!acc) throw new AccountError('WRONG_LOGIN', 'Please log in again');
-      if (arena.idOf(playerKey(acc)) !== undefined) throw new AccountError('IN_ARENA', 'Leave the arena first');
-      return accounts.rename(acc, name);
+      return renameAccount(acc, name);
     },
     /** Practice/test helper: put the player of this token somewhere (like the server's debugTeleport). */
     teleport(token, x, z) {

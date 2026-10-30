@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { decodeServerMessage, encodeClient } from '@pvp/net-protocol';
 import { createLocalServer, createFakeSocket, practiceHash, OPEN, CLOSED } from '../src/index.js';
+import { ANYWHERE, decodeWord } from '@pvp/name-filter/words';
 
 const settle = () => new Promise(r => setTimeout(r, 0)); // let the deferred (microtask) deliveries run
 
@@ -53,7 +54,7 @@ test('the API works through @pvp/api-client: sign up, me, shop errors, 401', asy
   assert.equal(me.account.coins, 0);
   assert.equal(me.online, 0);
   await assert.rejects(api.buy('hat', 'crown'), /Not enough coins/);
-  await assert.rejects(api.signup('Practice_1', 'secret'), /taken/);
+  await assert.rejects(api.signup('Practice_1', 'secret'), /already has that name/);
   api.logout();
   await assert.rejects(api.me(), e => e.status === 401);
   const again = await api.login('practice_1', 'secret');
@@ -191,6 +192,21 @@ test('rename: changes the name, but not while in the arena', async () => {
   await settle();
   assert.equal(c.of('welcome')[0].players.find(p => p.id === c.of('welcome')[0].id).name, 'Hero_7');
   assert.throws(() => server.rename(token, 'Other_7'), /Leave the arena/);
+  await assert.rejects(api.rename('Other_7'), e => e.status === 400 && /Leave the arena/.test(e.message));
+});
+
+test('/api/rename (#41): bad words and look-alike names are refused, a good name works', async () => {
+  const { server } = setup();
+  const api = server.createApi();
+  await server.createApi().signup('Bob_Kid', 'secret');
+  await api.signup('Player_8', 'secret');
+  const rude = `Big_${decodeWord(ANYWHERE[0])}`;
+  await assert.rejects(api.rename(rude), e => e.status === 400 && e.message === "You can't use that name. Please pick a new name.");
+  await assert.rejects(api.rename('B0B_kid'), e => e.status === 400 && e.message === 'Someone already has that name. Please pick a new name.');
+  await assert.rejects(server.createApi().signup(rude, 'secret'), e => e.message === "You can't use that name. Please pick a new name.");
+  assert.equal((await api.me()).account.name, 'Player_8');
+  assert.equal((await api.rename('Hero_8')).account.name, 'Hero_8');
+  assert.equal((await api.me()).account.name, 'Hero_8');
 });
 
 test('ensurePlayer: a local player right away, kept on the next page load', async () => {

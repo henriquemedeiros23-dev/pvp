@@ -12,6 +12,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import WebSocket from 'ws';
 import { decodeServerMessage } from '@pvp/net-protocol';
+import { ANYWHERE, decodeWord } from '@pvp/name-filter/words';
 
 const SERVER = fileURLToPath(new URL('../server.js', import.meta.url));
 const REAL_DATA = fileURLToPath(new URL('../data/accounts.json', import.meta.url));
@@ -99,7 +100,20 @@ test('sign up, join the arena, bad messages are dropped, leave', async () => {
 
   const taken = await post('/api/signup', { name: NAME, password: 'secret1' });
   assert.equal(taken.status, 400);
-  assert.equal(taken.body.error, 'That name is taken');
+  assert.equal(taken.body.error, 'Someone already has that name. Please pick a new name.');
+
+  // #41: names with swear words are refused (sign up and rename); look-alikes are taken
+  const rude = `Big_${decodeWord(ANYWHERE[0])}`;
+  const badSignup = await post('/api/signup', { name: rude, password: 'secret1' });
+  assert.deepEqual([badSignup.status, badSignup.body.error], [400, "You can't use that name. Please pick a new name."]);
+  const badRename = await post('/api/rename', { name: rude }, signup.body.token);
+  assert.deepEqual([badRename.status, badRename.body.error], [400, "You can't use that name. Please pick a new name."]);
+  const alike = await post('/api/signup', { name: NAME.replace(/o/g, '0').toUpperCase(), password: 'secret1' });
+  assert.equal(alike.body.error, 'Someone already has that name. Please pick a new name.');
+  const renamed = await post('/api/rename', { name: NAME.toUpperCase() }, signup.body.token);
+  assert.equal(renamed.body.account.name, NAME.toUpperCase());
+  assert.equal((await post('/api/rename', { name: NAME }, signup.body.token)).body.account.name, NAME);
+  assert.equal((await post('/api/rename', { name: 'x' })).status, 401);
 
   const ws = new WebSocket(`ws://127.0.0.1:${port}/?token=${signup.body.token}`);
   const inbox = messages(ws);

@@ -3,6 +3,7 @@
 // - launchBrowser(): Chromium from PLAYWRIGHT_BROWSERS_PATH (or /opt/pw-browsers, or CHROMIUM_PATH)
 //   with software WebGL (swiftshader)
 // - newPage(): a page that records console errors, page crashes and bad HTTP answers
+// - signedIn() / openAndLogIn() / logInForm() / signUpForm(): the Account screen (#46)
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import net from 'node:net';
@@ -104,18 +105,41 @@ export async function newPage(browser, contextOptions = { viewport: { width: 110
   return out;
 }
 
-/** Sign up through the API and log the page in with the saved token (opens the game with ?debug). */
+/**
+ * Sign up through the API, open the game (?debug) and log in through the Account screen (#46: it always comes
+ * first, a saved token does not skip it). Waits for the menu. Returns the name.
+ */
 export async function signedIn(page, baseUrl, prefix) {
   const name = prefix + Date.now().toString(36).slice(-7);
   const res = await fetch(`${baseUrl}/api/signup`, {
     method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name, password: 'secret1' }),
   });
   if (res.status !== 200) throw new Error(`signup failed: ${res.status}`);
-  const { token } = await res.json();
-  await page.addInitScript(t => localStorage.setItem('pvp.token', t), token);
-  await page.goto(`${baseUrl}/?debug=1`);
-  await page.locator('#menu').waitFor({ state: 'visible', timeout: SLOW });
+  await openAndLogIn(page, baseUrl, name);
   return name;
+}
+
+/** Open the game (?debug), log in with the Account screen's "Log in" part and wait for the menu. */
+export async function openAndLogIn(page, baseUrl, name, password = 'secret1') {
+  await page.goto(`${baseUrl}/?debug=1`);
+  await page.locator('#login').waitFor({ state: 'visible', timeout: SLOW });
+  await logInForm(page, name, password);
+  await page.locator('#menu').waitFor({ state: 'visible', timeout: SLOW });
+}
+
+/** Fill the "Log in" part of the Account screen and press Log in. Does not wait for the menu. */
+export async function logInForm(page, name, password = 'secret1') {
+  await page.fill('#loginName', name);
+  await page.fill('#loginPass', password);
+  await page.click('#btnLogin');
+}
+
+/** Fill the "Create an account" part (password typed twice; `repeat` defaults to the same). Does not wait for the menu. */
+export async function signUpForm(page, name, password = 'secret1', repeat = password) {
+  await page.fill('#signupName', name);
+  await page.fill('#signupPass', password);
+  await page.fill('#signupPass2', repeat);
+  await page.click('#btnSignup');
 }
 
 /** The game's read-only debug view (needs ?debug in the page address). */

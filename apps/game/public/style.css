@@ -34,6 +34,33 @@ input:focus { border-color: var(--gold); }
 .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 22px; padding: 24px; width: 100%; box-shadow: 0 20px 60px rgba(0,0,0,0.5); }
 .panel.narrow { max-width: 380px; display: flex; flex-direction: column; gap: 12px; }
 .panel.center { text-align: center; align-items: center; }
+
+/* Account screen (#46): "Log in" and "Create an account". Phone portrait: one under the other (scrolls);
+   wide or landscape: side by side. */
+#login { justify-content: flex-start; }
+#login > .panel { margin: auto; }
+.panel.account { max-width: 760px; display: flex; flex-direction: column; gap: 12px; padding: 20px; }
+.account-parts { display: grid; grid-template-columns: 1fr; gap: 14px; }
+.account-part { display: flex; flex-direction: column; gap: 10px; padding: 16px; border-radius: 16px; background: rgba(0,0,0,0.25); border: 1px solid var(--line); }
+.account-part h2 { margin: 0; font-size: 20px; font-weight: 900; }
+.account-part .muted { margin: -4px 0 2px; font-size: 14px; }
+.account-part input { padding: 12px 14px; }
+.account-part .error { margin: 0; }
+.account-part .error:empty { display: none; }
+@media (min-width: 640px) { .account-parts { grid-template-columns: 1fr 1fr; } }
+@media (orientation: landscape) and (max-height: 500px) {
+  #login { padding: 8px calc(12px + var(--safe-r)) 8px calc(12px + var(--safe-l)); }
+  .panel.account { padding: 10px 14px; gap: 6px; }
+  .panel.account .logo { font-size: 24px; margin: 0; }
+  .panel.account .logo br { display: none; }
+  .panel.account .logo span { margin-left: 0.3em; }
+  .account-parts { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .account-part { padding: 10px 12px; gap: 6px; }
+  .account-part h2 { font-size: 16px; }
+  .account-part .muted { display: none; }
+  .account-part input { padding: 8px 12px; }
+  .account-part .big { padding: 9px 14px; }
+}
 .row { display: flex; gap: 10px; }
 .row > * { flex: 1; }
 
@@ -56,7 +83,20 @@ input:focus { border-color: var(--gold); }
 .muted { color: var(--muted); }
 
 .topbar { width: 100%; display: flex; justify-content: space-between; align-items: center; padding: 12px calc(16px + var(--safe-r)) 12px calc(16px + var(--safe-l)); }
-.who { font-weight: 800; font-size: 18px; }
+.who { font-weight: 800; font-size: 18px; display: flex; align-items: center; gap: 8px; min-width: 0; }
+.who #menuName { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Change your name (#41): ✏️ next to the name opens a small panel under the top bar */
+.rename-btn { flex: none; background: rgba(0,0,0,0.45); border: 1px solid var(--line); border-radius: 999px; width: 36px; height: 36px; font-size: 17px; line-height: 1; }
+.rename-panel {
+  position: absolute; z-index: 20; top: 64px; left: calc(12px + var(--safe-l)); width: min(340px, calc(100% - 24px));
+  display: flex; flex-direction: column; gap: 10px; padding: 16px; border-radius: 18px;
+  background: var(--panel); border: 1px solid var(--line); box-shadow: 0 16px 40px rgba(0,0,0,0.55);
+}
+.rename-panel label { font-weight: 800; }
+.rename-panel input { padding: 10px 14px; }
+.rename-panel .big { padding: 10px 14px; }
+.rename-panel .error { text-align: left; margin: 0; }
+.rename-panel .error:empty { display: none; }
 .coins { display: flex; align-items: center; gap: 8px; background: rgba(0,0,0,0.45); border: 1px solid var(--line); padding: 8px 14px; border-radius: 999px; font-weight: 800; font-size: 18px; }
 /* the coin from the boss's drawing (#29): js/main.js sets --coin-icon from @pvp/hud-model's coinIconDataUrl() */
 .coin { display: inline-block; flex: none; width: 24px; height: 24px; background: var(--coin-icon, none) center / contain no-repeat; vertical-align: middle; }

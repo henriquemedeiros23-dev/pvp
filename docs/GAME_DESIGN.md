@@ -151,4 +151,12 @@ Decided by the boss through 22 questions.
 ## Other
 - **Platform:** phones (runs in the phone's browser).
 - **Accounts:** saved, so you keep your coins and skins.
+- **Account screen (#46):** always the first screen when you open PvP Island (also practice mode; a saved login does
+  not skip it, only your last name is filled in, never the password). Top part "Log in": name + password, you keep
+  everything. Below: "Create an account": a name, a password, and the same password again. Different passwords: "The
+  passwords are not the same. Try again." Log out in the menu brings you back to the Account screen.
+- **Names (#41):** 3 to 16 letters, numbers or `_`. The ✏️ button next to your name in the menu changes it. No swear
+  words or slurs (also in tricky spellings like `B.A.D`, l33t or accents): "You can't use that name. Please pick a new
+  name." No one can use the same name, also not a look-alike copy (`Bob`, `B0b`, `b_o_b`, `BOB` are the same name; `Bob1`
+  and `Bob2` are different): "Someone already has that name. Please pick a new name." The server decides.
 - **Goal:** just for fun, to play with friends.

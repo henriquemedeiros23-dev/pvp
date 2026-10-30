@@ -13,7 +13,7 @@ import WebSocket from 'ws';
 import { generateIsland } from '@pvp/world-gen';
 import { RULES } from '@pvp/game-rules';
 import { FLAG_AIM } from '@pvp/net-protocol';
-import { RUN, SKIP, SLOW, startServer, launchBrowser, debug, waitDebug } from './helpers.js';
+import { RUN, SKIP, SLOW, startServer, launchBrowser, debug, waitDebug, openAndLogIn } from './helpers.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const SHOTS = path.join(HERE, '..', '..', '..', '..', 'docs', 'screenshots');
@@ -70,7 +70,7 @@ async function accountWith(prefix, ...weapons) {
     await post('/api/buy', { kind: 'weapon', id: weapon }, token);
     await post('/api/bar/put', { kind: 'weapon', id: weapon }, token);
   }
-  return token;
+  return { token, name };
 }
 
 // Another player (plain WebSocket) standing somewhere, so there is someone to aim at in the picture.
@@ -107,10 +107,8 @@ test('phone: tap 🎯 AIM with the Shootbm to aim until tapped again; switching 
   });
   let target = null;
   try {
-    const token = await accountWith('aim_', 'gun', 'shootbm');
-    await page.addInitScript(t => localStorage.setItem('pvp.token', t), token);
-    await page.goto(`${server.url}/?debug=1`);
-    await page.locator('#menu').waitFor({ state: 'visible', timeout: SLOW });
+    const { name } = await accountWith('aim_', 'gun', 'shootbm');
+    await openAndLogIn(page, server.url, name); // the Account screen (#46)
     await page.click('#btnJoin');
     await page.locator('#hud').waitFor({ state: 'visible' });
     const joined = await waitDebug(page, s => s.mode === 'play' && s.inv, { what: 'joined' });

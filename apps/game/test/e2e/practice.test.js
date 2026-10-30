@@ -2,7 +2,7 @@
 // Skipped in a normal `npm test`. Run it with:  npm run test:e2e   (from the repo root)
 //
 // It builds dist/practice/pvp-island.html, opens it over file://, and checks: the island draws,
-// a local player is ready (no login), the name can be changed, join works, walking works, opening a
+// the Account screen comes first (#46: create an account, saved in the browser), the name can be changed, join works, walking works, opening a
 // chest gives +3 coins, bots are on the island, and there are no console errors.
 // The only outside request allowed is three.js from the CDN; the test answers it with the same
 // file from node_modules (this machine may not reach the CDN).
@@ -15,7 +15,7 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { generateIsland } from '@pvp/world-gen';
 import { circleHitsBox } from '@pvp/collision';
-import { RUN, SKIP, launchBrowser, debug, waitDebug } from './helpers.js';
+import { RUN, SKIP, launchBrowser, debug, waitDebug, signUpForm, logInForm } from './helpers.js';
 import { build, THREE_CDN } from '../../../../scripts/build-practice.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '..');
@@ -48,6 +48,13 @@ async function practicePage(contextOptions) {
     return route.abort();
   });
   return { context, page, errors, outside };
+}
+
+// The Account screen comes first (#46), also in practice mode: create an account (saved in this browser).
+async function practiceSignUp(page, name = 'Practice_Kid') {
+  await page.locator('#login').waitFor({ state: 'visible', timeout: 60000 });
+  await signUpForm(page, name);
+  await page.locator('#menu').waitFor({ state: 'visible', timeout: 60000 });
 }
 
 const free = (x, z, r = 0.7) => Math.hypot(x, z) < island.playRadius - 3 && !island.grid.near(x, z, r + 1).some(b => circleHitsBox(x, z, r, b));
@@ -84,26 +91,26 @@ async function teleportTo(page, spot) {
   await waitDebug(page, s => s.me && Math.hypot(s.me.x - spot.x, s.me.z - spot.z) < 0.5, { what: 'the teleport' });
 }
 
-test('practice file: no server, no login; join, walk, open a chest for +3 coins', { skip: SKIP, timeout: 240000 }, async () => {
+test('practice file: no server; Account screen, join, walk, open a chest for +3 coins', { skip: SKIP, timeout: 240000 }, async () => {
   assert.ok(fs.statSync(file).size < 5 * 1024 * 1024, 'under 5 MB');
   const h = await practicePage({ viewport: { width: 1100, height: 700 } });
   const { page } = h;
   try {
     await page.goto(`${pathToFileURL(file).href}?debug=1&seed=e2e`);
-    // a local player is ready: straight to the menu
-    await page.locator('#menu').waitFor({ state: 'visible', timeout: 60000 });
+    // the Account screen first: create an account (saved in this browser)
+    await practiceSignUp(page, 'Practice_Kid');
     await page.locator('#practiceBadge').waitFor({ state: 'visible' });
     assert.equal(await page.title(), 'PvP Island (Practice)');
     assert.equal(await page.textContent('#practiceBadge'), 'Practice mode');
-    assert.match(await page.textContent('#menuName'), /^Player_\d{4}$/);
+    assert.equal(await page.textContent('#menuName'), 'Practice_Kid');
     assert.equal(await page.textContent('#menuCoins'), '0');
-    assert.equal(await page.locator('#btnLogout').isVisible(), false);
+    assert.equal(await page.locator('#btnLogout').isVisible(), true);
 
     // change the name
     await page.click('#btnRename');
     await page.fill('#renameInput', 'x');
     await page.press('#renameInput', 'Enter');
-    await page.waitForFunction(() => /3 to 16/.test(document.querySelector('.practice-name-form .error').textContent));
+    await page.waitForFunction(() => /3 to 16/.test(document.getElementById('renameError').textContent));
     await page.fill('#renameInput', 'Boss_Kid');
     await page.press('#renameInput', 'Enter');
     await page.waitForFunction(() => document.getElementById('menuName').textContent === 'Boss_Kid');
@@ -143,8 +150,11 @@ test('practice file: no server, no login; join, walk, open a chest for +3 coins'
     await page.locator('#menu').waitFor({ state: 'visible' });
     await page.waitForFunction(() => document.getElementById('menuCoins').textContent === '3', null, { timeout: 60000 });
 
-    // the page is kept: after a reload the same player with the same coins
+    // the page is kept: after a reload the Account screen, then log in: the same player with the same coins
     await page.reload();
+    await page.locator('#login').waitFor({ state: 'visible', timeout: 60000 });
+    assert.equal(await page.inputValue('#loginName'), 'Boss_Kid'); // the last name is filled in
+    await logInForm(page, 'Boss_Kid');
     await page.locator('#menu').waitFor({ state: 'visible', timeout: 60000 });
     await page.waitForFunction(() => document.getElementById('menuName').textContent === 'Boss_Kid' && document.getElementById('menuCoins').textContent === '3', null, { timeout: 60000 });
 
@@ -174,7 +184,7 @@ test('artifact version: boots inside a wrapper page, join works, no console erro
   const { page } = h;
   try {
     await page.goto(`${pathToFileURL(wrapper).href}?debug=1&seed=artifact`);
-    await page.locator('#menu').waitFor({ state: 'visible', timeout: 60000 });
+    await practiceSignUp(page);
     assert.equal(await page.title(), 'PvP Island');
     await page.locator('#practiceBadge').waitFor({ state: 'visible' });
     // full height inside the wrapper, with our own background
@@ -197,7 +207,7 @@ test('practice file: the island draws (screenshot on a phone in landscape)', { s
   const { page } = h;
   try {
     await page.goto(`${pathToFileURL(file).href}?debug=1&seed=screenshot`);
-    await page.locator('#menu').waitFor({ state: 'visible', timeout: 60000 });
+    await practiceSignUp(page);
     await page.click('#btnJoin');
     await page.locator('#hud').waitFor({ state: 'visible', timeout: 60000 });
     await waitDebug(page, x => x.me && x.inv, { what: 'joining' });

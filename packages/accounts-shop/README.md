@@ -16,7 +16,7 @@ try {
   const { token, account } = accounts.signup('Stick_Kid', 'secret'); // or accounts.login(name, pw)
   send({ token, account: accounts.publicView(account) });             // never send `account` itself
 } catch (err) {
-  send({ error: err.message }); // kid-friendly text, e.g. "That name is taken"; err.code e.g. 'NAME_TAKEN'
+  send({ error: err.message }); // kid-friendly text, e.g. "Someone already has that name. Please pick a new name."; err.code e.g. 'NAME_TAKEN'
 }
 
 const acc = accounts.byToken(token);        // null if not logged in
@@ -42,7 +42,7 @@ accounts.returnFromArena(acc, { weapons, potions, bombs });         // left aliv
                                                                     // back into the same bar slots, loot into the Inventory
 // knocked out: just don't call returnFromArena, the bar's things are lost; the Inventory never is
 
-accounts.rename(acc, 'New_Name');        // same name rules; tokens stay logged in
+accounts.rename(acc, 'New_Name');        // same name rules as sign up; tokens stay logged in
 
 // the ranking (#47): knockouts are counted per account, with the time of the last one (it breaks ties)
 accounts.addKnockout(accounts.byName('stick_kid'), now); // byName ignores case (an arena player key works); returns the new count
@@ -65,11 +65,11 @@ filled like the old automatic pick, so their first match feels the same (the 2 b
 potions, the bombs, then more weapons while slots are free). A new account starts with an empty bar. A broken saved bar
 is cleaned on load: anything that does not fit (a second shield, too many potions) goes back into the Inventory.
 
-Error codes: `BAD_NAME`, `BAD_PASSWORD`, `NAME_TAKEN`, `WRONG_LOGIN`, `UNKNOWN_ITEM`, `ALREADY_OWNED`, `NOT_ENOUGH_COINS`, `NOT_OWNED`, and for the bar `BAR_FULL`, `SLOT_TAKEN`, `STACK_FULL`, `ONE_SHIELD`, `BAD_SLOT`, `BAD_COUNT`, `EMPTY_SLOT` (all `AccountError`). Passing an account object that didn't come from this service throws a `TypeError`.
+Error codes: `BAD_NAME`, `BAD_WORD`, `BAD_PASSWORD`, `NAME_TAKEN`, `WRONG_LOGIN`, `UNKNOWN_ITEM`, `ALREADY_OWNED`, `NOT_ENOUGH_COINS`, `NOT_OWNED`, and for the bar `BAR_FULL`, `SLOT_TAKEN`, `STACK_FULL`, `ONE_SHIELD`, `BAD_SLOT`, `BAD_COUNT`, `EMPTY_SLOT` (all `AccountError`). Passing an account object that didn't come from this service throws a `TypeError`.
 
 A store is any object with `load()` (all records), `save(data)` (may be delayed) and `flush()` (Promise). The JSON file store writes to `<file>.tmp`, then renames it over the file, so a crash can't leave half a file. A broken file throws on load instead of silently starting empty.
 
-Rules: names are 3-16 letters, numbers or `_`, unique ignoring case. Passwords need 4+ characters and are stored as scrypt hashes with a random salt. Logging in makes a new token; only the 2 newest tokens work.
+Rules: names are 3-16 letters, numbers or `_`, checked by `@pvp/name-filter` (#41): no swear words or slurs (`BAD_WORD`: "You can't use that name. Please pick a new name."), and unique ignoring case **and look-alikes** (`B0b`, `b_o_b` clash with `Bob`; `NAME_TAKEN`: "Someone already has that name. Please pick a new name."). A look-alike index keeps this fast. Log in only checks the format, so accounts saved before #41 (a rude name, or two look-alike names) keep working; `publicView` then has `mustRename: true` so the menu can ask for a new name. Passwords need 4+ characters and are stored as scrypt hashes with a random salt. Logging in makes a new token; only the 2 newest tokens work.
 
 **In the browser** (practice mode, `@pvp/local-server`): no Node imports, so pass the hashing and random bytes in.
 

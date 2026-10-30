@@ -16,13 +16,15 @@ import { createLocalServer } from '@pvp/local-server';
 const server = createLocalServer({ seed: 'abc', storage: localStorage, bots: 3 });
 // options: now (clock), timer ({ setInterval, clearInterval }), autoStart, defer, randomBytes, island, storagePrefix
 
-const api = server.createApi();          // an @pvp/api-client: signup/login/me/buy/equip/inventory/toBar/fromBar, token in storage
-server.ensurePlayer();                   // no login screen: a local 'Player_1234' right away (kept on reload)
+const api = server.createApi();          // an @pvp/api-client: signup/login/me/buy/equip/rename/inventory/toBar/fromBar,
+                                         // token and lastName in storage
+server.ensurePlayer();                   // optional: a local 'Player_1234' right away, no log in (kept on reload).
+                                         // The practice page does not use it: it shows the Account screen (#46).
 const ws = server.connect(api.token);    // like new WebSocket(url): send, close, readyState, onopen/onmessage/onclose
 ws.onopen = () => ws.send(encodeClient('join'));
 ws.onmessage = e => decodeServerMessage(e.data);
 
-server.rename(api.token, 'Boss_Kid');    // change the name (not while in the arena)
+server.rename(api.token, 'Boss_Kid');    // change the name (not while in the arena); api.rename() does the same via /api/rename
 server.teleport(api.token, 10, 20);      // practice/test helper, like the server's debugTeleport
 
 // tests: createLocalServer({ autoStart: false, now: () => t }) and call server.tick() yourself

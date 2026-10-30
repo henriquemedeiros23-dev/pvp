@@ -1,0 +1,17 @@
+{
+  "name": "@pvp/account-form",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Checks the Account screen forms (log in, create an account with the password typed twice) before asking the server.",
+  "type": "module",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "scripts": {
+    "test": "node --test"
+  },
+  "dependencies": {
+    "@pvp/name-filter": "1.0.0"
+  }
+}

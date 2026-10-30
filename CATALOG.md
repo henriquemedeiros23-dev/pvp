@@ -22,6 +22,8 @@ graph LR
   worldgen --> collision
   worldgen --> random
   accounts["@pvp/accounts-shop"] --> rules
+  accounts --> names["@pvp/name-filter"]
+  accountform["@pvp/account-form"] --> names
   shop["@pvp/shop-catalog"] --> rules
   shop --> hud
   hud["@pvp/hud-model"] --> rules
@@ -43,7 +45,7 @@ graph LR
 ```
 
 `@pvp/api-client`, `@pvp/touch-controls`, `@pvp/collision`, `@pvp/game-rules`,
-`@pvp/net-protocol`, `@pvp/seeded-random` and `@pvp/leaderboard` need no other package.
+`@pvp/net-protocol`, `@pvp/name-filter`, `@pvp/seeded-random` and `@pvp/leaderboard` need no other package.
 
 ## All packages
 
@@ -54,14 +56,16 @@ graph LR
 | `@pvp/collision` | Walls, jumping, landing and ray hits in a world made of boxes. | both | fully: pure math, no random, no time | 19 |
 | `@pvp/world-gen` | Builds the island of ruins (houses, towers, chests) from a seed. | both | fully: all random comes from the seed | 12 |
 | `@pvp/net-protocol` | Every message between phone and server, with builders and checks. | both | fully: pure functions and frozen data | 21 |
-| `@pvp/accounts-shop` | Accounts, log in, coins, buying skins, weapons, potions and bombs, the Inventory and the 5-slot fast bar (only the bar goes into the arena). | Node (browser via `/browser`) | partly: logic is pure, tokens/clock are passed in, file saving is real I/O | 46 |
+| `@pvp/accounts-shop` | Accounts, log in, rename (no bad or look-alike names), coins, buying skins, weapons, potions and bombs, the Inventory and the 5-slot fast bar (only the bar goes into the arena). | Node (browser via `/browser`) | partly: logic is pure, tokens/clock are passed in, file saving is real I/O | 49 |
+| `@pvp/name-filter` | Is this player name OK? 3-16 letters, numbers or _, no swear words or slurs (tricky spellings too, no false alarms on normal words), and a look-alike key so nobody copies a name. | both | fully: pure functions and a fixed word list | 12 |
 | `@pvp/arena` | The fight itself: players, chests, loot, weapons, shields, shock and freeze, drinking potions, aiming, thrown bombs, damage, knockouts, damage numbers for nearby players. | both | fully: time and seeded random are passed in (replay tests) | 134 |
 | `@pvp/shop-catalog` | Turns the rules and an account into the cards the shop screen shows, and the Inventory screen: spaces (at least 2 of everything) and the fast bar. | both | fully: pure functions of their inputs | 21 |
 | `@pvp/hud-model` | Turns your inventory and health into the in-game HUD: Durability bar of the held weapon, H.P bar, 5 slots, shield pill, potion button with drinking ring, "Charging 1.4s" after a shot, damage numbers above heads, aiming (zoom, scope ring, AIM / AIM ON button), bomb buttons, the coin icon from the boss's drawing. | both | fully: pure functions of their inputs (time passed in) | 42 |
-| `@pvp/api-client` | Talks to the server's account, shop and Inventory/fast bar API and keeps the login token. | both | fully: fetch and storage are passed in | 12 |
+| `@pvp/api-client` | Talks to the server's account, shop, rename and Inventory/fast bar API, keeps the login token and the last name used. | both | fully: fetch and storage are passed in | 14 |
+| `@pvp/account-form` | Checks the Account screen: log in, and create an account with the password typed twice ("The passwords are not the same. Try again."). | both | fully: pure functions of the typed text | 6 |
 | `@pvp/stickman-3d` | A three.js stickman with skins, outfits, the boss's weapons and shields, the Healing Potion flask, bombs and their red area, frozen/shocked looks and animation. | browser (pose math also in Node) | partly: pose math is pure, how it looks depends on the renderer | 27 |
 | `@pvp/island-scene` | The 3D island: sky with clouds, warm sun, green grass ground with dirt paths, grass tufts, flowers, bushes, rocks, beach with wet sand, waves, palms, ruins and chests, and gold coins popping out of opened chests. A lighter version for phones. | browser (also builds in Node) | partly: all placement and colors from a seed, time passed in, how it looks depends on the renderer | 19 |
-| `@pvp/local-server` | The game server inside the page (practice mode): arena, accounts in localStorage, tick, fake WebSocket, bots. | browser (also Node) | partly: seeded arena and bots, time and timer passed in; tokens and localStorage are real | 18 |
+| `@pvp/local-server` | The game server inside the page (practice mode): arena, accounts in localStorage, tick, fake WebSocket, bots. | browser (also Node) | partly: seeded arena and bots, time and timer passed in; tokens and localStorage are real | 19 |
 | `@pvp/leaderboard` | The ranking: top 50 players by knockouts (a tie: who got there first), your own place even outside the top, 🥇🥈🥉 rows for the screen. | both | fully: pure functions (the knockout time is passed in) | 8 |
 | `@pvp/touch-controls` | Joystick, aim by dragging, buttons, held actions (shield), toggled actions (aim: on until pressed again), buttons that hide and show, keyboard and mouse (right click aims). | browser (core also in Node) | partly: the core is pure, the DOM part depends on real fingers and mice | 27 |
 
@@ -174,12 +178,29 @@ graph LR
 | `accounts.returnFromArena` | `accounts.returnFromArena(acc, { weapons, potions, bombs }); // back into the bar slots, loot into the Inventory` |
 | `createJsonFileStore(file, opts)` | `createJsonFileStore('data/accounts.json', { saveDelayMs: 1000 });` |
 | `createWebStorageStore(storage, key)` | `createWebStorageStore(localStorage, 'pvp.accounts'); // memory if blocked` |
-| `accounts.rename` | `accounts.rename(acc, 'New_Name');` |
+| `accounts.rename` | `accounts.rename(acc, 'New_Name'); // same checks as sign up (@pvp/name-filter)` |
 | `accounts.addKnockout` / `byName` / `rankingEntries` | `accounts.addKnockout(accounts.byName(ev.byKey), now); accounts.rankingEntries(); // the ranking (#47)` |
 | `AccountError` | `catch (e) { if (e.code === 'NAME_TAKEN') ... }` |
 
-**Depends on:** `@pvp/game-rules` (and Node's `crypto` and `fs`).
+**Depends on:** `@pvp/game-rules`, `@pvp/name-filter` (and Node's `crypto` and `fs`).
+**Names (#41):** sign up and rename refuse bad words (`BAD_WORD`) and names that are taken or look like a taken one (`NAME_TAKEN`, "Someone already has that name. Please pick a new name."), using a look-alike index. Log in only checks the format, so old accounts keep working; `publicView` adds `mustRename: true` for an old name that would not pass today.
 **Determinism:** partly. Shop and loadout logic is pure. Tokens, salts and timestamps come from the injected `randomBytes` and `now`, so tests are repeatable. The JSON file store writes real files on a timer.
+
+## `@pvp/name-filter`
+
+**Purpose:** checks a new player name (issue #41): 3 to 16 letters, numbers or `_`, and no swear words or slurs (English and a few common Portuguese ones) in any tricky spelling: case, accents, l33t (`0 1 3 4 5 7 @ $`), `*`, dots/spaces/`_` between letters, repeated letters. Normal words that hide a rude piece ("Classic", "Grass", "Assassin", "Scunthorpe", "HotWater", "Spicy") pass. `nameKey` folds look-alikes so "B0b" and "b_o_b" clash with "Bob" (but "Bob1" and "Bob2" don't).
+
+| Export | Example |
+|---|---|
+| `checkName(name, opts)` | `checkName(' Stick_Kid '); // { ok: true, name: 'Stick_Kid' } or { ok: false, reason: 'bad-word', message }` |
+| `checkName(name, { isTaken })` | `checkName('B0b', { isTaken: key => keys.has(key) }); // { ok: false, reason: 'taken', message: NAME_TAKEN_MESSAGE }` |
+| `hasBadWord(text)` | `hasBadWord('Classic'); // false` |
+| `nameKey(name)` | `nameKey('B0b') === nameKey('Bob'); // true` |
+| `BAD_WORD_MESSAGE` / `NAME_TAKEN_MESSAGE` | `"You can't use that name. Please pick a new name."` |
+| `@pvp/name-filter/words` | the word lists (ROT13) and `decodeWord`, for tests |
+
+**Depends on:** nothing.
+**Determinism:** fully. Pure functions and a fixed word list.
 
 ## `@pvp/arena`
 
@@ -258,7 +279,7 @@ graph LR
 
 ## `@pvp/api-client`
 
-**Purpose:** talks to the server's account and shop API (sign up, log in, me, buy, equip, the Inventory and the fast bar) and remembers the login token, with friendly error messages.
+**Purpose:** talks to the server's account and shop API (sign up, log in, me, buy, equip, rename, the Inventory and the fast bar) and remembers the login token (and the last name used on this device, to pre-fill the Account screen; never the password), with friendly error messages.
 
 | Export | Example |
 |---|---|
@@ -267,12 +288,27 @@ graph LR
 | `api.me` | `const { account, online } = await api.me();` |
 | `api.buy` / `api.equip` | `await api.buy('hat', 'crown');` |
 | `api.ranking` | `const { top, me } = await api.ranking(); // top 50 by knockouts + my place (#47)` |
+| `api.rename` | `await api.rename('Boss_Kid'); // a refused name throws with the kid-friendly message` |
+| `api.lastName` | `nameBox.value = api.lastName; // '' if nobody logged in here yet` |
 | `api.inventory` / `api.toBar` / `api.fromBar` | `await api.toBar('weapon', 'icesword', { slot: 0 }); await api.fromBar(0); // #39` |
 | `ApiError` | `catch (e) { show(e.message); /* e.status 0 = no connection */ }` |
 | `safeStorage(storage)` | `const s = safeStorage(localStorage); s.set('k', 'v');` |
 
 **Depends on:** nothing.
 **Determinism:** fully. No randomness and no clock; `fetch` and storage are passed in, so tests use fakes.
+
+## `@pvp/account-form`
+
+**Purpose:** checks the two parts of the Account screen (issue #46) before asking the server: "Log in" (name + password) and "Create an account" (name + password + the same password again). Says which box the message belongs to.
+
+| Export | Example |
+|---|---|
+| `checkSignupForm(form)` | `checkSignupForm({ name, password, repeat }); // { ok: false, field: 'repeat', reason: 'passwords-different', message: 'The passwords are not the same. Try again.' }` |
+| `checkLoginForm(form)` | `checkLoginForm({ name, password }); // { ok: true, name, password } (name trimmed)` |
+| `MIN_PASSWORD` / `PASSWORDS_DIFFERENT_MESSAGE` | `4` / `'The passwords are not the same. Try again.'` |
+
+**Depends on:** `@pvp/name-filter` (bad and wrong names get the same messages as on the server).
+**Determinism:** fully. Pure functions of the typed text.
 
 ## `@pvp/stickman-3d`
 
@@ -323,14 +359,14 @@ graph LR
 | Export | Example |
 |---|---|
 | `createLocalServer(opts)` | `const server = createLocalServer({ seed: 'abc', storage: localStorage, bots: 3 });` |
-| `server.createApi()` / `server.ensurePlayer()` | `const api = server.createApi(); server.ensurePlayer(); // a local player, no login` |
+| `server.createApi()` / `server.ensurePlayer()` | `const api = server.createApi(); server.ensurePlayer(); // optional local player (the practice page shows the Account screen instead)` |
 | `server.connect(token)` | `const ws = server.connect(api.token); ws.onmessage = e => ...; ws.send(text);` |
-| `server.rename` / `server.teleport` | `server.rename(api.token, 'Boss_Kid');` |
+| `server.rename` / `server.teleport` | `server.rename(api.token, 'Boss_Kid'); // or api.rename('Boss_Kid') (/api/rename)` |
 | `server.tick(now)` | `createLocalServer({ autoStart: false, now }); server.tick(); // tests` |
 | `createBots(opts)` | `const bots = createBots({ arena, island, random: createRandom('b'), count: 3 }); bots.tick(now);` |
 | `createFakeSocket(opts)` | the WebSocket-like object (send, close, readyState, onopen/onmessage/onclose) |
 
-**Depends on:** `@pvp/arena`, `@pvp/accounts-shop` (browser entry), `@pvp/api-client`, `@pvp/leaderboard`, `@pvp/net-protocol`, `@pvp/world-gen`, `@pvp/seeded-random`, `@pvp/collision`, `@pvp/game-rules`.
+**Depends on:** `@pvp/arena`, `@pvp/accounts-shop` (browser entry), `@pvp/api-client`, `@pvp/leaderboard`, `@pvp/name-filter`, `@pvp/net-protocol`, `@pvp/world-gen`, `@pvp/seeded-random`, `@pvp/collision`, `@pvp/game-rules`.
 **Determinism:** partly. The arena and bots use seeded randoms and time/timer are passed in, so tests replay exactly; login tokens use `crypto.getRandomValues` unless `randomBytes` is passed, and `localStorage` is real storage.
 
 ## `@pvp/leaderboard`
