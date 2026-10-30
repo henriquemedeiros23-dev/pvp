@@ -22,7 +22,7 @@ const ws = server.connect(api.token);    // like new WebSocket(url): send, close
 ws.onopen = () => ws.send(encodeClient('join'));
 ws.onmessage = e => decodeServerMessage(e.data);
 
-server.rename(api.token, 'Boss_Kid');    // change the name (not while in the arena)
+server.rename(api.token, 'Boss_Kid');    // change the name (not while in the arena); api.rename() does the same via /api/rename
 server.teleport(api.token, 10, 20);      // practice/test helper, like the server's debugTeleport
 
 // tests: createLocalServer({ autoStart: false, now: () => t }) and call server.tick() yourself

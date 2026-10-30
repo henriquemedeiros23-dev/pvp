@@ -2,9 +2,10 @@
 // Browser-safe core: no Node imports. Hashing and random bytes are passed in
 // (accounts.js gives the Node defaults: scrypt and crypto.randomBytes).
 import * as gameRules from '@pvp/game-rules';
+import { checkName, nameKey, NAME_TAKEN_MESSAGE } from '@pvp/name-filter';
 
-const NAME_RE = /^[A-Za-z0-9_]{3,16}$/;
 const MIN_PASSWORD = 4;
+const CODES = { 'bad-word': 'BAD_WORD', taken: 'NAME_TAKEN' }; // @pvp/name-filter reason -> AccountError code
 const MAX_DEVICES = 2; // a player may stay logged in on this many devices at once
 
 /** An error with a friendly, kid-readable `message` and a stable `code`. */
@@ -61,6 +62,15 @@ export function createAccounts({
   // Records keyed by lower-case name. No prototype, so a name like "__proto__" is just a name.
   const records = Object.assign(Object.create(null), store.load());
   const tokens = new Map(); // token -> record
+  // Look-alike index (#41): nameKey ("B0b" and "b_o_b" -> "bob") -> lower-case names that have it.
+  // Old accounts that already clash all stay in their set and keep working.
+  const lookAlikes = new Map();
+  const indexName = (name, add) => {
+    const k = nameKey(name), key = name.toLowerCase();
+    let set = lookAlikes.get(k);
+    if (add) { if (!set) lookAlikes.set(k, set = new Set()); set.add(key); }
+    else if (set) { set.delete(key); if (!set.size) lookAlikes.delete(k); }
+  };
 
   for (const rec of Object.values(records)) {
     // Older data kept one `token`; now each account keeps a list.
@@ -78,6 +88,7 @@ export function createAccounts({
     // in #26) are dropped from the backpack.
     for (const id of Object.keys(rec.stash)) if (!Object.hasOwn(WEAPONS, id)) delete rec.stash[id];
     for (const t of rec.tokens) tokens.set(t, rec);
+    if (typeof rec.name === 'string') indexName(rec.name, true);
   }
 
   const save = () => store.save(records);
@@ -97,10 +108,23 @@ export function createAccounts({
     return account;
   }
 
+  // A new name (sign up, rename): format, no bad words (@pvp/name-filter), and nobody has it or a look-alike of it.
+  // `self` is the lower-case name of the account being renamed (its own old name is not in the way).
+  function checkNewName(name, self) {
+    const isTaken = k => [...(lookAlikes.get(k) ?? [])].some(other => other !== self);
+    const res = checkName(name, { isTaken });
+    if (!res.ok) fail(CODES[res.reason] ?? 'BAD_NAME', res.message);
+    const key = res.name.toLowerCase();
+    if (Object.hasOwn(records, key) && key !== self) fail('NAME_TAKEN', NAME_TAKEN_MESSAGE);
+    return res.name;
+  }
+
+  // Log in: only the format, so an old account whose name would not pass today still logs in.
   function checkCredentials(name, password) {
-    name = String(name ?? '').trim();
+    const res = checkName(name, { badWords: false });
     password = String(password ?? '');
-    if (!NAME_RE.test(name)) fail('BAD_NAME', 'Your name must be 3 to 16 letters, numbers or _');
+    if (!res.ok) fail('BAD_NAME', res.message);
+    name = res.name;
     if (password.length < MIN_PASSWORD) fail('BAD_PASSWORD', `Your password needs at least ${MIN_PASSWORD} characters`);
     return { name, password };
   }
@@ -116,9 +140,9 @@ export function createAccounts({
   }
 
   function signup(name, password) {
-    ({ name, password } = checkCredentials(name, password));
+    name = checkNewName(name);
+    ({ password } = checkCredentials(name, password));
     const key = name.toLowerCase();
-    if (Object.hasOwn(records, key)) fail('NAME_TAKEN', 'That name is taken');
     const salt = toHex(randomBytes(16));
     records[key] = {
       name,
@@ -133,6 +157,7 @@ export function createAccounts({
       tokens: [],
       createdAt: now(),
     };
+    indexName(name, true);
     return newToken(records[key]);
   }
 
@@ -175,6 +200,8 @@ export function createAccounts({
       stash: { ...a.stash },
       potions: a.potions,
       bombs: { ...a.bombs },
+      // An old name that would not be allowed today (#41): the menu asks for a new one. Missing when the name is fine.
+      ...(checkName(a.name).ok ? {} : { mustRename: true }),
     };
   }
 
@@ -212,16 +239,20 @@ export function createAccounts({
     return publicView(a);
   }
 
-  /** Change the account's name (same rules as at sign up; the tokens stay logged in). Returns publicView. */
+  /**
+   * Change the account's name (same rules as at sign up: no bad words, nobody else has it or a look-alike;
+   * the tokens stay logged in). Returns publicView.
+   */
   function rename(account, newName) {
     const a = own(account);
-    const name = String(newName ?? '').trim();
-    if (!NAME_RE.test(name)) fail('BAD_NAME', 'Your name must be 3 to 16 letters, numbers or _');
-    const oldKey = a.name.toLowerCase(), key = name.toLowerCase();
-    if (key !== oldKey && Object.hasOwn(records, key)) fail('NAME_TAKEN', 'That name is taken');
+    const oldKey = a.name.toLowerCase();
+    const name = checkNewName(newName, oldKey);
+    const key = name.toLowerCase();
+    indexName(a.name, false);
     delete records[oldKey];
     a.name = name;
     records[key] = a;
+    indexName(name, true);
     save();
     return publicView(a);
   }

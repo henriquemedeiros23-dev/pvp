@@ -16,7 +16,7 @@ try {
   const { token, account } = accounts.signup('Stick_Kid', 'secret'); // or accounts.login(name, pw)
   send({ token, account: accounts.publicView(account) });             // never send `account` itself
 } catch (err) {
-  send({ error: err.message }); // kid-friendly text, e.g. "That name is taken"; err.code e.g. 'NAME_TAKEN'
+  send({ error: err.message }); // kid-friendly text, e.g. "Someone already has that name. Please pick a new name."; err.code e.g. 'NAME_TAKEN'
 }
 
 const acc = accounts.byToken(token);        // null if not logged in
@@ -40,7 +40,7 @@ accounts.returnPotions(acc, 2);             // left alive: unused potions go bac
 const bombs = accounts.takeBombs(acc);      // { bomb: 5, legendarybomb: 3 } at most (each bomb's maxCarry) leave the backpack
 accounts.returnBombs(acc, { bomb: 2 });     // left alive: unused bombs go back
 
-accounts.rename(acc, 'New_Name');        // same name rules; tokens stay logged in
+accounts.rename(acc, 'New_Name');        // same name rules as sign up; tokens stay logged in
 accounts.logout(token);
 await accounts.flush();                     // on shutdown
 ```
@@ -52,11 +52,11 @@ The backpack also counts Healing Potions (`potions`, any number; only 3 go into 
 accounts without it load with 0 potions. Bombs are counted the same way (`bombs: { bomb, legendarybomb }`, any number;
 older accounts load with 0).
 
-Error codes: `BAD_NAME`, `BAD_PASSWORD`, `NAME_TAKEN`, `WRONG_LOGIN`, `UNKNOWN_ITEM`, `ALREADY_OWNED`, `NOT_ENOUGH_COINS`, `NOT_OWNED` (all `AccountError`). Passing an account object that didn't come from this service throws a `TypeError`.
+Error codes: `BAD_NAME`, `BAD_WORD`, `BAD_PASSWORD`, `NAME_TAKEN`, `WRONG_LOGIN`, `UNKNOWN_ITEM`, `ALREADY_OWNED`, `NOT_ENOUGH_COINS`, `NOT_OWNED` (all `AccountError`). Passing an account object that didn't come from this service throws a `TypeError`.
 
 A store is any object with `load()` (all records), `save(data)` (may be delayed) and `flush()` (Promise). The JSON file store writes to `<file>.tmp`, then renames it over the file, so a crash can't leave half a file. A broken file throws on load instead of silently starting empty.
 
-Rules: names are 3-16 letters, numbers or `_`, unique ignoring case. Passwords need 4+ characters and are stored as scrypt hashes with a random salt. Logging in makes a new token; only the 2 newest tokens work.
+Rules: names are 3-16 letters, numbers or `_`, checked by `@pvp/name-filter` (#41): no swear words or slurs (`BAD_WORD`: "You can't use that name. Please pick a new name."), and unique ignoring case **and look-alikes** (`B0b`, `b_o_b` clash with `Bob`; `NAME_TAKEN`: "Someone already has that name. Please pick a new name."). A look-alike index keeps this fast. Log in only checks the format, so accounts saved before #41 (a rude name, or two look-alike names) keep working; `publicView` then has `mustRename: true` so the menu can ask for a new name. Passwords need 4+ characters and are stored as scrypt hashes with a random salt. Logging in makes a new token; only the 2 newest tokens work.
 
 **In the browser** (practice mode, `@pvp/local-server`): no Node imports, so pass the hashing and random bytes in.
 

@@ -146,4 +146,8 @@ Decided by the boss through 22 questions.
 ## Other
 - **Platform:** phones (runs in the phone's browser).
 - **Accounts:** saved, so you keep your coins and skins.
+- **Names (#41):** 3 to 16 letters, numbers or `_`. The ✏️ button next to your name in the menu changes it. No swear
+  words or slurs (also in tricky spellings like `B.A.D`, l33t or accents): "You can't use that name. Please pick a new
+  name." No one can use the same name, also not a look-alike copy (`Bob`, `B0b`, `b_o_b`, `BOB` are the same name; `Bob1`
+  and `Bob2` are different): "Someone already has that name. Please pick a new name." The server decides.
 - **Goal:** just for fun, to play with friends.

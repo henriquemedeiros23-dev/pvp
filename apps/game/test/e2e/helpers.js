@@ -118,6 +118,13 @@ export async function signedIn(page, baseUrl, prefix) {
   return name;
 }
 
+/** Create an account through the Account screen's form (the page must show #login). Does not wait for the menu. */
+export async function signUpForm(page, name, password = 'secret1') {
+  await page.fill('#loginName', name);
+  await page.fill('#loginPass', password);
+  await page.click('#btnSignup');
+}
+
 /** The game's read-only debug view (needs ?debug in the page address). */
 export const debug = page => page.evaluate(() => window.pvpDebug());
 

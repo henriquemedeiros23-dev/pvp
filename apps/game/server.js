@@ -65,6 +65,10 @@ function handleApi(req, res, body) {
       return send(200, { account });
     }
     if (url === '/api/equip') return send(200, { account: accounts.equip(acc, body.kind, body.id) });
+    if (url === '/api/rename') { // #41: the ✏️ name button (no bad words, nobody has it or a look-alike)
+      if (arena.idOf(playerKey(acc)) !== undefined) return send(400, { error: 'Leave the arena first' });
+      return send(200, { account: accounts.rename(acc, body.name) });
+    }
     return send(404, { error: 'Not found' });
   } catch (e) {
     if (e instanceof AccountError) return send(400, { error: e.message });

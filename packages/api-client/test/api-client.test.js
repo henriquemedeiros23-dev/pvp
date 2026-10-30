@@ -61,6 +61,24 @@ test('login, then me/buy/equip send the token header and the right body', async 
   ]);
 });
 
+test('rename sends the trimmed name with the token; a refused name keeps the token', async () => {
+  const fetch = fakeFetch(
+    { status: 400, body: { error: "You can't use that name. Please pick a new name." } },
+    { status: 200, body: { account: { ...ACCOUNT, name: 'Hero_7' } } },
+  );
+  const storage = memoryStorage();
+  storage.setItem(TOKEN_KEY, 't9');
+  const api = createApiClient({ fetch, storage });
+  await assert.rejects(api.rename('bad'), e => e.status === 400 && e.message === "You can't use that name. Please pick a new name.");
+  assert.equal(api.token, 't9');
+  const res = await api.rename('  Hero_7 ');
+  assert.equal(res.account.name, 'Hero_7');
+  assert.deepEqual(fetch.calls.map(c => [c.url, c.opts.headers['x-token'], c.body]), [
+    ['/api/rename', 't9', { name: 'bad' }],
+    ['/api/rename', 't9', { name: 'Hero_7' }],
+  ]);
+});
+
 test('server errors become ApiError with the server message', async () => {
   const fetch = fakeFetch({ status: 400, body: { error: 'That name is taken' } });
   const api = createApiClient({ fetch });

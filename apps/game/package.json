@@ -16,6 +16,7 @@
     "@pvp/game-rules": "*",
     "@pvp/hud-model": "*",
     "@pvp/island-scene": "*",
+    "@pvp/name-filter": "*",
     "@pvp/net-protocol": "*",
     "@pvp/seeded-random": "*",
     "@pvp/shop-catalog": "*",

@@ -54,7 +54,20 @@ input:focus { border-color: var(--gold); }
 .muted { color: var(--muted); }
 
 .topbar { width: 100%; display: flex; justify-content: space-between; align-items: center; padding: 12px calc(16px + var(--safe-r)) 12px calc(16px + var(--safe-l)); }
-.who { font-weight: 800; font-size: 18px; }
+.who { font-weight: 800; font-size: 18px; display: flex; align-items: center; gap: 8px; min-width: 0; }
+.who #menuName { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Change your name (#41): ✏️ next to the name opens a small panel under the top bar */
+.rename-btn { flex: none; background: rgba(0,0,0,0.45); border: 1px solid var(--line); border-radius: 999px; width: 36px; height: 36px; font-size: 17px; line-height: 1; }
+.rename-panel {
+  position: absolute; z-index: 20; top: 64px; left: calc(12px + var(--safe-l)); width: min(340px, calc(100% - 24px));
+  display: flex; flex-direction: column; gap: 10px; padding: 16px; border-radius: 18px;
+  background: var(--panel); border: 1px solid var(--line); box-shadow: 0 16px 40px rgba(0,0,0,0.55);
+}
+.rename-panel label { font-weight: 800; }
+.rename-panel input { padding: 10px 14px; }
+.rename-panel .big { padding: 10px 14px; }
+.rename-panel .error { text-align: left; margin: 0; }
+.rename-panel .error:empty { display: none; }
 .coins { display: flex; align-items: center; gap: 8px; background: rgba(0,0,0,0.45); border: 1px solid var(--line); padding: 8px 14px; border-radius: 999px; font-weight: 800; font-size: 18px; }
 /* the coin from the boss's drawing (#29): js/main.js sets --coin-icon from @pvp/hud-model's coinIconDataUrl() */
 .coin { display: inline-block; flex: none; width: 24px; height: 24px; background: var(--coin-icon, none) center / contain no-repeat; vertical-align: middle; }

@@ -76,6 +76,12 @@ export function createLocalServer({
   const tokens = safeStorage(storage);
   const tokenStorage = { getItem: k => tokens.get(k), setItem: (k, v) => tokens.set(k, v), removeItem: k => tokens.remove(k) };
 
+  // Rename (#41, like the server's /api/rename): not while in the arena; accounts-shop checks the name.
+  function renameAccount(acc, name) {
+    if (arena.idOf(playerKey(acc)) !== undefined) throw new AccountError('IN_ARENA', 'Leave the arena first');
+    return accounts.rename(acc, name);
+  }
+
   // ---------------------------------------------------------------- API (like the server's /api/*)
   function handleApi(url, body, token) {
     try {
@@ -93,6 +99,7 @@ export function createLocalServer({
         return [200, { account }];
       }
       if (url === '/api/equip') return [200, { account: accounts.equip(acc, body.kind, body.id) }];
+      if (url === '/api/rename') return [200, { account: renameAccount(acc, body.name) }];
       return [404, { error: 'Not found' }];
     } catch (e) {
       if (e instanceof AccountError) return [400, { error: e.message }];
@@ -302,8 +309,7 @@ export function createLocalServer({
     rename(token, name) {
       const acc = accounts.byToken(token);
       if (!acc) throw new AccountError('WRONG_LOGIN', 'Please log in again');
-      if (arena.idOf(playerKey(acc)) !== undefined) throw new AccountError('IN_ARENA', 'Leave the arena first');
-      return accounts.rename(acc, name);
+      return renameAccount(acc, name);
     },
     /** Practice/test helper: put the player of this token somewhere (like the server's debugTeleport). */
     teleport(token, x, z) {

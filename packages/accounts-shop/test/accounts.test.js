@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import * as gameRules from '@pvp/game-rules';
 import { STARTING_WEAPON, DEFAULT_SKIN, MAX_SLOTS, itemPrice, weaponPrice, skinPrice } from '@pvp/game-rules';
 import { createAccounts, createMemoryStore, AccountError } from '../src/index.js';
+// #41: rude test names come from the name-filter word list (ROT13), so none is written in this file.
+import { ANYWHERE, decodeWord } from '@pvp/name-filter/words';
 
 // Fake randomness: counts up, so every token and salt is different but repeatable.
 function fakeRandom() {
@@ -46,7 +48,7 @@ test('duplicate names are refused, ignoring upper/lower case', () => {
   accounts.signup('Bob', 'pass');
   rejects(() => accounts.signup('bob', 'other'), 'NAME_TAKEN');
   rejects(() => accounts.signup('BOB', 'other'), 'NAME_TAKEN');
-  assert.throws(() => accounts.signup('BOB', 'other'), { message: 'That name is taken' });
+  assert.throws(() => accounts.signup('BOB', 'other'), { message: 'Someone already has that name. Please pick a new name.' });
 });
 
 test('bad names and short passwords are refused', () => {
@@ -346,4 +348,56 @@ test('old saved accounts without bombs still load (0 bombs); bad bomb counts bec
   assert.deepEqual(again.publicView(again.login('Old_Kid', 'secret').account).bombs, { bomb: 0, legendarybomb: 0 });
   const odd = again.login('Odd_Kid', 'secret').account;
   assert.deepEqual(again.takeBombs(odd), { bomb: 0, legendarybomb: 0 });
+});
+
+// ---------------------------------------------------------------- #41 names
+const RUDE_NAME = `Big_${decodeWord(ANYWHERE[0])}`;
+
+test('a name with a swear word is refused at sign up and rename (kid-friendly message)', () => {
+  const { accounts } = setup();
+  assert.throws(() => accounts.signup(RUDE_NAME, 'pass'),
+    e => e instanceof AccountError && e.code === 'BAD_WORD' && e.message === "You can't use that name. Please pick a new name.");
+  assert.throws(() => accounts.signup([...decodeWord(ANYWHERE[0])].join('_'), 'pass'), e => e.code === 'BAD_WORD');
+  const { account } = accounts.signup('Good_Kid', 'pass');
+  assert.throws(() => accounts.rename(account, RUDE_NAME), e => e.code === 'BAD_WORD');
+  assert.equal(accounts.publicView(account).name, 'Good_Kid'); // unchanged
+  assert.equal(accounts.rename(account, 'Classic_Kid').name, 'Classic_Kid');
+});
+
+test('look-alike copies of a name are taken too; Bob1 and Bob2 are different', () => {
+  const { accounts } = setup();
+  const bob = accounts.signup('Bob', 'pass');
+  for (const name of ['bob', 'B0b', 'b_o_b', 'BOB', 'B_0_B']) {
+    assert.throws(() => accounts.signup(name, 'pass'),
+      e => e.code === 'NAME_TAKEN' && e.message === 'Someone already has that name. Please pick a new name.', name);
+  }
+  accounts.signup('Bob1', 'pass');
+  accounts.signup('Bob2', 'pass');
+  rejects(() => accounts.signup('Bobl', 'pass'), 'NAME_TAKEN'); // looks like Bob1
+  const other = accounts.signup('Zed_7', 'pass');
+  rejects(() => accounts.rename(other.account, 'B_o_b'), 'NAME_TAKEN');
+  assert.equal(accounts.rename(bob.account, 'B0b').name, 'B0b'); // your own name in another spelling is fine
+  rejects(() => accounts.signup('bob', 'pass'), 'NAME_TAKEN');
+  // after a rename the old name is free again
+  accounts.rename(other.account, 'Zed_8');
+  assert.equal(accounts.publicView(accounts.signup('Zed_7', 'pass').account).name, 'Zed_7');
+});
+
+test('old accounts that clash or have a bad name still load and log in; a bad name is flagged', () => {
+  const first = setup();
+  for (const n of ['Old_One', 'Old_Two', 'Old_Three']) first.accounts.signup(n, 'pass');
+  const saved = first.store.load();
+  // pretend these were saved before #41: a look-alike pair and a rude name
+  const move = (from, to) => { saved[to.toLowerCase()] = { ...saved[from], name: to }; delete saved[from]; };
+  move('old_two', 'Old_0ne');
+  move('old_three', RUDE_NAME);
+  const { accounts } = setup({ store: createMemoryStore(saved) });
+  assert.equal(accounts.publicView(accounts.login('Old_One', 'pass').account).mustRename, undefined);
+  assert.equal(accounts.publicView(accounts.login('Old_0ne', 'pass').account).mustRename, undefined);
+  const rude = accounts.login(RUDE_NAME, 'pass').account;
+  assert.equal(accounts.publicView(rude).mustRename, true);
+  rejects(() => accounts.signup('0ld_One', 'pass'), 'NAME_TAKEN');
+  assert.equal(accounts.rename(rude, 'New_Name').name, 'New_Name');
+  assert.equal(accounts.publicView(rude).mustRename, undefined);
+  assert.equal(accounts.login('New_Name', 'pass').account, rude);
 });

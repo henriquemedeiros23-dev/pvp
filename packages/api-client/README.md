@@ -2,7 +2,7 @@
 
 ## What it does
 
-Talks to the game server's account and shop API (sign up, log in, who am I, buy, equip) and remembers the login token, with short friendly error messages. Plain ES module with no dependencies, so it works in Node and directly in the browser.
+Talks to the game server's account and shop API (sign up, log in, who am I, buy, equip, rename) and remembers the login token, with short friendly error messages. Plain ES module with no dependencies, so it works in Node and directly in the browser.
 
 ## How to use
 
@@ -15,6 +15,7 @@ const { account } = await api.signup('Bob', 'secret');     // or api.login(name,
 const { account: me, online } = await api.me();
 await api.buy('hat', 'crown');       // kind: 'color' | 'hat' | 'face' | 'back' | 'shirt' | 'weapon'
 await api.equip('hat', 'crown');     // each resolves { account }
+await api.rename('Boss_Kid');        // { account }; a refused name throws with a kid-friendly message
 api.logout();                         // forgets the token on this device
 
 try { await api.buy('weapon', 'icesword'); }

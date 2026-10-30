@@ -17,6 +17,7 @@
     "@pvp/arena": "*",
     "@pvp/collision": "*",
     "@pvp/game-rules": "*",
+    "@pvp/name-filter": "*",
     "@pvp/net-protocol": "*",
     "@pvp/seeded-random": "*",
     "@pvp/world-gen": "*"

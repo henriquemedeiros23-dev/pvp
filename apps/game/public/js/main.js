@@ -89,6 +89,7 @@ async function refresh() {
 // ------------------------------------------------------------ login
 function goLogin(message = '') {
   account = null;
+  closeRename();
   $('loginError').textContent = message;
   show('login');
 }
@@ -123,6 +124,8 @@ function showMenu(message = '', { refresh: doRefresh = true } = {}) {
   msg.classList.toggle('hidden', !message);
   show('menu');
   preview();
+  // A name saved before #41 that would not be allowed today: ask for a new one.
+  if (account?.mustRename && $('renamePanel').classList.contains('hidden')) openRename("You can't use that name. Please pick a new name.");
   if (doRefresh) refresh().catch(e => handleError(e));
 }
 
@@ -130,7 +133,40 @@ setInterval(() => {
   if (visible('menu') && !document.hidden && !leaving) refresh().catch(e => handleError(e));
 }, ONLINE_REFRESH_MS);
 
-$('btnShop').addEventListener('click', () => { $('shopError').textContent = ''; show('shop'); renderShop(); });
+$('btnShop').addEventListener('click', () => { closeRename(); $('shopError').textContent = ''; show('shop'); renderShop(); });
+
+// ------------------------------------------------------------ change your name (#41)
+// The ✏️ next to the name opens a small panel. The server checks the name (@pvp/name-filter in accounts-shop):
+// no bad words, nobody has it or a look-alike of it. A "no" shows the message in red and keeps the panel open.
+function openRename(message = '') {
+  $('renameInput').value = account ? account.name : '';
+  $('renameError').textContent = message;
+  $('renamePanel').classList.remove('hidden');
+  $('renameInput').focus();
+  $('renameInput').select();
+}
+function closeRename() {
+  $('renamePanel').classList.add('hidden');
+  $('renameError').textContent = '';
+}
+$('btnRename').addEventListener('click', () => ($('renamePanel').classList.contains('hidden') ? openRename() : closeRename()));
+$('btnRenameCancel').addEventListener('click', closeRename);
+$('renameInput').addEventListener('keydown', e => { if (e.key === 'Escape') closeRename(); });
+$('renamePanel').addEventListener('submit', async e => {
+  e.preventDefault();
+  if (busy) return;
+  busy = true;
+  $('renameError').textContent = '';
+  try {
+    const res = await api.rename($('renameInput').value);
+    setAccount(res.account);
+    closeRename();
+  } catch (err) {
+    handleError(err, $('renameError'));
+  } finally {
+    busy = false;
+  }
+});
 $('btnLogout').addEventListener('click', () => { api.logout(); goLogin(); });
 
 $('btnJoin').addEventListener('click', async () => {

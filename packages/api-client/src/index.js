@@ -104,6 +104,8 @@ export function createApiClient({ baseUrl = '', fetch: fetchFn, storage, tokenKe
     buy: (kind, id) => post('/api/buy', { kind, id }, true),
     /** Wear a skin item you own. Resolves { account }. */
     equip: (kind, id) => post('/api/equip', { kind, id }, true),
+    /** Change your name (#41). The server checks it (no bad words, nobody has it). Resolves { account }. */
+    rename: name => post('/api/rename', { name: String(name ?? '').trim() }, true),
     /** Forget the token on this device (no server call). */
     logout() { store.remove(tokenKey); },
   };

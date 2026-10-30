@@ -103,7 +103,7 @@ test('practice file: no server, no login; join, walk, open a chest for +3 coins'
     await page.click('#btnRename');
     await page.fill('#renameInput', 'x');
     await page.press('#renameInput', 'Enter');
-    await page.waitForFunction(() => /3 to 16/.test(document.querySelector('.practice-name-form .error').textContent));
+    await page.waitForFunction(() => /3 to 16/.test(document.getElementById('renameError').textContent));
     await page.fill('#renameInput', 'Boss_Kid');
     await page.press('#renameInput', 'Enter');
     await page.waitForFunction(() => document.getElementById('menuName').textContent === 'Boss_Kid');

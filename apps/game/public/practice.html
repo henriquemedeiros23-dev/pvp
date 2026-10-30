@@ -27,6 +27,7 @@
         "@pvp/island-scene": "/packages/island-scene/src/index.js",
         "@pvp/touch-controls": "/packages/touch-controls/src/index.js",
         "@pvp/net-protocol": "/packages/net-protocol/src/index.js",
+        "@pvp/name-filter": "/packages/name-filter/src/index.js",
         "@pvp/arena": "/packages/arena/src/index.js",
         "@pvp/accounts-shop/browser": "/packages/accounts-shop/src/browser.js",
         "@pvp/local-server": "/packages/local-server/src/index.js"
@@ -54,9 +55,22 @@
   <!-- Main menu -->
   <section id="menu" class="screen hidden">
     <header class="topbar">
-      <div class="who"><span id="menuName"></span></div>
+      <div class="who">
+        <span id="menuName"></span>
+        <!-- Change your name (#41): the server says no to bad words and to names someone already has -->
+        <button id="btnRename" class="rename-btn" title="Change your name" aria-label="Change your name">✏️</button>
+      </div>
       <div class="coins"><span class="coin"></span><span id="menuCoins">0</span></div>
     </header>
+    <form id="renamePanel" class="rename-panel hidden" autocomplete="off">
+      <label for="renameInput">New name</label>
+      <input id="renameInput" maxlength="16" placeholder="New name" autocomplete="off" spellcheck="false">
+      <div class="row">
+        <button id="btnRenameOk" type="submit" class="big">OK</button>
+        <button id="btnRenameCancel" type="button" class="big alt">Cancel</button>
+      </div>
+      <p id="renameError" class="error"></p>
+    </form>
     <div class="menu-body">
       <h1 class="logo small">PvP <span>ISLAND</span></h1>
       <div id="menuMessage" class="message hidden"></div>

@@ -13,6 +13,7 @@
     "test": "node --test"
   },
   "dependencies": {
-    "@pvp/game-rules": "1.0.0"
+    "@pvp/game-rules": "1.0.0",
+    "@pvp/name-filter": "1.0.0"
   }
 }
