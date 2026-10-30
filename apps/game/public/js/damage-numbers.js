@@ -1,11 +1,11 @@
 // Damage numbers above heads (#33): "-15" floats up and fades out over a player's head for 2 seconds.
 // Glue only: what to show and how it moves come from @pvp/hud-model (damageNumber, damageFloat).
+// They start just ABOVE the name bar (#54): damageStartHeight(distance), since the bar grows with distance.
 // Cheap on phones: a small pool of HTML labels that are reused, moved with one transform each frame.
 import * as THREE from 'three';
-import { damageNumber, damageFloat } from '@pvp/hud-model';
+import { damageNumber, damageFloat, damageStartHeight } from '@pvp/hud-model';
 
 const POOL_SIZE = 16;     // at most this many numbers at once (the oldest one is reused)
-const HEAD_Y = 2.55;      // meters above the feet: just over the name tag
 const SPREAD = [0, 28, -28, 14, -14]; // side steps (px), so quick hits on one player do not sit on top of each other
 
 export class DamageNumbers {
@@ -54,11 +54,12 @@ export class DamageNumbers {
       if (f.done) { n.live = false; n.el.hidden = true; continue; }
       const p = where(n.id);
       if (p) { n.x = p.x; n.y = p.y; n.z = p.z; }
-      const v = this.v.set(n.x, n.y + HEAD_Y + f.rise, n.z).project(camera);
+      const startY = damageStartHeight(camera.position.distanceTo(this.v.set(n.x, n.y, n.z))); // over the name bar
+      const v = this.v.set(n.x, n.y + startY + f.rise, n.z).project(camera);
       if (v.z > 1 || v.z < -1) { n.el.hidden = true; continue; } // behind the camera
       n.el.hidden = false;
       const sx = (v.x + 1) / 2 * width, sy = (1 - v.y) / 2 * height;
-      n.el.style.transform = `translate(${sx.toFixed(1)}px, ${sy.toFixed(1)}px) translate(-50%, -50%) translateX(${n.side}px) scale(${f.scale.toFixed(3)})`;
+      n.el.style.transform = `translate(${sx.toFixed(1)}px, ${sy.toFixed(1)}px) translate(-50%, -100%) translateX(${n.side}px) scale(${f.scale.toFixed(3)})`; // bottom on the point: all of it above the bar
       n.el.style.opacity = f.opacity.toFixed(3);
     }
   }

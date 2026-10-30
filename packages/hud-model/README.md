@@ -2,7 +2,7 @@
 
 ## What it does
 
-Pure functions that turn the player's inventory (the server's `inv` message) and health into what the in-game HUD shows (the boss's drawing, #24): a big **Durability** bar for the weapon you are holding, the **H.P** bar with its percent, always all weapon slots (empty ones too), which slot a key picks, the small **Shield** pill for the shield on your other arm (#26), the "Your Shootbm broke!" text, and the **Healing Potion button** with its count and drinking progress ring (#28), the **"Charging 1.4s"** text after a shot (#35), the **damage numbers** above heads (#33) and the **coin icon** from the boss's drawing (#29). The game only draws the result. Plain ES module, works in Node and directly in the browser (with an import map for `@pvp/game-rules`).
+Pure functions that turn the player's inventory (the server's `inv` message) and health into what the in-game HUD shows (the boss's drawing, #24): a big **Durability** bar for the weapon you are holding, the **H.P** bar with its percent, always all weapon slots (empty ones too), which slot a key picks, the small **Shield** pill for the shield on your other arm (#26), the "Your Shootbm broke!" text, and the **Healing Potion button** with its count and drinking progress ring (#28), the **"Charging 1.4s"** text after a shot (#35), the **damage numbers** above heads (#33), the **name bar** above every other player (#54) and the **coin icon** from the boss's drawing (#29). The game only draws the result. Plain ES module, works in Node and directly in the browser (with an import map for `@pvp/game-rules`).
 
 ## How to use
 
@@ -133,6 +133,22 @@ const v = aimView(weaponId, { ...state, blend: amount });
 //   cameraDistance, shoulder (camera multipliers, AIM_CAMERA), crosshairScale (1 .. 0.6), scope, scopeOpacity }
 camera.fov = zoomedFov(70, v.zoom);                 // 2 = things look twice as big
 aimButtonView(input.aim, { paused: !v.aiming });    // { on, paused, icon: '🎯', label: 'AIM' / 'AIM ON', title }
+```
+
+**Name bar** (`src/namebar.js`, #54): a small dark pill with the player's name in bold white and the H.P bar under it.
+Pure layout and colors; `createNameBar` in `@pvp/stickman-3d` draws it on a canvas (user names: canvas text only).
+
+```js
+import { nameBarView, nameBarFit, damageStartHeight, NAME_BAR, NAME_BAR_COLORS } from '@pvp/hud-model';
+
+const v = nameBarView('Ace', 45, 100, { measure: bar.measure }); // measure: real text width (else a guess)
+// { text: 'Ace', hp: 45, percent: 45, level: 'mid' (green > 60 %, yellow > 30 %, red), width: 76, height: 44,
+//   pixelRatio: 2, pill: { x, y, w, h, r }, textX, textY, hpBar: { x, y, w, h, r, fill }, colors: { …, hp: '#ffd23f' },
+//   key: 'Ace|45/100' }  // redraw the canvas only when key changes
+nameBarFit(cameraDistance);
+// { visible, scale, y: 2.1, worldHeight, top }: same size closer than 4 m, grows with distance (stays readable on
+// screen) up to 6x, hidden beyond 60 m (NAME_BAR.hideDistance)
+damageStartHeight(cameraDistance); // where damage numbers start: just above the bar's top (meters above the feet)
 ```
 
 ## Determinism

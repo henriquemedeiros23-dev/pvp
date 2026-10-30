@@ -2,7 +2,7 @@
 
 ## What it does
 
-A three.js stickman character: body in a skin color or pattern (gold, zebra stripes, rainbow), outfits (hats like the Demon Horns, face items, capes, shirts), a weapon in the right hand, a shield on the left arm (raised in front or lowered), frozen and shocked looks, and walk / crouch / slide / jump / aim / swing animation. Weapon models follow the boss's cards. The animation math is a pure function, `computePose()`, that can be tested without three.js.
+A three.js stickman character: body in a skin color or pattern (gold, zebra stripes, rainbow), outfits (hats like the Demon Horns, face items, capes, shirts), a weapon in the right hand, a shield on the left arm (raised in front or lowered), frozen and shocked looks, a name bar sprite above the head (#54), and walk / crouch / slide / jump / aim / swing animation. Weapon models follow the boss's cards. The animation math is a pure function, `computePose()`, that can be tested without three.js.
 
 ## How to use
 
@@ -57,8 +57,25 @@ Pure pose: `computePose(state, prev, dt)` with `state = { speed, crouch, slide, 
 </script>
 ```
 
+**Name bar** (#54): a sprite that always faces the camera, with the player's name in a dark pill and the H.P bar under it.
+It draws a "view" (layout and colors, e.g. from `nameBarView` in `@pvp/hud-model`) on a 2x canvas (crisp on retina), only
+when `view.key` changes (cheap on phones). Names are drawn as canvas text only, never as HTML.
+
+```js
+import { createNameBar } from '@pvp/stickman-3d';
+import { nameBarView, nameBarFit, NAME_BAR } from '@pvp/hud-model';
+
+const bar = createNameBar({ metersPerPx: NAME_BAR.metersPerPx }); // opts.createCanvas for tests (no DOM in Node: draws nothing)
+sm.root.add(bar.object);                                          // its bottom middle sits at its position
+bar.draw(nameBarView(name, hp, 100, { measure: bar.measure }));   // true if it redrew
+bar.fit(nameBarFit(camera.position.distanceTo(sm.root.position))); // every frame: size by distance, hide when far
+bar.dispose();
+```
+
+A wall between the camera and the player hides the bar for free (depth test on, no ray casts). `drawNameBar(ctx, view)` is the plain canvas drawing.
+
 Nothing touches `document` at import time. The zebra stripes canvas texture is made the first time a zebra skin is built, and only if a DOM canvas exists; in Node zebra falls back to a plain material.
 
 ## Determinism
 
-Partly deterministic. `computePose()`, `rainbowHue()` and `weaponModelKind()` are pure: same input, same output, no randomness, time is passed in (also to the weapons' `userData.update(time)`, so the lightning and glow look the same for the same time). The three.js objects built from them are deterministic too, but how they look on screen depends on the renderer (graphics).
+Partly deterministic. `computePose()`, `rainbowHue()` and `weaponModelKind()` are pure (the name bar's layout comes from pure `nameBarView` in `@pvp/hud-model`): same input, same output, no randomness, time is passed in (also to the weapons' `userData.update(time)`, so the lightning and glow look the same for the same time). The three.js objects built from them are deterministic too, but how they look on screen depends on the renderer (graphics).

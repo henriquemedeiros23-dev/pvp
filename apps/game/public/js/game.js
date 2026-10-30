@@ -4,7 +4,7 @@ import * as THREE from 'three';
 import * as C from '@pvp/game-rules';
 import { generateIsland } from '@pvp/world-gen';
 import { movePlayer, rayBoxes, rayCylinder } from '@pvp/collision';
-import { Stickman, buildWeapon, buildPotion, holdPotion, buildBomb, buildBombArea } from '@pvp/stickman-3d';
+import { Stickman, buildWeapon, buildPotion, holdPotion, buildBomb, buildBombArea, createNameBar } from '@pvp/stickman-3d';
 import { createIslandScene } from '@pvp/island-scene';
 import { createInputState, attachTouchControls, attachDesktopControls, isTouchDevice } from '@pvp/touch-controls';
 import { decodeServerMessage, encodeClient, unpackSnapshotPlayer, makeFlags, readFlags } from '@pvp/net-protocol';
@@ -12,7 +12,7 @@ import { slotBar, heldDurabilityView, healthView, pickSlot, brokeMessage, shield
 import { potionView, drinkState, drinkMessage, POTION_ICON_SVG, bombView } from '@pvp/hud-model';
 import { chargeView, chargeStarts, hitMarker } from '@pvp/hud-model';
 import { aimView, aimBlend, aimButtonView, aimHandKey, zoomedFov } from '@pvp/hud-model';
-import { coinsToast } from '@pvp/hud-model';
+import { coinsToast, nameBarView, nameBarFit, NAME_BAR } from '@pvp/hud-model';
 import { DamageNumbers } from './damage-numbers.js';
 import { GameSounds } from './game-sounds.js';
 
@@ -44,30 +44,6 @@ function rayWorld(world, ox, oy, oz, dx, dy, dz, maxDist) {
 // Distance along a unit ray to a standing player, or Infinity.
 function rayPlayer(ox, oy, oz, dx, dy, dz, px, py, pz, height) {
   return rayCylinder(v3(ox, oy, oz), v3(dx, dy, dz), { x: px, y: py, z: pz, height, radius: HIT_RADIUS });
-}
-
-function nameTag(name) {
-  const c = document.createElement('canvas');
-  c.width = 256; c.height = 72;
-  const tex = new THREE.CanvasTexture(c);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false }));
-  sprite.scale.set(1.8, 0.5, 1);
-  sprite.position.y = 2.35;
-  sprite.renderOrder = 5;
-  sprite.userData.draw = hp => {
-    const g = c.getContext('2d');
-    g.clearRect(0, 0, 256, 72);
-    g.font = 'bold 28px system-ui, sans-serif';
-    g.textAlign = 'center';
-    g.lineWidth = 6; g.strokeStyle = 'rgba(0,0,0,0.7)'; g.strokeText(name, 128, 30);
-    g.fillStyle = '#fff'; g.fillText(name, 128, 30);
-    g.fillStyle = 'rgba(0,0,0,0.6)'; g.fillRect(48, 44, 160, 16);
-    g.fillStyle = hp > 35 ? '#45e070' : '#ff5a4a'; g.fillRect(50, 46, 156 * Math.max(0, hp) / 100, 12);
-    tex.needsUpdate = true;
-  };
-  sprite.userData.draw(100);
-  return sprite;
 }
 
 export class Game {
@@ -315,6 +291,11 @@ export class Game {
       chargeHint: play && !$('charge').classList.contains('hidden') ? $('chargeHint').textContent : '', // '25%' while charging (#38)
       damageNumbers: play ? this.dmgNums.shown() : [],
       sound: this.sounds.player?.stats() ?? null, // #55
+      // the name bars above the other players (#54): what they show and whether they are drawn now
+      nameBars: play ? [...this.remotes].map(([id, r]) => ({
+        id, text: r.tag.view?.text ?? '', hp: r.tag.view?.hp ?? null, level: r.tag.view?.level ?? null,
+        visible: r.tag.object.visible, height: +r.tag.object.scale.y.toFixed(3), draws: r.tag.draws, // height in meters
+      })) : [],
       hitmark: this.lastHitmark ?? null, // the last hit marker's kind: 'hit' | 'head' | 'ko' | 'blocked' (#45)
     };
   }
@@ -434,14 +415,15 @@ export class Game {
         const info = this.infos.get(id);
         if (!info) continue;
         const sm = new Stickman(info.skin);
-        const tag = nameTag(info.name);
-        sm.root.add(tag);
+        // the name bar above the head (#54): only on OTHER players, never on your own
+        const tag = createNameBar({ metersPerPx: NAME_BAR.metersPerPx });
+        sm.root.add(tag.object);
         const bubble = new THREE.Mesh(new THREE.SphereGeometry(1.2, 16, 12), new THREE.MeshBasicMaterial({ color: '#7fd7ff', transparent: true, opacity: 0.18, depthWrite: false }));
         bubble.position.y = 0.95;
         sm.root.add(bubble);
         sm.root.position.set(x, y, z);
         this.scene.add(sm.root);
-        r = { sm, tag, bubble, hp: -1, tx: x, ty: y, tz: z, try: ry, pitch, flags, lastX: x, lastZ: z, speed: 0 };
+        r = { sm, tag, name: info.name, bubble, hp: -1, tx: x, ty: y, tz: z, try: ry, pitch, flags, lastX: x, lastZ: z, speed: 0 };
         this.remotes.set(id, r);
       }
       r.tx = x; r.ty = y; r.tz = z; r.try = ry; r.pitch = pitch; r.flags = flags;
@@ -450,7 +432,7 @@ export class Game {
       r.sm.setShield(shield || null);
       r.sm.shieldUp = shieldUp;
       r.sm.setStatus({ frozen, shocked });
-      if (hp !== r.hp) { r.hp = hp; r.tag.userData.draw(hp); }
+      if (hp !== r.hp) { r.hp = hp; r.tag.draw(nameBarView(r.name, hp, C.MAX_HP, { measure: r.tag.measure })); } // redraws only when it changed
     }
     for (const id of [...this.remotes.keys()]) if (!seen.has(id)) this.removeRemote(id);
   }
@@ -459,6 +441,7 @@ export class Game {
     const r = this.remotes.get(id);
     if (!r) return;
     this.scene.remove(r.sm.root);
+    r.tag.dispose();
     r.sm.dispose();
     this.remotes.delete(id);
   }
@@ -905,8 +888,18 @@ export class Game {
     else this.updateMenu(dt);
     this.updateWorld(dt);
     this.sounds.frame(dt);
-    if (this.mode === 'play') this.dmgNums.update(this.camera, innerWidth, innerHeight, performance.now(), id => this.playerPos(id));
+    if (this.mode === 'play') {
+      this.updateNameBars();
+      this.dmgNums.update(this.camera, innerWidth, innerHeight, performance.now(), id => this.playerPos(id));
+    }
     this.renderer.render(this.scene, this.camera);
+  }
+
+  // Name bars (#54): each frame, size by distance from the camera (readable far away, not huge up close),
+  // hidden beyond NAME_BAR.hideDistance. A wall in front hides it by itself (depth test, no ray casts).
+  updateNameBars() {
+    const cam = this.camera.position;
+    for (const r of this.remotes.values()) r.tag.fit(nameBarFit(cam.distanceTo(r.sm.root.position)));
   }
 
   updateMenu(dt) {

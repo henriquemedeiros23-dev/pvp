@@ -15,6 +15,8 @@ export { AIM_TIME_MS, AIM_CAMERA, AIM_BUTTON, aimBlend, aimView, aimButtonView, 
 export {
   chargeView, chargeStarts, damageNumber, damageFloat, hitMarker, HEADSHOT_MARKER_SCALE, READY_FLASH_MS, DAMAGE_NUMBER_MS, DAMAGE_NUMBER_RISE, DAMAGE_COLORS,
 } from './feedback.js';
+// The name bar above every other player (#54): layout, colors, size by distance; damage numbers start above it.
+export { NAME_BAR, NAME_BAR_COLORS, HP_LEVELS, nameBarText, nameBarView, nameBarFit, damageStartHeight } from './namebar.js';
 
 /** One emoji per weapon id, for slots, the kill feed and the shop (bombs too: they can knock out). */
 export const WEAPON_ICONS = Object.freeze({

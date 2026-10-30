@@ -66,10 +66,10 @@ and `@pvp/file-backup` need no other package (the last three keep the online ser
 | `@pvp/name-filter` | Is this player name OK? 3-16 letters, numbers or _, no swear words or slurs (tricky spellings too, no false alarms on normal words), and a look-alike key so nobody copies a name. | both | fully: pure functions and a fixed word list | 12 |
 | `@pvp/arena` | The fight itself: players, chests, loot, weapons, shields, shock and freeze, drinking potions, aiming, thrown bombs, damage, knockouts, damage numbers for nearby players. | both | fully: time and seeded random are passed in (replay tests) | 134 |
 | `@pvp/shop-catalog` | Turns the rules and an account into the cards the shop screen shows, and the Inventory screen: spaces (at least 2 of everything), the fast bar, the extras bar and the trash's "are you sure?" words. | both | fully: pure functions of their inputs | 24 |
-| `@pvp/hud-model` | Turns your inventory and health into the in-game HUD: Durability bar of the held weapon, H.P bar, 5 slots, shield pill, potion button with drinking ring, "Charging 1.4s" after a shot, damage numbers above heads, aiming (zoom, scope ring, AIM / AIM ON button), bomb buttons, the coin icon from the boss's drawing. | both | fully: pure functions of their inputs (time passed in) | 42 |
+| `@pvp/hud-model` | Turns your inventory and health into the in-game HUD: Durability bar of the held weapon, H.P bar, 5 slots, shield pill, potion button with drinking ring, "Charging 1.4s" after a shot, damage numbers above heads, the name bar above other players (pill, H.P colors, size by distance), aiming (zoom, scope ring, AIM / AIM ON button), bomb buttons, the coin icon from the boss's drawing. | both | fully: pure functions of their inputs (time passed in) | 47 |
 | `@pvp/api-client` | Talks to the server's account, shop, rename and Inventory/fast bar/extras bar/trash API, keeps the login token and the last name used. | both | fully: fetch and storage are passed in | 15 |
 | `@pvp/account-form` | Checks the Account screen: log in, and create an account with the password typed twice ("The passwords are not the same. Try again."). | both | fully: pure functions of the typed text | 6 |
-| `@pvp/stickman-3d` | A three.js stickman with skins, outfits, the boss's weapons and shields, the Healing Potion flask, bombs and their red area, frozen/shocked looks and animation. | browser (pose math also in Node) | partly: pose math is pure, how it looks depends on the renderer | 27 |
+| `@pvp/stickman-3d` | A three.js stickman with skins, outfits, the boss's weapons and shields, the Healing Potion flask, bombs and their red area, frozen/shocked looks, the name bar above the head, and animation. | browser (pose math also in Node) | partly: pose math is pure, how it looks depends on the renderer | 30 |
 | `@pvp/island-scene` | The 3D island: sky with clouds, warm sun, green grass ground with dirt paths, grass tufts, flowers, bushes, rocks, beach with wet sand, waves, palms, ruins and chests, and gold coins popping out of opened chests. A lighter version for phones. | browser (also builds in Node) | partly: all placement and colors from a seed, time passed in, how it looks depends on the renderer | 19 |
 | `@pvp/local-server` | The game server inside the page (practice mode): arena, accounts in localStorage, tick, fake WebSocket, bots. | browser (also Node) | partly: seeded arena and bots, time and timer passed in; tokens and localStorage are real | 24 |
 | `@pvp/leaderboard` | The ranking: top 50 players by knockouts (a tie: who got there first), your own place even outside the top, 🥇🥈🥉 rows for the screen. | both | fully: pure functions (the knockout time is passed in) | 8 |
@@ -265,7 +265,7 @@ and `@pvp/file-backup` need no other package (the last three keep the online ser
 
 ## `@pvp/hud-model`
 
-**Purpose:** pure functions that turn the `inv` message and your health into what the in-game HUD shows (the boss's drawing): the Durability bar of the weapon you hold, the H.P bar with its percent, always all 5 weapon slots (empty ones too), the small Shield pill, which slot a key picks, the "Charging 1.4s" text under the crosshair, the damage numbers above heads, and the coin icon (the boss's drawing: almost square, cut corners, a "P", sparkle lines).
+**Purpose:** pure functions that turn the `inv` message and your health into what the in-game HUD shows (the boss's drawing): the Durability bar of the weapon you hold, the H.P bar with its percent, always all 5 weapon slots (empty ones too), the small Shield pill, which slot a key picks, the "Charging 1.4s" text under the crosshair, the damage numbers above heads (they start above the name bar), the name bar above every other player (#54), and the coin icon (the boss's drawing: almost square, cut corners, a "P", sparkle lines).
 
 | Export | Example |
 |---|---|
@@ -284,6 +284,7 @@ and `@pvp/file-backup` need no other package (the last three keep the online ser
 | `aimButtonView(on, { paused })`, `aimHandKey(inv)` | `aimButtonView(true).label; // 'AIM ON' (#40); aimHandKey(inv) // '1:shootbm': aiming switches off when it changes` |
 | `chargeStarts(inv, now, prev)` | `chargeStarts({ weapons: ['gun', 'shootbm'], charge: [0, 2700] }, now); // per slot lastFireAt for chargeView (#38)` |
 | `damageNumber(msg)` / `damageFloat(age)` | `damageNumber({ t: 'dmg', id: 3, amount: 15 }).text; // '-15'; damageFloat(1000) // { rise, opacity, scale, done }` |
+| `nameBarView(name, hp, max, { measure })`, `nameBarFit(dist)`, `damageStartHeight(dist)` | `nameBarView('Ace', 45).level; // 'mid' (yellow); nameBarFit(70).visible // false: hidden past 60 m (#54)` |
 | `hitMarker(msg)`, `HEADSHOT_MARKER_SCALE` | `hitMarker({ t: 'hitmark', dead: false, head: true }); // { kind: 'head', scale: 1.6, color: orange } (#45; a headshot number: '-5' badge 'HEADSHOT')` |
 | `COIN_ICON_SVG` / `coinIconSvg(opts)` / `coinIconDataUrl()` | `el.innerHTML = COIN_ICON_SVG; coinIconSvg({ label: 'PvP', sparkle: false }); // CSS: url("${coinIconDataUrl()}")` |
 | `coinsToast(amount)` | `coinsToast(3).text; // '+3 coins'` |
@@ -328,7 +329,7 @@ and `@pvp/file-backup` need no other package (the last three keep the online ser
 
 ## `@pvp/stickman-3d`
 
-**Purpose:** a three.js stickman: skin colors and patterns, outfits, a weapon in hand (models from the boss's cards), a shield on the left arm, frozen / shocked looks, and walk / crouch / slide / jump / aim / swing / shield-up animation.
+**Purpose:** a three.js stickman: skin colors and patterns, outfits, a weapon in hand (models from the boss's cards), a shield on the left arm, frozen / shocked looks, the name bar above the head, and walk / crouch / slide / jump / aim / swing / shield-up animation.
 
 | Export | Example |
 |---|---|
@@ -339,6 +340,7 @@ and `@pvp/file-backup` need no other package (the last three keep the online ser
 | `buildWeapon(id)` | `const loot = buildWeapon('supersword'); loot.userData.update?.(time); // a THREE.Group` |
 | `buildPotion()` / `holdPotion(sm, on)` | `scene.add(buildPotion()); holdPotion(sm, true); // drinking` |
 | `buildBomb(id)` / `buildBombArea(side)` | `scene.add(buildBomb('legendarybomb'), buildBombArea(5)); // gold bomb, red 5x5 square` |
+| `createNameBar(opts)` / `drawNameBar(ctx, view)` | `const bar = createNameBar(); sm.root.add(bar.object); bar.draw(nameBarView(name, hp)); bar.fit(nameBarFit(d)); // #54` |
 | `computePose(state, prev, dt)` | `const pose = computePose({ speed: 3, time }, null, dt);` |
 | `weaponModelKind(id)` | `weaponModelKind('shootbm'); // 'special:shootbm'` |
 | `disposeObject(obj)` | `disposeObject(loot); // free geometries and materials` |
