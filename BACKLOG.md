@@ -90,6 +90,7 @@ The live list is on GitHub Issues: https://github.com/henriquemedeiros23-dev/pvp
 | 53 | ✅ | **Trash in the Inventory** | A small 🗑️ button: tap it, tap an item, confirm to destroy it. |
 | 54 | ✅ | **Name bar above players** | A clear small bar with the name (and HP) above every player. |
 | 55 | ✅ | **Sounds (no music)** | Shots, swords, bombs, chests, coins and headshots, with volume and mute. No music. |
+| 56 | 🔲 | **Smaller name bars** | The name bars above players are a bit too big. |
 
 ## Later ideas
 - ~~Sounds and music~~ (done in #55, no music)
