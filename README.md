@@ -31,6 +31,21 @@ All settings are in the table at the end of DEPLOY.md.
 - `npm run load-check`: a fake full island (125 players) and how much work and data that is.
 - `npm run admin:reset-accounts -- --yes`: the launch-day reset (wipes ALL accounts after a backup). Only when the boss asks.
 
+### Free: the family laptop as the server (Cloudflare Tunnel)
+
+[docs/SERVIDOR-LAPTOP.md](docs/SERVIDOR-LAPTOP.md) is a simple guide **in Spanish** for a parent (Windows and Mac):
+install Node.js and Git, download the game, `npm run serve`, and share it with a free Cloudflare Tunnel
+(`cloudflared tunnel --url http://localhost:3000` for a quick link, or a fixed address with a Cloudflare account).
+
+- `npm run serve` (`scripts/serve.mjs`, works on Windows and Mac): `NODE_ENV=production`, `PORT=3000`,
+  `TRUST_PROXY=cloudflare` and the accounts in `<home>/pvp-island-data/accounts.json` (outside the game folder,
+  so `git pull` or downloading the game again never touches them). Refuses to start with `PVP_TEST_HOOKS`.
+  `npm start` stays the plain developer start.
+- `TRUST_PROXY=cloudflare`: cloudflared connects from the laptop itself (127.0.0.1), so the server believes
+  `CF-Connecting-IP` (and `X-Forwarded-Proto` / `CF-Visitor` for https) **only** from loopback connections. Every
+  player then gets their own limits; phones on the Wi-Fi keep their own address and cannot fake the header.
+- `npm run admin:reset-laptop -- --yes`: the launch-day reset for the laptop's accounts file.
+
 ### Practice mode (one file, no server)
 
 `npm run build:practice` makes `dist/practice/pvp-island.html`: the whole game in ONE html file that runs

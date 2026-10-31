@@ -4,15 +4,15 @@
 
 Safety helpers for a small Node web server that is put online: the security headers (a Content-Security-Policy
 that allows only the site itself, cdn.jsdelivr.net and the page's own inline scripts by hash; no framing; nosniff;
-no referrer), the real client IP and https behind a host's proxy (only when you say you trust it), safe static
-file paths (no `../`), and the CSP hashes of inline `<script>` blocks (like an import map). Node only (uses `node:crypto` and `node:path`).
+no referrer), the real client IP and https behind a host's proxy or a Cloudflare Tunnel on the same computer (only when you say you trust it), safe static
+file paths (no `../`), and the CSP hashes of inline `<script>` blocks (like an import map). Node only (uses `node:crypto`, `node:net` and `node:path`).
 
 ## How to use
 
 ```js
 import { securityHeaders, inlineScriptHashes, clientIp, isHttps, parseTrustProxy, safeJoin } from '@pvp/http-guard';
 
-const trustProxy = parseTrustProxy(process.env.TRUST_PROXY); // '1' on Render/Railway, unset at home
+const trustProxy = parseTrustProxy(process.env.TRUST_PROXY); // '1' on Render/Railway, 'cloudflare' behind cloudflared, unset at home
 
 http.createServer((req, res) => {
   const ip = clientIp(req, { trustProxy });                    // X-Forwarded-For only counts when trusted
@@ -27,6 +27,11 @@ http.createServer((req, res) => {
   res.end(html);
 });
 ```
+
+**Cloudflare Tunnel** (`TRUST_PROXY=cloudflare`, the constant `CLOUDFLARE`): cloudflared runs on the same computer, so
+every visitor arrives from 127.0.0.1. Then `clientIp` uses the `CF-Connecting-IP` header (if it is a real IP) and
+`isHttps` uses `X-Forwarded-Proto` or `CF-Visitor`, but **only** when the socket peer is loopback (`isLoopback(ip)`).
+Visitors on the local Wi-Fi keep their own address and cannot fake the header; `X-Forwarded-For` is ignored in this mode.
 
 Also: `contentSecurityPolicy(opts)` (just the CSP text), `cspHash(text)`, `safeHost(host)` and `DEFAULT_SCRIPT_HOSTS`.
 

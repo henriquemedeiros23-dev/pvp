@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { safeHost, contentSecurityPolicy, securityHeaders, cspHash, inlineScriptHashes, parseTrustProxy, clientIp, isHttps, safeJoin } from '../src/index.js';
+import { safeHost, contentSecurityPolicy, securityHeaders, cspHash, inlineScriptHashes, parseTrustProxy, clientIp, isHttps, safeJoin, isLoopback, CLOUDFLARE } from '../src/index.js';
 
 test('safeHost: normal hosts pass, header tricks do not', () => {
   assert.equal(safeHost('PvP.onrender.com'), 'pvp.onrender.com');
@@ -65,6 +65,49 @@ test('isHttps: from the socket, or a trusted proxy', () => {
   assert.equal(isHttps(req), false);
   assert.equal(isHttps(req, { trustProxy: 1 }), true);
   assert.equal(isHttps({ socket: { encrypted: true }, headers: {} }), true);
+});
+
+test('parseTrustProxy: cloudflare', () => {
+  assert.equal(parseTrustProxy('cloudflare'), CLOUDFLARE);
+  assert.equal(parseTrustProxy(' Cloudflare '), 'cloudflare');
+  assert.equal(parseTrustProxy('cloudflared'), 'cloudflare');
+  assert.equal(parseTrustProxy('cloud'), 0);
+});
+
+test('isLoopback: only this computer', () => {
+  for (const ip of ['127.0.0.1', '127.1.2.3', '::1', '::ffff:127.0.0.1']) assert.equal(isLoopback(ip), true, ip);
+  for (const ip of ['192.168.1.5', '::ffff:10.0.0.1', '1.1.1.1', 'fe80::1', '', undefined, 'localhost']) assert.equal(isLoopback(ip), false, String(ip));
+});
+
+test('clientIp with cloudflare: CF-Connecting-IP only from the tunnel on this computer', () => {
+  const cf = { trustProxy: 'cloudflare' };
+  const tunnel = (headers, remoteAddress = '127.0.0.1') => ({ socket: { remoteAddress }, headers });
+  // every player through the tunnel gets their own address, not 127.0.0.1
+  assert.equal(clientIp(tunnel({ 'cf-connecting-ip': '203.0.113.7' }), cf), '203.0.113.7');
+  assert.equal(clientIp(tunnel({ 'cf-connecting-ip': '2001:db8::5' }, '::1'), cf), '2001:db8::5');
+  assert.equal(clientIp(tunnel({ 'cf-connecting-ip': '198.51.100.2' }, '::ffff:127.0.0.1'), cf), '198.51.100.2');
+  // X-Forwarded-For is not used in this mode (CF-Connecting-IP is the one Cloudflare sets itself)
+  assert.equal(clientIp(tunnel({ 'x-forwarded-for': '6.6.6.6' }), cf), '127.0.0.1');
+  // the kid playing on the laptop itself (no header): loopback
+  assert.equal(clientIp(tunnel({}), cf), '127.0.0.1');
+  // junk in the header is ignored
+  assert.equal(clientIp(tunnel({ 'cf-connecting-ip': 'evil, 1.2.3.4' }), cf), '127.0.0.1');
+  assert.equal(clientIp(tunnel({ 'cf-connecting-ip': ['9.9.9.9', '8.8.8.8'] }), cf), '9.9.9.9');
+  // a phone on the Wi-Fi cannot fake it: the header is ignored from a non-loopback peer
+  assert.equal(clientIp(tunnel({ 'cf-connecting-ip': '1.2.3.4' }, '192.168.1.20'), cf), '192.168.1.20');
+  // and without the setting the header means nothing
+  assert.equal(clientIp(tunnel({ 'cf-connecting-ip': '1.2.3.4' })), '127.0.0.1');
+  assert.equal(clientIp(tunnel({ 'cf-connecting-ip': '1.2.3.4' }), { trustProxy: 1 }), '127.0.0.1');
+});
+
+test('isHttps with cloudflare: X-Forwarded-Proto or CF-Visitor, only from the tunnel', () => {
+  const cf = { trustProxy: 'cloudflare' };
+  assert.equal(isHttps({ socket: { remoteAddress: '127.0.0.1' }, headers: { 'x-forwarded-proto': 'https' } }, cf), true);
+  assert.equal(isHttps({ socket: { remoteAddress: '::1' }, headers: { 'cf-visitor': '{"scheme":"https"}' } }, cf), true);
+  assert.equal(isHttps({ socket: { remoteAddress: '127.0.0.1' }, headers: { 'cf-visitor': 'not json' } }, cf), false);
+  assert.equal(isHttps({ socket: { remoteAddress: '127.0.0.1' }, headers: {} }, cf), false);
+  assert.equal(isHttps({ socket: { remoteAddress: '192.168.1.20' }, headers: { 'x-forwarded-proto': 'https' } }, cf), false);
+  assert.equal(isHttps({ socket: { remoteAddress: '127.0.0.1' }, headers: { 'cf-visitor': '{"scheme":"https"}' } }, { trustProxy: 1 }), false);
 });
 
 test('safeJoin: stays inside the folder', () => {

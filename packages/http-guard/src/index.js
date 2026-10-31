@@ -2,6 +2,7 @@
 // security headers (Content-Security-Policy and friends), the real client IP behind a host's proxy,
 // whether the page came over https, safe static file paths, and hashes of inline <script> blocks.
 import crypto from 'node:crypto';
+import net from 'node:net';
 import path from 'node:path';
 
 /** Hosts the page may load scripts from, besides itself (three.js in the practice page comes from jsdelivr). */
@@ -80,39 +81,70 @@ const cleanIp = ip => {
   return ip;
 };
 
+/** The TRUST_PROXY value for a Cloudflare Tunnel (cloudflared running on the same computer). */
+export const CLOUDFLARE = 'cloudflare';
+
 /**
  * Read the TRUST_PROXY setting: '' / '0' / 'false' / undefined -> 0 (trust nobody),
- * '1' / 'true' -> 1 proxy (Render, Railway, Fly...), a number n -> n proxies in front.
+ * '1' / 'true' -> 1 proxy (Render, Railway, Fly...), a number n -> n proxies in front,
+ * 'cloudflare' -> 'cloudflare' (a Cloudflare Tunnel on this computer: CF-Connecting-IP is believed,
+ * but only from a loopback peer, see clientIp).
  */
 export function parseTrustProxy(value) {
   if (value === undefined || value === null) return 0;
   const v = String(value).trim().toLowerCase();
   if (v === '' || v === '0' || v === 'false' || v === 'no') return 0;
   if (v === 'true' || v === 'yes') return 1;
+  if (v === CLOUDFLARE || v === 'cloudflared') return CLOUDFLARE;
   const n = Number(v);
   return Number.isInteger(n) && n > 0 ? Math.min(n, 10) : 0;
 }
+
+/** True for this computer's own addresses: 127.x.x.x and ::1 (also written ::ffff:127.0.0.1). */
+export function isLoopback(ip) {
+  ip = cleanIp(ip);
+  if (net.isIPv4(ip)) return ip.startsWith('127.');
+  return ip === '::1' || ip === '0:0:0:0:0:0:0:1';
+}
+
+const firstHeader = v => (Array.isArray(v) ? v[0] : v);
+
+// cloudflared runs on this computer, so its requests come from loopback. Anyone else (the Wi-Fi) is not believed.
+const fromLocalTunnel = req => isLoopback(req?.socket?.remoteAddress);
 
 /**
  * The client's IP address. req: { socket: { remoteAddress }, headers }.
  * trustProxy: how many proxies in front of us (0: X-Forwarded-For is ignored, anyone can fake it).
  * With n proxies the client is the n-th address from the right of X-Forwarded-For.
+ * With 'cloudflare' the CF-Connecting-IP header is used, but only when the connection comes from this
+ * computer (cloudflared) and the header is a real IP; players on the same Wi-Fi keep their own address.
  */
 export function clientIp(req, { trustProxy = 0 } = {}) {
   const direct = cleanIp(req?.socket?.remoteAddress) || 'unknown';
   if (!trustProxy) return direct;
+  if (trustProxy === CLOUDFLARE) {
+    if (!fromLocalTunnel(req)) return direct;
+    const cf = cleanIp(String(firstHeader(req.headers?.['cf-connecting-ip']) ?? ''));
+    return net.isIP(cf) ? cf : direct;
+  }
   const xff = req.headers?.['x-forwarded-for'];
   const list = (Array.isArray(xff) ? xff.join(',') : String(xff ?? '')).split(',').map(cleanIp).filter(Boolean);
   if (!list.length) return direct;
   return list[Math.max(0, list.length - trustProxy)];
 }
 
-/** True when the page came over https (directly, or through a trusted proxy that says X-Forwarded-Proto: https). */
+/**
+ * True when the page came over https (directly, or through a trusted proxy that says X-Forwarded-Proto: https).
+ * With 'cloudflare': only from a loopback peer, by X-Forwarded-Proto: https or CF-Visitor {"scheme":"https"}.
+ */
 export function isHttps(req, { trustProxy = 0 } = {}) {
   if (req?.socket?.encrypted) return true;
   if (!trustProxy) return false;
-  const proto = String(req.headers?.['x-forwarded-proto'] ?? '').split(',')[0].trim().toLowerCase();
-  return proto === 'https';
+  if (trustProxy === CLOUDFLARE && !fromLocalTunnel(req)) return false;
+  const proto = String(firstHeader(req.headers?.['x-forwarded-proto']) ?? '').split(',')[0].trim().toLowerCase();
+  if (proto === 'https') return true;
+  if (trustProxy !== CLOUDFLARE) return false;
+  try { return JSON.parse(String(firstHeader(req.headers?.['cf-visitor']) ?? '')).scheme === 'https'; } catch { return false; }
 }
 
 /**

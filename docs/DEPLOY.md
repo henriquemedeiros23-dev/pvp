@@ -13,6 +13,9 @@ We use **Render** (render.com). The repository already has a file called `render
 everything: how to start the game, the health check, and a small disk where the accounts are saved.
 There is a shorter section for **Railway** at the end, if you like that one better.
 
+> **Free option:** the family laptop can be the server, shared with a free Cloudflare Tunnel. That guide is in
+> Spanish: [SERVIDOR-LAPTOP.md](SERVIDOR-LAPTOP.md) (`npm run serve`). The laptop must stay on while people play.
+
 ---
 
 ## 1. Create the game on Render
@@ -163,7 +166,7 @@ Railway (railway.app) can run the game from the `Dockerfile` in the repository.
 | `PORT` | `3000` | Port for the page, the API and the WebSocket (one address for all). |
 | `DATA_FILE` | `apps/game/data/accounts.json` | The accounts file. **Online: on the persistent disk** (`/var/data/accounts.json` on Render, `/data/accounts.json` in Docker). Saved safely (temp file + rename). Daily backups (`accounts.json.backup-<time>`, last `BACKUPS_TO_KEEP`) are kept next to it. |
 | `NODE_ENV` | (unset) | `production` online. With `PVP_TEST_HOOKS=1` the server refuses to start. |
-| `TRUST_PROXY` | `0` | How many proxies are in front (Render/Railway: `1`). Only then `X-Forwarded-For` / `X-Forwarded-Proto` are believed. If the logs show every player with the same address, try `2`. |
+| `TRUST_PROXY` | `0` | How many proxies are in front (Render/Railway: `1`). Only then `X-Forwarded-For` / `X-Forwarded-Proto` are believed. If the logs show every player with the same address, try `2`. `cloudflare`: a Cloudflare Tunnel (cloudflared) on the same computer; `CF-Connecting-IP` (and `X-Forwarded-Proto` / `CF-Visitor`) are believed only from loopback connections (`npm run serve` sets this). |
 | `MAX_PLAYERS` | `125` (`RULES.MAX_PLAYERS`) | Players in the arena at once; the next one sees "The island is full, try again soon!". |
 | `MAX_CONNECTIONS` | `3 × MAX_PLAYERS` | Game connections in total. |
 | `MAX_CONNECTIONS_PER_IP` | `20` | Game connections from one address (close code 4029). |
@@ -181,6 +184,9 @@ Railway (railway.app) can run the game from the `Dockerfile` in the repository.
   back into their accounts), closes sockets with code 1012, saves the accounts and exits.
 - `npm run admin:reset-accounts -- --yes` (`scripts/reset-accounts.mjs`, uses `DATA_FILE`): backup, empty file,
   and a `accounts.json.reset-requested` note that makes the next server start wipe again.
+- `npm run serve` (`scripts/serve.mjs` + `scripts/laptop-env.mjs`): the laptop start (#57): production, port 3000,
+  `TRUST_PROXY=cloudflare`, accounts in `<home>/pvp-island-data/`; refuses `PVP_TEST_HOOKS`.
+  `npm run admin:reset-laptop -- --yes` resets that file.
 - `npm run load-check` (`scripts/load-check.mjs`, `--players 200 --seconds 20 --json`): the numbers in section 6.
 - Files: `render.yaml` (Render Blueprint, native Node runtime, disk at `/var/data`), `Dockerfile` +
   `.dockerignore` (Node 22 slim, `npm ci --omit=dev --workspace=@pvp/game`, runs as user `node`, HEALTHCHECK on `/healthz`).

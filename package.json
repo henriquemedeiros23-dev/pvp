@@ -9,11 +9,13 @@
   ],
   "scripts": {
     "start": "npm start --workspace=@pvp/game",
+    "serve": "node scripts/serve.mjs",
     "test": "npm run catalog:check && npm test --workspaces --if-present",
     "catalog:check": "node scripts/catalog-check.mjs",
     "test:e2e": "E2E=1 node --test --test-concurrency=1 apps/game/test/e2e/*.test.js",
     "build:practice": "node scripts/build-practice.mjs",
     "admin:reset-accounts": "node scripts/reset-accounts.mjs",
+    "admin:reset-laptop": "node scripts/reset-accounts.mjs --laptop",
     "load-check": "node scripts/load-check.mjs"
   },
   "devDependencies": {

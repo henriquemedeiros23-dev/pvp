@@ -61,6 +61,8 @@ const LIMITS = {
 };
 LIMITS.maxConnections = envInt('MAX_CONNECTIONS', LIMITS.maxPlayers * 3); // all game connections together
 // How many proxies (the host's HTTPS front door) sit in front of us. 0: X-Forwarded-* headers are ignored.
+// 'cloudflare' (#57): a Cloudflare Tunnel (cloudflared) on this same computer; CF-Connecting-IP is believed
+// only for connections from loopback, so every player has their own limits instead of all being 127.0.0.1.
 const TRUST_PROXY = parseTrustProxy(process.env.TRUST_PROXY);
 const TOO_MANY_TRIES = 'Too many tries. Wait a minute.';
 let stopping = false; // true once SIGTERM/SIGINT came: new requests and connections are turned away
@@ -403,6 +405,7 @@ const CLOSE_TOO_FAST = 4008;  // far too many messages
 const CLOSE_RESTART = 1012;   // the server is restarting (an update)
 const connsPerIp = createConcurrencyLimit({ max: LIMITS.connectionsPerIp });
 const wss = new WebSocketServer({ server, maxPayload: MAX_CLIENT_MESSAGE_SIZE });
+wss.on('error', () => {}); // it repeats the http server's errors; server.on('error') below explains them
 wss.on('connection', (ws, req) => {
   if (stopping) { ws.close(CLOSE_RESTART, 'restart'); return; }
   const ip = clientIp(req, { trustProxy: TRUST_PROXY });
@@ -441,8 +444,17 @@ wss.on('connection', (ws, req) => {
   ws.on('close', () => { leaveAlive(conn); pump(); });
 });
 
+// The port is taken (the game is already running in another window, or another program uses it): say so plainly.
+server.on('error', e => {
+  if (e.code === 'EADDRINUSE') console.error(`Port ${PORT} is already in use: is PvP Island already running in another window? Close it (Ctrl+C) or set another PORT.`);
+  else console.error('The server could not start:', e.message);
+  process.exit(1);
+});
+
 server.listen(PORT, () => {
   console.log(`PvP Island is running!`);
+  if (TRUST_PROXY === 'cloudflare') console.log('  Cloudflare Tunnel mode: players\' addresses come from CF-Connecting-IP, only for cloudflared on this computer.');
+  else if (TRUST_PROXY) console.log(`  Trusting ${TRUST_PROXY} proxy in front (X-Forwarded-For).`);
   console.log(`  On this computer:  http://localhost:${PORT}`);
   for (const list of Object.values(os.networkInterfaces())) {
     for (const n of list || []) if (n.family === 'IPv4' && !n.internal) console.log(`  On phones (same Wi-Fi): http://${n.address}:${PORT}`);

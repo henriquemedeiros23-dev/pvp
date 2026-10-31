@@ -4,7 +4,7 @@
 // Every server here is a real child process with its own temp accounts file.
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { spawn, execFileSync } from 'node:child_process';
+import { spawn, spawnSync, execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import http from 'node:http';
 import net from 'node:net';
@@ -92,9 +92,9 @@ async function signup(port, headers) {
 }
 
 /** Open a game connection. Resolves { ws, msgs, closed: Promise<code> } once open (or closed). */
-function connect(port, token) {
+function connect(port, token, headers = {}) {
   return new Promise(resolve => {
-    const ws = new WebSocket(`ws://127.0.0.1:${port}/?token=${encodeURIComponent(token)}`);
+    const ws = new WebSocket(`ws://127.0.0.1:${port}/?token=${encodeURIComponent(token)}`, { headers });
     const msgs = [];
     const closed = new Promise(r => ws.once('close', code => r(code)));
     ws.on('message', raw => { try { msgs.push(JSON.parse(String(raw))); } catch {} });
@@ -188,6 +188,14 @@ test('a bad limit setting refuses to start', async () => {
   await assert.rejects(start({ MAX_PLAYERS: 'lots' }), /MAX_PLAYERS must be a whole number/);
 });
 
+test('a port that is already in use: a plain message, not a crash (#57)', () => {
+  const env = { ...process.env, PORT: String(main.port), DATA_FILE: path.join(tempDir(), 'accounts.json') };
+  delete env.NODE_ENV; delete env.PVP_TEST_HOOKS;
+  const r = spawnSync(process.execPath, [SERVER], { env, encoding: 'utf8', timeout: 10000 });
+  assert.equal(r.status, 1);
+  assert.match(r.stderr, new RegExp(`Port ${main.port} is already in use`));
+});
+
 test('MAX_PLAYERS: the next player gets "full"', async () => {
   const s = await start({ MAX_PLAYERS: '1' });
   const a = await connect(s.port, (await signup(s.port)).token);
@@ -232,6 +240,39 @@ test('new accounts per address per day; X-Forwarded-For only counts with TRUST_P
   const page = await request(proxied.port, { path: '/', headers: { 'x-forwarded-proto': 'https' } });
   assert.ok(page.headers['strict-transport-security'], 'https behind a trusted proxy');
   await proxied.stop();
+});
+
+test('TRUST_PROXY=cloudflare (#57): each tunnel player has their own limits; https and wss through the tunnel', async () => {
+  const s = await start({ NODE_ENV: 'production', TRUST_PROXY: 'cloudflare', MAX_SIGNUPS_PER_IP_PER_DAY: '1', MAX_CONNECTIONS_PER_IP: '1' });
+  await waitFor(() => /Cloudflare Tunnel mode/.test(s.output()));
+  // cloudflared connects from this computer (127.0.0.1) and says who the player is in CF-Connecting-IP
+  const a = await signup(s.port, { 'cf-connecting-ip': '203.0.113.1' });
+  const b = await signup(s.port, { 'cf-connecting-ip': '203.0.113.2' });
+  const again = await post(s.port, '/api/signup', { name: newName(), password: 'secret1' }, { headers: { 'cf-connecting-ip': '203.0.113.2' } });
+  assert.equal(again.status, 429);
+  // X-Forwarded-For is not believed in this mode: without CF-Connecting-IP it is the laptop itself
+  await signup(s.port, { 'x-forwarded-for': '5.5.5.5' });
+  assert.equal((await post(s.port, '/api/signup', { name: newName(), password: 'secret1' }, { headers: { 'x-forwarded-for': '6.6.6.6' } })).status, 429);
+
+  // the page through the tunnel: https (HSTS) and its own wss:// allowed in the CSP
+  const tunnelHost = 'calm-fox-1234.trycloudflare.com';
+  const page = await request(s.port, { path: '/', headers: { host: tunnelHost, 'x-forwarded-proto': 'https', 'cf-visitor': '{"scheme":"https"}', 'cf-connecting-ip': '203.0.113.1' } });
+  assert.equal(page.status, 200);
+  assert.ok(page.headers['strict-transport-security'], 'https through the tunnel');
+  assert.match(page.headers['content-security-policy'], new RegExp(`wss://${tunnelHost.replace(/\./g, '\\.')}`));
+  assert.ok(!(await request(s.port, { path: '/' })).headers['strict-transport-security'], 'plain http on the laptop / Wi-Fi');
+
+  // game connections (the wss upgrade arrives as a normal WebSocket from cloudflared): counted per player
+  const wsA = await connect(s.port, a.token, { 'cf-connecting-ip': '203.0.113.1', 'x-forwarded-proto': 'https', host: tunnelHost });
+  const wsB = await connect(s.port, b.token, { 'cf-connecting-ip': '203.0.113.2', 'x-forwarded-proto': 'https', host: tunnelHost });
+  assert.equal(wsA.ws.readyState, WebSocket.OPEN);
+  assert.equal(wsB.ws.readyState, WebSocket.OPEN);
+  wsA.ws.send(JSON.stringify({ t: 'join' }));
+  await waitFor(() => wsA.msgs.some(m => m.t === 'welcome'));
+  const wsA2 = await connect(s.port, a.token, { 'cf-connecting-ip': '203.0.113.1' });
+  assert.equal(await wsA2.closed, 4029); // the same player address is limited (MAX_CONNECTIONS_PER_IP=1)
+  wsA.ws.close(); wsB.ws.close();
+  await s.stop();
 });
 
 test('SIGTERM: players in the arena get their bar things back, then accounts are saved', async () => {
