@@ -59,11 +59,11 @@ export function drawNameBar(g, v) {
 /**
  * A name bar: { object (THREE.Sprite, its bottom sits at its position), draw(view), fit({ visible, scale, y }),
  * measure(text, font), draws, view, dispose() }. Add `object` to the player's root (it faces the camera by itself).
- * opts.metersPerPx: world size of one CSS pixel at scale 1 (default 0.009). opts.createCanvas: make a canvas
+ * opts.metersPerPx: world size of one CSS pixel at scale 1 (default 0.0056, like NAME_BAR.metersPerPx). opts.createCanvas: make a canvas
  * (default document.createElement('canvas'); none in Node: then it draws nothing).
  * A wall between you and the player hides it for free (depth test on, no ray casts).
  */
-export function createNameBar({ metersPerPx = 0.009, createCanvas = defaultCanvas, renderOrder = 5 } = {}) {
+export function createNameBar({ metersPerPx = 0.0056, createCanvas = defaultCanvas, renderOrder = 5 } = {}) {
   const canvas = createCanvas();
   const g = canvas?.getContext?.('2d') ?? null;
   const material = new THREE.SpriteMaterial({ transparent: true, depthWrite: false, depthTest: true });

@@ -19,10 +19,10 @@ export const NAME_BAR = Object.freeze({
   hpInset: 10,        // the H.P bar is this much narrower than the pill on each side
   border: 1.5,        // thin light outline so the dark pill shows on dark ground too
   pixelRatio: 2,      // draw at 2x for retina screens
-  metersPerPx: 0.009, // world size of one CSS pixel when close (the 44 px tall bar is 0.4 m)
+  metersPerPx: 0.0056, // world size of one CSS pixel when close (the 44 px tall bar is about 0.25 m; #56: 62% of the #54 size)
   y: 2.1,             // the bottom of the bar, meters above the player's feet (over the head)
   nearDistance: 4,    // closer than this the bar keeps its world size (it gets a bit bigger as you walk up, not huge)
-  maxScale: 6,        // farther away it grows with distance (stays readable) up to this many times
+  maxScale: 3.5,      // farther away it grows with distance (stays readable) up to this many times (#56: was 6, far names stay small)
   hideDistance: 60,   // farther than this it is hidden
 });
 

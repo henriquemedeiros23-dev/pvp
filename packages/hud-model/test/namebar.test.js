@@ -76,3 +76,17 @@ test('damage numbers start above the name bar', () => {
     assert.ok(damageStartHeight(d) < fit.top + 0.5);
   }
 });
+
+test('#56: the bar is smaller than in #54 (about 62% up close) and grows less with distance, but stays readable', () => {
+  const h = NAME_BAR.pillH + NAME_BAR.gap + NAME_BAR.hpH;
+  const old = { metersPerPx: 0.009, maxScale: 6 }; // the #54 sizes
+  const close = nameBarFit(2).worldHeight / (h * old.metersPerPx);
+  assert.ok(close >= 0.58 && close <= 0.66, `up close: ${close.toFixed(2)} of the old size`);
+  assert.ok(NAME_BAR.maxScale <= 4, 'grows at most ~3.5x far away');
+  // on screen (world height / distance) far names are still at least ~1/4 of the near on-screen size
+  const near = nameBarFit(NAME_BAR.nearDistance).worldHeight / NAME_BAR.nearDistance;
+  const far = nameBarFit(NAME_BAR.hideDistance).worldHeight / NAME_BAR.hideDistance;
+  assert.ok(far < near && far > near / 5, 'far names are smaller on screen but not tiny');
+  // damage numbers still start just over the smaller bar
+  for (const d of [1, 10, 40]) assert.ok(Math.abs(damageStartHeight(d) - nameBarFit(d).top - 0.12) < 1e-9);
+});
