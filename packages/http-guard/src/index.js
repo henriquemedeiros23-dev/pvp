@@ -63,11 +63,21 @@ export function cspHash(text) {
   return 'sha256-' + crypto.createHash('sha256').update(text, 'utf8').digest('base64');
 }
 
-/** The CSP hashes of every inline <script> (without src) in an HTML text, e.g. the import map. */
+/**
+ * Line endings the way a browser reads an HTML page: every \r\n and every lone \r becomes \n
+ * (the HTML spec's "input stream preprocessing"). Browsers hash an inline script AFTER this,
+ * so a page saved with Windows line endings (CRLF) must be hashed the same way (issue #58).
+ */
+export function normalizeNewlines(text) {
+  return String(text).replace(/\r\n?/g, '\n');
+}
+
+/** The CSP hashes of every inline <script> (without src) in an HTML text, e.g. the import map. CRLF-safe. */
 export function inlineScriptHashes(html) {
   const out = [];
   const re = /<script\b([^>]*)>([\s\S]*?)<\/script>/gi;
-  for (let m; (m = re.exec(html));) {
+  const text = normalizeNewlines(html);
+  for (let m; (m = re.exec(text));) {
     if (/\bsrc\s*=/i.test(m[1])) continue;
     out.push(cspHash(m[2]));
   }

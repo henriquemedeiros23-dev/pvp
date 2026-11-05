@@ -11,6 +11,8 @@
   <link rel="manifest" href="/manifest.json">
   <link rel="icon" href="/icon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/style.css">
+  <!-- @pvp/boot-guard (#58): forms never reload the page; a message if the game code cannot load. Before the import map. -->
+  <script src="/packages/boot-guard/src/boot.js"></script>
   <script type="importmap">
     {
       "imports": {
@@ -45,6 +47,7 @@
   <section id="login" class="screen">
     <div class="panel account">
       <h1 class="logo">PvP<br><span>ISLAND</span></h1>
+      <p id="bootError" class="error boot-error" role="alert" hidden></p>
       <div class="account-parts">
         <form id="loginForm" class="account-part" autocomplete="on">
           <h2>Log in</h2>

@@ -331,3 +331,24 @@ De vez en cuando copie esa carpeta entera a un USB o a la nube (Google Drive, iC
 | A todos se les cortó el juego | La laptop se durmió o perdió el Wi-Fi. Vea el paso f, y vuelva a encender el juego y el túnel. |
 | "The island is very busy" | Demasiadas conexiones desde la misma casa o escuela (más de 20). Cierren pestañas que no usen. |
 | `npm install` da errores | Compruebe que tiene internet y que Node.js es la versión LTS. Escriba `npm install` otra vez. |
+
+### Si los botones no hacen nada en Windows
+
+Antes (issue #58), en algunas laptops con Windows los botones **Log in** y **Create account** no hacían nada
+(la página se recargaba y los cuadros quedaban vacíos). La causa: Git para Windows guardaba los archivos con otro
+tipo de fin de línea (CRLF) y el navegador bloqueaba el código del juego.
+
+- **Ya está arreglado.** Actualice el juego (paso h: `git pull`, `npm install`, `npm run serve`) y recargue la página.
+- Si después de actualizar todavía no funciona (o `git pull` se queja de cambios), en la carpeta del juego escriba,
+  uno por uno (las cuentas no se pierden, están en `pvp-island-data`):
+
+  ```
+  git config core.autocrlf false
+  git config core.eol lf
+  git rm --cached -r -q .
+  git reset --hard HEAD
+  ```
+
+  Luego vuelva a encender el juego (`npm run serve`).
+- Si el juego no puede cargar, ahora la pantalla de cuenta lo dice: *"The game could not load. Check your internet
+  and reload the page."* Revise el internet y recargue la página.

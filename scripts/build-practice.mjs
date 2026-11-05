@@ -11,6 +11,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { BOOT_SCRIPT_TAG, inlineBootScriptTag } from '@pvp/boot-guard';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PUBLIC = path.join(ROOT, 'apps', 'game', 'public');
@@ -75,6 +76,8 @@ export function singleFile(practiceHtml, js, { css, icon }) {
   html = replaceOnce(html, '<link rel="manifest" href="/manifest.json">\n', '', 'the manifest link');
   html = html.replace(/<link rel="icon" href="\/icon.svg"[^>]*>/, () => `<link rel="icon" href="data:image/svg+xml;base64,${Buffer.from(icon).toString('base64')}" type="image/svg+xml">`);
   html = replaceOnce(html, '<link rel="stylesheet" href="/style.css">', `<style>\n${css}</style>`, 'the stylesheet link');
+  // @pvp/boot-guard (#58): the early script goes inside too (forms never reload, a message if the game cannot load).
+  html = replaceOnce(html, BOOT_SCRIPT_TAG, inlineBootScriptTag(), 'the boot-guard script tag');
   const map = { imports: { three: THREE_CDN } };
   html = html.replace(IMPORT_MAP_RE, () => `<script type="importmap">${JSON.stringify(map)}</script>`);
   // "</script" inside the code would end the script tag early.
@@ -103,7 +106,7 @@ body { margin: 0; background: #16131f; }
 
 /**
  * The single file -> a fragment for a Claude artifact, which wraps it in its own doctype/html/head/body:
- * title, the viewport-fit meta, the import map, the styles, the game script, then the page markup.
+ * title, the viewport-fit meta, the boot-guard script, the import map, the styles, the game script, then the page markup.
  */
 export function artifactFile(html) {
   const map = IMPORT_MAP_RE.exec(html);
@@ -113,12 +116,15 @@ export function artifactFile(html) {
   const scriptEnd = html.lastIndexOf('</script>');
   if (bodyStart < 0 || scriptStart < 0 || scriptEnd < scriptStart) throw new Error('build-practice: page layout not as expected');
   const head = html.slice(0, bodyStart);
+  const boot = /<script>\n[\s\S]*?<\/script>/.exec(head);
+  if (!boot) throw new Error('build-practice: no boot-guard script');
   const styles = [...head.matchAll(/<style>[\s\S]*?<\/style>/g)].map(m => m[0]);
   const markup = html.slice(bodyStart + '<body>'.length, scriptStart).trim();
   const script = html.slice(scriptStart, scriptEnd + '</script>'.length);
   return [
     `<title>${ARTIFACT_TITLE}</title>`,
     '<meta name="claude:viewport-fit-sides" content="cover">',
+    boot[0],
     map[0],
     ...styles,
     `<style>${ARTIFACT_CSS}</style>`,

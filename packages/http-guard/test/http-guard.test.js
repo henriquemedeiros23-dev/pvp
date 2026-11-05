@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { safeHost, contentSecurityPolicy, securityHeaders, cspHash, inlineScriptHashes, parseTrustProxy, clientIp, isHttps, safeJoin, isLoopback, CLOUDFLARE } from '../src/index.js';
+import { safeHost, contentSecurityPolicy, securityHeaders, cspHash, inlineScriptHashes, normalizeNewlines, parseTrustProxy, clientIp, isHttps, safeJoin, isLoopback, CLOUDFLARE } from '../src/index.js';
 
 test('safeHost: normal hosts pass, header tricks do not', () => {
   assert.equal(safeHost('PvP.onrender.com'), 'pvp.onrender.com');
@@ -38,6 +38,17 @@ test('inline script hashes: inline scripts only, same as sha256 base64', () => {
   const expected = t => 'sha256-' + crypto.createHash('sha256').update(t).digest('base64');
   assert.deepEqual(inlineScriptHashes(html), [expected('{"a":1}'), expected('go()')]);
   assert.equal(cspHash('go()'), expected('go()'));
+});
+
+test('inlineScriptHashes: Windows line endings (CRLF, lone CR) hash like LF, the way browsers do (#58)', () => {
+  const lf = '<head>\n<script type="importmap">\n  { "imports": {\n    "a": "/a.js"\n  } }\n</script>\n</head>';
+  const crlf = lf.replace(/\n/g, '\r\n');
+  const cr = lf.replace(/\n/g, '\r');
+  assert.deepEqual(inlineScriptHashes(crlf), inlineScriptHashes(lf));
+  assert.deepEqual(inlineScriptHashes(cr), inlineScriptHashes(lf));
+  // the browser hashes the text with \n only
+  assert.deepEqual(inlineScriptHashes(crlf), [cspHash('\n  { "imports": {\n    "a": "/a.js"\n  } }\n')]);
+  assert.equal(normalizeNewlines('a\r\nb\rc\nd\r\n\r'), 'a\nb\nc\nd\n\n');
 });
 
 test('parseTrustProxy', () => {

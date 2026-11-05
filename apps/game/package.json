@@ -13,6 +13,7 @@
     "@pvp/accounts-shop": "*",
     "@pvp/api-client": "*",
     "@pvp/arena": "*",
+    "@pvp/boot-guard": "*",
     "@pvp/collision": "*",
     "@pvp/file-backup": "*",
     "@pvp/game-rules": "*",

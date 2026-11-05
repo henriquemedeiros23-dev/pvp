@@ -47,6 +47,8 @@ input:focus { border-color: var(--gold); }
 .account-part input { padding: 12px 14px; }
 .account-part .error { margin: 0; }
 .account-part .error:empty { display: none; }
+.boot-error { margin: 0 0 10px; }
+.boot-error[hidden] { display: none; }
 @media (min-width: 640px) { .account-parts { grid-template-columns: 1fr 1fr; } }
 @media (orientation: landscape) and (max-height: 500px) {
   #login { padding: 8px calc(12px + var(--safe-r)) 8px calc(12px + var(--safe-l)); }

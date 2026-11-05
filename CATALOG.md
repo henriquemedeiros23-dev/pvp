@@ -74,7 +74,8 @@ and `@pvp/file-backup` need no other package (the last three keep the online ser
 | `@pvp/local-server` | The game server inside the page (practice mode): arena, accounts in localStorage, tick, fake WebSocket, bots. | browser (also Node) | partly: seeded arena and bots, time and timer passed in; tokens and localStorage are real | 24 |
 | `@pvp/leaderboard` | The ranking: top 50 players by knockouts (a tie: who got there first), your own place even outside the top, 🥇🥈🥉 rows for the screen. | both | fully: pure functions (the knockout time is passed in) | 8 |
 | `@pvp/rate-limit` | Limits for an online server: token buckets (per key), open connections per key, a quota per time window, login brute-force protection with a wait that doubles. | both | fully: time is passed in | 9 |
-| `@pvp/http-guard` | Security headers (CSP: only self + cdn.jsdelivr.net + inline scripts by hash, no framing), the client IP and https behind a trusted proxy (a number of proxies, or a Cloudflare Tunnel on the same computer), safe static paths. | Node | fully: pure functions of the request and HTML | 12 |
+| `@pvp/http-guard` | Security headers (CSP: only self + cdn.jsdelivr.net + inline scripts by hash, no framing), the client IP and https behind a trusted proxy (a number of proxies, or a Cloudflare Tunnel on the same computer), safe static paths; inline script hashes read Windows line endings like a browser (#58). | Node | fully: pure functions of the request and HTML | 13 |
+| `@pvp/boot-guard` | The page's tiny early script (#58): forms never reload the page, and "The game could not load. Check your internet and reload the page." shows when the game's module code cannot start (import map blocked, CDN unreachable, an error while loading). | browser (classic script; Node side gives its text for builds) | partly: decisions are a function of the page events (tested with fake events), real loading and the short wait follow real time | 8 |
 | `@pvp/file-backup` | Daily backups of a data file (keep the last N), atomic writes, and a launch-day reset that backs up first and wipes again on the next start. | Node | partly: decisions from the time passed in, files are real I/O | 8 |
 | `@pvp/touch-controls` | Joystick, aim by dragging, buttons, held actions (shield), toggled actions (aim: on until pressed again), buttons that hide and show, keyboard and mouse (hold right click = shield, Shift = aim on/off). | browser (core also in Node) | partly: the core is pure, the DOM part depends on real fingers and mice | 28 |
 | `@pvp/sound` | Every game sound made in code with Web Audio (guns, swords, shields, hits, headshot ding, bombs, chests, coins, potions, footsteps, menu clicks; no audio files): recipes as data, a seeded planner, 3D sound (distance + stereo pan) with a cap on sounds at once, which sounds a server message makes, the 🔊 mute button and Sounds volume slider (saved per browser). | both (player and buttons: browser) | partly: recipes, planner, mixer math and message mapping are pure and seeded; real playback follows the audio clock | 26 |
@@ -465,13 +466,26 @@ and `@pvp/file-backup` need no other package (the last three keep the online ser
 |---|---|
 | `securityHeaders({ scriptHashes, host, https })` | `res.writeHead(200, { ...securityHeaders({ scriptHashes: inlineScriptHashes(html), host: req.headers.host }) })` |
 | `contentSecurityPolicy(opts)` / `DEFAULT_SCRIPT_HOSTS` | `"default-src 'self'; script-src 'self' https://cdn.jsdelivr.net 'sha256-...'; ... frame-ancestors 'none'"` |
-| `inlineScriptHashes(html)` / `cspHash(text)` | `inlineScriptHashes(indexHtml); // ['sha256-...'] for the import map` |
+| `inlineScriptHashes(html)` / `cspHash(text)` / `normalizeNewlines(text)` | `inlineScriptHashes(indexHtml); // ['sha256-...'] for the import map; CRLF hashed like LF, as browsers do (#58)` |
 | `parseTrustProxy(env)` / `clientIp(req, { trustProxy })` / `isHttps(req, { trustProxy })` | `clientIp(req, { trustProxy: parseTrustProxy(process.env.TRUST_PROXY) }); // X-Forwarded-For only when trusted` |
 | `CLOUDFLARE` / `isLoopback(ip)` (#57) | `clientIp(req, { trustProxy: 'cloudflare' }); // CF-Connecting-IP, only when the peer is 127.0.0.1/::1 (cloudflared)` |
 | `safeJoin(root, urlPath)` / `safeHost(host)` | `safeJoin(publicDir, '/js/../../x'); // null: refuse` |
 
 **Depends on:** nothing (Node's `crypto`, `net` and `path`).
 **Determinism:** fully. Pure functions of their inputs.
+
+## `@pvp/boot-guard`
+
+**Purpose:** a page whose code is an ES module must never "do nothing" (#58). `src/boot.js` is a classic script loaded first (before the import map): it stops every native form submit (no reload, the boxes keep what was typed) and, if the module code cannot start (a `script-src` CSP block, a script that failed to fetch, an error before ready, or no ready 1.5 s after load), shows the message in `#bootError`.
+
+| Export | Example |
+|---|---|
+| `src/boot.js` (browser, classic script) | `<script src="/packages/boot-guard/src/boot.js"></script>` then `globalThis.pvpBoot?.ready()` when the game's handlers are set up |
+| `BOOT_SCRIPT_TAG` / `inlineBootScriptTag()` / `bootScriptSource()` | `html.replace(BOOT_SCRIPT_TAG, () => inlineBootScriptTag()); // single-file practice build` |
+| `BOOT_MESSAGE` / `BOOT_SCRIPT_URL` / `BOOT_SCRIPT_FILE` | `'The game could not load. Check your internet and reload the page.'` |
+
+**Depends on:** nothing (Node's `fs` for reading its own script).
+**Determinism:** partly. The decisions are a plain function of the page events it gets (tests run it in `node:vm` with fake events and hand-run timers); in a browser they follow real loading and time.
 
 ## `@pvp/file-backup`
 

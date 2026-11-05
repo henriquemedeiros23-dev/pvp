@@ -1,0 +1,23 @@
+# Issue #58: text files always use LF line endings, also on Windows (Git for Windows defaults to core.autocrlf=true,
+# which gave index.html CRLF line endings there). Pictures and other binary files are never touched.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.avif binary
+*.bmp binary
+*.mp3 binary
+*.ogg binary
+*.wav binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.otf binary
+*.zip binary
+*.gz binary
+*.pdf binary
+*.glb binary

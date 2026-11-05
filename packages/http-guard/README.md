@@ -33,7 +33,11 @@ every visitor arrives from 127.0.0.1. Then `clientIp` uses the `CF-Connecting-IP
 `isHttps` uses `X-Forwarded-Proto` or `CF-Visitor`, but **only** when the socket peer is loopback (`isLoopback(ip)`).
 Visitors on the local Wi-Fi keep their own address and cannot fake the header; `X-Forwarded-For` is ignored in this mode.
 
-Also: `contentSecurityPolicy(opts)` (just the CSP text), `cspHash(text)`, `safeHost(host)` and `DEFAULT_SCRIPT_HOSTS`.
+`inlineScriptHashes(html)` reads line endings like a browser does: Windows line endings (`\r\n`, also a lone `\r`)
+become `\n` before hashing (`normalizeNewlines(text)`), so a page saved on Windows still gets the right hash (issue #58).
+Without this, a Windows clone's CRLF `index.html` got a wrong hash, the browser blocked the import map and no game code ran.
+
+Also: `contentSecurityPolicy(opts)` (just the CSP text), `cspHash(text)`, `normalizeNewlines(text)`, `safeHost(host)` and `DEFAULT_SCRIPT_HOSTS`.
 
 ## Determinism
 

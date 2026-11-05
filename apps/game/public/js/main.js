@@ -541,3 +541,5 @@ async function invAction(call) {
 // Always the Account screen first (#46): the saved token is forgotten, so a password is needed every time.
 api.logout();
 goLogin();
+// @pvp/boot-guard (#58): the game code runs, so the "could not load" message is not needed.
+globalThis.pvpBoot?.ready();

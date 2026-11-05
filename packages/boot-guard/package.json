@@ -1,0 +1,15 @@
+{
+  "name": "@pvp/boot-guard",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A tiny early classic script for a page whose code is an ES module: forms never reload the page, and a kid-simple message shows when the module code could not load.",
+  "type": "module",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./boot.js": "./src/boot.js"
+  },
+  "scripts": {
+    "test": "node --test"
+  }
+}
