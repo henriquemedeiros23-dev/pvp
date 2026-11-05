@@ -92,7 +92,7 @@ The live list is on GitHub Issues: https://github.com/henriquemedeiros23-dev/pvp
 | 55 | ✅ | **Sounds (no music)** | Shots, swords, bombs, chests, coins and headshots, with volume and mute. No music. |
 | 56 | ✅ | **Smaller name bars** | The name bars above players are a bit too big. |
 | 57 | ✅ | **Laptop server + Cloudflare Tunnel** | Free way to play online: the laptop runs the game, Cloudflare gives the link. Spanish guide. |
-| 58 | 🔲 | **Bug: Create account disappears** | The form reloads the page when the game script did not load; never reload, show a clear message. |
+| 59 | 🔲 | **Bug: Create account disappears** | The form reloads the page when the game script did not load; never reload, show a clear message. |
 
 ## Later ideas
 - ~~Sounds and music~~ (done in #55, no music)
